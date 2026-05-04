@@ -1,22 +1,20 @@
 #!/bin/bash
-# Launch Kiosk - Starts Chromium in kiosk mode
+# Launch Kiosk - Starts Chromium in kiosk mode for Shotclock Pi Kiosk
 
 export DISPLAY=:0
 
-# Optional: Set resolution
-# export DISPLAY=:0.0
-
-# Optional: Uncomment for HDMI audio
-# export AUDIO_DEVICE=both
-
 echo "Launching Shotclock Kiosk..."
 
+# Launch Chromium in full kiosk mode pointing to the local Pi Agent API
 chromium-browser \
   --kiosk \
   --no-sandbox \
   --disable-dev-shm-usage \
   --disable-gpu \
   --disable-software-rasterizer \
+  --disable-background-timer-throttling \
+  --disable-backgrounding-occluded-windows \
+  --disable-renderer-backgrounding \
   --disable-extensions \
   --disable-translate \
   --disable-background-networking \
@@ -25,8 +23,6 @@ chromium-browser \
   --no-first-run \
   --noerrdialogs \
   --ignore-gpu-blocklist \
-  --enable-features=UseOzonePlatform \
-  --ozone-platform=headless \
   http://localhost:3001
 
 echo "Kiosk closed."
