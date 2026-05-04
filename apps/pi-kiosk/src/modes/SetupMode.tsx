@@ -1,19 +1,11 @@
 // Setup Mode - Shows setup AP SSID/password/portal URL
 
-import { useState, useEffect } from 'react';
-
-interface SetupInfo {
-  apSsid: string;
-  apPassword: string;
-  portalUrl: string;
-}
-
 export default function SetupMode() {
-  const [setupInfo, setSetupInfo] = useState<SetupInfo>({
+  const setupInfo = {
     apSsid: 'Shotclock-Setup',
     apPassword: 'shotclock123',
-    portalUrl: 'http://192.168.4.1:3001',
-  });
+    portalUrl: 'http://192.168.4.1:8080',
+  };
 
   return (
     <div className="w-full h-full flex flex-col items-center justify-center bg-black text-white p-8">
@@ -44,7 +36,7 @@ export default function SetupMode() {
         </div>
         
         <div className="text-gray-500 text-sm">
-          <p>1. Connect to &quot;{setupInfo.apSsid}&quot; WiFi network</p>
+          <p>1. Connect to "{setupInfo.apSsid}" WiFi network</p>
           <p>2. Open {setupInfo.portalUrl} in your browser</p>
           <p>3. Follow the setup instructions</p>
         </div>

@@ -3,17 +3,12 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
-import type { DeviceMode, TimerStatePayload, DisplayConfigPayload } from '@shotclock/shared/types';
+import type { DeviceMode, TimerState, DisplayProfile } from '@shotclock/shared/types';
 
-export interface CachedState {
+export interface DeviceState {
   mode: DeviceMode;
-  timerState?: TimerStatePayload;
-  config?: DisplayConfigPayload;
-  lastUpdated: number;
-}
-
-export interface DeviceState extends CachedState {
-  displayProfile: DisplayConfigPayload['displayProfile'];
+  timerState?: TimerState;
+  displayProfile: DisplayProfile;
   calibrationData?: {
     x: number;
     y: number;
@@ -22,30 +17,33 @@ export interface DeviceState extends CachedState {
     rotation: number;
     timestamp: number;
   };
+  lastUpdated: number;
 }
 
 const STATE_DIR = path.join(os.homedir(), '.shotclock');
 const STATE_FILE = path.join(STATE_DIR, 'state.json');
 
+const DEFAULT_DISPLAY_PROFILE: DisplayProfile = {
+  id: 'default-generic',
+  name: 'Default Generic Display',
+  controllerType: 'generic',
+  viewport: { x: 0, y: 0, width: 1920, height: 1080, rotation: 0, scaleX: 1, scaleY: 1 },
+  safeZone: { top: 40, right: 40, bottom: 40, left: 40 },
+  fontSize: { shotClock: 200, gameClock: 120, score: 150, period: 80, label: 40 },
+  colors: {
+    background: '#000000',
+    foreground: '#ffffff',
+    accent: '#00ff00',
+    homeTeam: '#ff0000',
+    awayTeam: '#0000ff',
+    warning: '#ffff00',
+    danger: '#ff0000',
+  },
+};
+
 const DEFAULT_STATE: DeviceState = {
   mode: { type: 'setup' },
-  displayProfile: {
-    id: 'default-generic',
-    name: 'Default Generic Display',
-    controllerType: 'generic',
-    viewport: { x: 0, y: 0, width: 1920, height: 1080, rotation: 0, scaleX: 1, scaleY: 1 },
-    safeZone: { top: 40, right: 40, bottom: 40, left: 40 },
-    fontSize: { shotClock: 200, gameClock: 120, score: 150, period: 80, label: 40 },
-    colors: {
-      background: '#000000',
-      foreground: '#ffffff',
-      accent: '#00ff00',
-      homeTeam: '#ff0000',
-      awayTeam: '#0000ff',
-      warning: '#ffff00',
-      danger: '#ff0000',
-    },
-  },
+  displayProfile: DEFAULT_DISPLAY_PROFILE,
   lastUpdated: Date.now(),
 };
 
@@ -103,7 +101,7 @@ export function resetState(): DeviceState {
   return { ...DEFAULT_STATE, lastUpdated: Date.now() };
 }
 
-export function updateTimerState(timerState: TimerStatePayload): DeviceState {
+export function updateTimerState(timerState: TimerState): DeviceState {
   return saveState({ timerState });
 }
 

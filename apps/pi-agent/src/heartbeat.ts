@@ -1,15 +1,12 @@
 // Heartbeat - Periodic heartbeat loop
 
 import { loadIdentity } from './identity.js';
-import { sendHeartbeat, getSocket, isConnected } from './socket-client.js';
+import { sendHeartbeat, isConnected } from './socket-client.js';
 
 let heartbeatInterval: ReturnType<typeof setInterval> | null = null;
 let stopped = false;
 
-export function startHeartbeat(
-  socket: any,
-  identity: ReturnType<typeof loadIdentity>
-): () => void {
+export function startHeartbeat(): () => void {
   const interval = 30000; // 30 seconds
   
   console.log(`Starting heartbeat every ${interval / 1000} seconds`);

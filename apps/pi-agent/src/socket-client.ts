@@ -3,11 +3,19 @@
 import { io, Socket } from 'socket.io-client';
 import type { DeviceIdentity } from './identity.js';
 import type { AgentConfig } from './config-store.js';
-import type { DeviceToServerEvents, ServerToDeviceEvents, HelloPayload, HeartbeatPayload } from '@shotclock/shared/types';
+import type { ServerToDeviceEvents, HelloPayload, HeartbeatPayload } from '@shotclock/shared/types';
 import { loadState, saveState } from './state-store.js';
 import type { UpdateManager } from './update-manager.js';
 
-export type TypedSocket = Socket<ServerToDeviceEvents, DeviceToServerEvents>;
+export type TypedSocket = Socket<ServerToDeviceEvents, DeviceToDeviceEvents>;
+
+interface DeviceToDeviceEvents {
+  'device:hello': (data: HelloPayload) => void;
+  'device:heartbeat': (data: HeartbeatPayload) => void;
+  'device:state:ack': (data: { success: boolean; error?: string }) => void;
+  'device:config:ack': (data: { success: boolean; error?: string }) => void;
+  'device:update:status': (data: { deviceId: string; status: string; progress?: number; version?: string; error?: string }) => void;
+}
 
 let socket: TypedSocket | null = null;
 let reconnectAttempts = 0;
@@ -42,18 +50,18 @@ export function setupSocketClient(
   });
 
   // Handle disconnection
-  socket.on('disconnect', (reason) => {
+  socket.on('disconnect', (reason: string) => {
     console.log('Disconnected from server:', reason);
   });
 
   // Handle reconnect
-  socket.on('reconnect', (attempt) => {
+  socket.on('reconnect' as any, (attempt: number) => {
     console.log('Reconnected after', attempt, 'attempts');
     sendHello(identity);
   });
 
   // Handle reconnect error
-  socket.on('reconnect_error', (error) => {
+  socket.on('reconnect_error' as any, (error: Error) => {
     console.error('Reconnection error:', error);
     reconnectAttempts++;
   });
@@ -65,9 +73,9 @@ export function setupSocketClient(
   });
 
   // Handle config update from server
-  socket.on('config:update', (config) => {
+  socket.on('config:update', (configUpdate) => {
     console.log('Received config update');
-    saveState({ config });
+    saveState({ displayProfile: configUpdate.displayProfile });
   });
 
   // Handle mode set from server
@@ -83,7 +91,7 @@ export function setupSocketClient(
   });
 
   // Handle update install
-  socket.on('update:install', async (version) => {
+  socket.on('update:install', async (version: string) => {
     console.log('Received update install request for version:', version);
     await updateManager.installUpdate(version);
   });
@@ -99,7 +107,13 @@ export function setupSocketClient(
   socket.on('ping', () => {
     console.log('Received ping');
     if (socket) {
-      socket.emit('pong');
+      socket.emit('device:heartbeat', {
+        deviceId: identity.deviceId,
+        mode: { type: 'offline' },
+        displayState: { mode: { type: 'offline' } },
+        networkStatus: { signalStrength: 0, isConnected: false },
+        timestamp: Date.now(),
+      });
     }
   });
 
@@ -159,7 +173,7 @@ export function sendConfigAck(success: boolean, error?: string): void {
   socket.emit('device:config:ack', { success, error });
 }
 
-export function sendUpdateStatus(status: any): void {
+export function sendUpdateStatus(status: { deviceId: string; status: string; progress?: number; version?: string; error?: string }): void {
   if (!socket) return;
   socket.emit('device:update:status', status);
 }

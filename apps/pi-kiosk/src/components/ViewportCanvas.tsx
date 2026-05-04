@@ -1,7 +1,6 @@
 // ViewportCanvas - Main canvas with CSS transform based on calibration
 
 import { ReactNode } from 'react';
-import type { DisplayProfile } from '@shotclock/shared/types';
 import { useDisplayProfile } from '../hooks/useDisplayProfile';
 
 interface ViewportCanvasProps {

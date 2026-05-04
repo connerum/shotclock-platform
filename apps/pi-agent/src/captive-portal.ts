@@ -1,23 +1,35 @@
 // Captive Portal - Express server for setup on 192.168.4.1
 
 import express, { Request, Response } from 'express';
-import type { CaptivePortalConfig, SetupState } from '@shotclock/shared/types';
 import { setupAP } from './setup-ap.js';
 import { wifiManager } from './wifi-manager.js';
-import { saveConfig, loadConfig } from './config-store.js';
+import { saveConfig } from './config-store.js';
 import { markAsPaired } from './identity.js';
-import { getPairingCode, regeneratePairingCode } from './pairing-code.js';
+
+interface SetupState {
+  step: 'initial' | 'ap_created' | 'network_selected' | 'network_connected' | 'complete';
+  ssid?: string;
+  password?: string;
+}
+
+interface CaptivePortalConfig {
+  apSsid: string;
+  apPassword: string;
+  apChannel: number;
+  serverIp: string;
+  serverPort: number;
+}
 
 const DEFAULT_CONFIG: CaptivePortalConfig = {
   apSsid: 'Shotclock-Setup',
   apPassword: 'shotclock123',
   apChannel: 6,
   serverIp: '192.168.4.1',
-  serverPort: 3001,
+  serverPort: 8080,
 };
 
 const portalApp = express();
-let server: ReturnType<typeof server.listen> | null = null;
+let server: ReturnType<typeof portalApp.listen> | null = null;
 let setupState: SetupState = { step: 'initial' };
 
 /**
@@ -27,15 +39,14 @@ export function startCaptivePortal(config: Partial<CaptivePortalConfig> = {}): v
   const portalConfig = { ...DEFAULT_CONFIG, ...config };
   
   portalApp.use(express.json());
-  portalApp.use(express.static('public'));
   
   // Setup state endpoint
-  portalApp.get('/api/setup/status', (req: Request, res: Response) => {
-    res.json({ state: setupState });
+  portalApp.get('/api/setup/status', (_req: Request, res: Response) => {
+    res.json({ state: setupState, configured: setupState.step === 'complete' });
   });
   
   // WiFi networks endpoint
-  portalApp.get('/api/wifi/networks', async (req: Request, res: Response) => {
+  portalApp.get('/api/wifi/networks', async (_req: Request, res: Response) => {
     try {
       const networks = await wifiManager.scan();
       res.json({ networks });
@@ -61,7 +72,7 @@ export function startCaptivePortal(config: Partial<CaptivePortalConfig> = {}): v
       if (success) {
         setupState = { 
           ...setupState, 
-          step: 'network_connected', 
+          step: 'network_connected',
           ssid,
           password 
         };
@@ -116,66 +127,76 @@ export function startCaptivePortal(config: Partial<CaptivePortalConfig> = {}): v
   });
   
   // Fallback to setup page
-  portalApp.get('*', (req: Request, res: Response) => {
-    res.send(`
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <title>Shotclock Setup</title>
-        <meta name="viewport" content="width=device-width, initial-scale=1">
-        <style>
-          body { font-family: Arial, sans-serif; max-width: 500px; margin: 50px auto; padding: 20px; background: #000; color: #fff; }
-          h1 { color: #00ff00; }
-          .status { background: #222; padding: 15px; border-radius: 8px; margin: 10px 0; }
-          .btn { background: #00ff00; color: #000; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; margin: 5px; }
-          .btn:hover { background: #00cc00; }
-          input { background: #333; color: #fff; border: 1px solid #444; padding: 10px; border-radius: 5px; width: 100%; margin: 5px 0; }
-          .network { background: #222; padding: 10px; margin: 5px 0; border-radius: 5px; cursor: pointer; }
-          .network:hover { background: #333; }
-        </style>
-      </head>
-      <body>
-        <h1>Shotclock Setup</h1>
-        <div id="status" class="status">
-          <p><strong>Step:</strong> <span id="step">${setupState.step}</span></p>
-          <p><strong>AP:</strong> ${portalConfig.apSsid}</p>
-        </div>
-        <div id="networks"></div>
-        <script>
-          async function refresh() {
-            const res = await fetch('/api/setup/status');
-            const { state } = await res.json();
-            document.getElementById('step').textContent = state.step;
-            
-            if (state.step === 'initial' || state.step === 'device_connected') {
-              loadNetworks();
-            }
-          }
-          
-          async function loadNetworks() {
-            const res = await fetch('/api/wifi/networks');
-            const { networks } = await res.json();
-            document.getElementById('networks').innerHTML = networks.map(n => 
-              '<div class=\"network\" onclick=\"connect(\\'' + n.ssid + '\\')\">' + n.ssid + ' (' + n.signalStrength + '%)</div>'
-            ).join('');
-          }
-          
-          async function connect(ssid) {
-            const password = prompt('Enter password for ' + ssid);
-            await fetch('/api/wifi/connect', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ ssid, password })
-            });
-            refresh();
-          }
-          
-          refresh();
-          setInterval(refresh, 3000);
-        </script>
-      </body>
-      </html>
-    `);
+  portalApp.get('/setup', (_req: Request, res: Response) => {
+    res.send(`<!DOCTYPE html>
+<html>
+<head>
+  <title>Shotclock Setup</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    body { font-family: Arial, sans-serif; max-width: 500px; margin: 50px auto; padding: 20px; background: #000; color: #fff; }
+    h1 { color: #00ff00; }
+    .status { background: #222; padding: 15px; border-radius: 8px; margin: 10px 0; }
+    .btn { background: #00ff00; color: #000; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; margin: 5px; }
+    .btn:hover { background: #00cc00; }
+    input { background: #333; color: #fff; border: 1px solid #444; padding: 10px; border-radius: 5px; width: 100%; margin: 5px 0; }
+    .network { background: #222; padding: 10px; margin: 5px 0; border-radius: 5px; cursor: pointer; }
+    .network:hover { background: #333; }
+    .info { background: #111; border: 1px solid #00ff00; padding: 15px; border-radius: 8px; margin: 10px 0; text-align: center; }
+  </style>
+</head>
+<body>
+  <h1>Shotclock Setup</h1>
+  <div class="info">
+    <p><strong>Connect to: ${portalConfig.apSsid}</strong></p>
+    <p>Password: ${portalConfig.apPassword}</p>
+  </div>
+  <div id="status" class="status">
+    <p><strong>Step:</strong> <span id="step">${setupState.step}</span></p>
+  </div>
+  <div id="networks"></div>
+  <script>
+    async function refresh() {
+      const res = await fetch('/api/setup/status');
+      const data = await res.json();
+      document.getElementById('step').textContent = data.state.step;
+      
+      if (data.state.step === 'initial' || data.state.step === 'ap_created') {
+        loadNetworks();
+      }
+      
+      if (data.state.step === 'complete') {
+        document.getElementById('status').innerHTML = '<p style="color:#00ff00">Setup Complete! Restarting...</p>';
+      }
+    }
+    
+    async function loadNetworks() {
+      try {
+        const res = await fetch('/api/wifi/networks');
+        const { networks } = await res.json();
+        document.getElementById('networks').innerHTML = networks.map(n => 
+          '<div class="network" onclick="connect(\\'' + n.ssid + '\\')">' + n.ssid + ' (' + n.signalStrength + '%)</div>'
+        ).join('');
+      } catch (e) {
+        document.getElementById('networks').innerHTML = '<p>Loading networks...</p>';
+      }
+    }
+    
+    async function connect(ssid) {
+      const password = prompt('Enter password for ' + ssid);
+      await fetch('/api/wifi/connect', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ssid, password })
+      });
+      refresh();
+    }
+    
+    refresh();
+    setInterval(refresh, 3000);
+  </script>
+</body>
+</html>`);
   });
   
   server = portalApp.listen(portalConfig.serverPort, portalConfig.serverIp, () => {

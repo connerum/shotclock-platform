@@ -12,14 +12,26 @@ import ViewportCanvas from './components/ViewportCanvas';
 
 type KioskMode = 'setup' | 'pairing' | 'offline' | 'shot-clock' | 'media' | 'calibration' | 'blank';
 
+interface ShotClockState {
+  mode?: { type: string };
+  timerState?: {
+    shotClock: number;
+    gameClock: number;
+    homeScore: number;
+    awayScore: number;
+    period?: number;
+    isRunning: boolean;
+  };
+}
+
 export default function App() {
   const { state, config, isLoading } = useLocalApi();
-  const displayProfile = useDisplayProfile(config?.displayProfile);
+  const displayProfile = useDisplayProfile(config?.displayProfile ?? null);
   const [currentMode, setCurrentMode] = useState<KioskMode>('pairing');
 
   useEffect(() => {
     if (state?.mode?.type) {
-      setCurrentMode(state.mode.type);
+      setCurrentMode(state.mode.type as KioskMode);
     }
   }, [state?.mode]);
 
@@ -43,7 +55,7 @@ export default function App() {
       case 'offline':
         return <OfflineMode />;
       case 'shot-clock':
-        return <ShotClockMode state={state} />;
+        return <ShotClockMode state={state as ShotClockState | undefined} />;
       case 'media':
         return <MediaMode />;
       case 'calibration':
@@ -51,7 +63,7 @@ export default function App() {
       case 'blank':
         return <BlankMode />;
       default:
-        return <ShotClockMode state={state} />;
+        return <ShotClockMode state={state as ShotClockState | undefined} />;
     }
   };
 

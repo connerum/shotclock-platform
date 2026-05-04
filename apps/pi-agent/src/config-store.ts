@@ -22,7 +22,7 @@ const CONFIG_DIR = path.join(os.homedir(), '.shotclock');
 const CONFIG_FILE = path.join(CONFIG_DIR, 'config.json');
 
 const DEFAULT_CONFIG: AgentConfig = {
-  serverUrl: process.env.SERVER_URL || 'http://localhost:3000',
+  serverUrl: process.env.SERVER_URL || 'http://localhost:3030',
   mode: 'setup',
   heartbeatInterval: 30000,
   pairingCodeLength: 6,

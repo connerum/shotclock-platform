@@ -6,13 +6,6 @@ type CalibrationStep = 'grid' | 'corners' | 'complete';
 
 export default function CalibrationMode() {
   const [step, setStep] = useState<CalibrationStep>('grid');
-  const [calibrationData, setCalibrationData] = useState({
-    x: 0,
-    y: 0,
-    scaleX: 1,
-    scaleY: 1,
-    rotation: 0,
-  });
 
   const renderGrid = () => (
     <div className="w-full h-full relative">

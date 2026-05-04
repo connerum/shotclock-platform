@@ -6,19 +6,24 @@ import type { AgentConfig } from './config-store.js';
 import type { TypedSocket } from './socket-client.js';
 import type { UpdateManager } from './update-manager.js';
 import type { OfflineMode } from './offline-mode.js';
-import { loadState, saveState, resetState } from './state-store.js';
+import { loadState, saveState } from './state-store.js';
 import { getPairingCode, regeneratePairingCode, getPairingCodeTimeRemaining, formatTimeRemaining } from './pairing-code.js';
-import { loadConfig, saveConfig } from './config-store.js';
-import { loadIdentity } from './identity.js';
-import { getStatus, getSavedNetworks, scan as wifiScan, connect as wifiConnect, forget as wifiForget } from './wifi-manager.js';
-import type { SetupState } from '@shotclock/shared/types';
+import { saveConfig as saveAgentConfig, loadConfig as loadAgentConfig } from './config-store.js';
+import { setupAP } from './setup-ap.js';
+import { wifiManager } from './wifi-manager.js';
+import type { DeviceMode, TimerState } from '@shotclock/shared/types';
+
+interface SetupState {
+  step: 'initial' | 'ap_created' | 'network_selected' | 'network_connected' | 'complete';
+  ssid?: string;
+}
 
 export function startLocalApi(
   identity: DeviceIdentity,
   config: AgentConfig,
-  socket: TypedSocket,
+  _socket: TypedSocket,
   updateManager: UpdateManager,
-  offlineMode: OfflineMode
+  _offlineMode: OfflineMode
 ): void {
   const app = express();
   const port = config.localApiPort || 3001;
@@ -26,9 +31,9 @@ export function startLocalApi(
   app.use(express.json());
   
   // GET /local/status - Get device status
-  app.get('/local/status', (req: Request, res: Response) => {
+  app.get('/local/status', async (_req: Request, res: Response) => {
     const state = loadState();
-    const netStatus = getStatus();
+    const netStatus = await wifiManager.getStatus();
     
     res.json({
       deviceId: identity.deviceId,
@@ -36,14 +41,14 @@ export function startLocalApi(
       firmwareVersion: identity.firmwareVersion,
       mode: state.mode,
       status: 'running',
-      isOnline: socket?.connected ?? false,
+      isOnline: false, // Will be connected via socket
       network: netStatus,
       lastUpdated: state.lastUpdated,
     });
   });
   
   // GET /local/state - Get current state
-  app.get('/local/state', (req: Request, res: Response) => {
+  app.get('/local/state', (_req: Request, res: Response) => {
     const state = loadState();
     res.json({ state });
   });
@@ -51,7 +56,11 @@ export function startLocalApi(
   // POST /local/state - Update state
   app.post('/local/state', (req: Request, res: Response) => {
     try {
-      const state = saveState(req.body);
+      const { mode, timerState } = req.body;
+      const state = saveState({
+        ...(mode && { mode: mode as DeviceMode }),
+        ...(timerState && { timerState: timerState as TimerState }),
+      });
       res.json({ state });
     } catch (error) {
       res.status(400).json({ error: 'Invalid state' });
@@ -59,12 +68,12 @@ export function startLocalApi(
   });
   
   // GET /local/config - Get config
-  app.get('/local/config', (req: Request, res: Response) => {
-    const config = loadConfig();
+  app.get('/local/config', (_req: Request, res: Response) => {
+    const configData = loadAgentConfig();
     const state = loadState();
     
     res.json({
-      config,
+      config: configData,
       displayProfile: state.displayProfile,
       calibrationData: state.calibrationData,
     });
@@ -73,15 +82,15 @@ export function startLocalApi(
   // POST /local/config - Update config
   app.post('/local/config', (req: Request, res: Response) => {
     try {
-      const config = saveConfig(req.body);
-      res.json({ config });
+      const configData = saveAgentConfig(req.body);
+      res.json({ config: configData });
     } catch (error) {
       res.status(400).json({ error: 'Invalid config' });
     }
   });
   
   // GET /local/pairing-code - Get current pairing code
-  app.get('/local/pairing-code', (req: Request, res: Response) => {
+  app.get('/local/pairing-code', (_req: Request, res: Response) => {
     const code = getPairingCode();
     const timeRemaining = getPairingCodeTimeRemaining();
     
@@ -94,7 +103,7 @@ export function startLocalApi(
   });
   
   // POST /local/pairing-code/regenerate - Regenerate pairing code
-  app.post('/local/pairing-code/regenerate', (req: Request, res: Response) => {
+  app.post('/local/pairing-code/regenerate', (_req: Request, res: Response) => {
     const code = regeneratePairingCode();
     res.json({
       code: code.code,
@@ -103,17 +112,17 @@ export function startLocalApi(
   });
   
   // GET /api/setup/status - Get setup status
-  app.get('/api/setup/status', (req: Request, res: Response) => {
+  app.get('/api/setup/status', (_req: Request, res: Response) => {
     const setupState: SetupState = {
       step: config.mode === 'setup' ? 'ap_created' : 'complete',
     };
-    res.json({ state: setupState });
+    res.json({ configured: config.mode !== 'setup', state: setupState });
   });
   
   // GET /api/wifi/networks - Scan for networks
-  app.get('/api/wifi/networks', async (req: Request, res: Response) => {
+  app.get('/api/wifi/networks', async (_req: Request, res: Response) => {
     try {
-      const networks = await wifiScan();
+      const networks = await wifiManager.scan();
       res.json({ networks });
     } catch (error) {
       res.status(500).json({ error: 'Failed to scan networks' });
@@ -130,7 +139,7 @@ export function startLocalApi(
         return;
       }
       
-      const success = await wifiConnect(ssid, password);
+      const success = await wifiManager.connect(ssid, password);
       res.json({ success, ssid });
     } catch (error) {
       res.status(500).json({ error: 'Connection failed' });
@@ -147,7 +156,7 @@ export function startLocalApi(
         return;
       }
       
-      const success = await wifiForget(ssid);
+      const success = await wifiManager.forget(ssid);
       res.json({ success });
     } catch (error) {
       res.status(500).json({ error: 'Failed to forget network' });
@@ -155,9 +164,10 @@ export function startLocalApi(
   });
   
   // POST /api/setup/complete - Complete setup
-  app.post('/api/setup/complete', (req: Request, res: Response) => {
+  app.post('/api/setup/complete', async (_req: Request, res: Response) => {
     try {
-      saveConfig({ mode: 'online' });
+      saveAgentConfig({ mode: 'online' });
+      await setupAP.stop();
       res.json({ success: true });
     } catch (error) {
       res.status(500).json({ error: 'Failed to complete setup' });
@@ -165,13 +175,13 @@ export function startLocalApi(
   });
   
   // GET /local/update/status - Get update status
-  app.get('/local/update/status', (req: Request, res: Response) => {
+  app.get('/local/update/status', (_req: Request, res: Response) => {
     const status = updateManager.getStatus();
     res.json({ status });
   });
   
   // POST /local/update/check - Check for updates
-  app.post('/local/update/check', async (req: Request, res: Response) => {
+  app.post('/local/update/check', async (_req: Request, res: Response) => {
     try {
       const result = await updateManager.checkForUpdates();
       res.json(result);

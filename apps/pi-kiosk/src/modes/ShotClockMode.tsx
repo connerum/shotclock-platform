@@ -1,12 +1,18 @@
 // Shot Clock Mode - Main shot clock display
 
-import type { TimerStatePayload } from '@shotclock/shared/types';
 import ShotClock from '../components/ShotClock';
 
 interface ShotClockModeProps {
   state?: {
     mode?: { type: string };
-    timerState?: TimerStatePayload;
+    timerState?: {
+      shotClock: number;
+      gameClock: number;
+      homeScore: number;
+      awayScore: number;
+      period?: number;
+      isRunning: boolean;
+    };
   };
 }
 

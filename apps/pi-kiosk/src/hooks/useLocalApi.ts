@@ -1,15 +1,15 @@
 // useLocalApi hook - Polls /local/state, /local/config
 
 import { useState, useEffect, useCallback } from 'react';
-import type { TimerStatePayload, DisplayConfigPayload, DeviceMode } from '@shotclock/shared/types';
+import type { TimerState, DeviceMode, DisplayProfile } from '@shotclock/shared/types';
 
 interface LocalApiState {
   mode?: DeviceMode;
-  timerState?: TimerStatePayload;
+  timerState?: TimerState;
 }
 
 interface LocalApiConfig {
-  displayProfile: DisplayConfigPayload['displayProfile'];
+  displayProfile: DisplayProfile;
   calibrationData?: {
     x: number;
     y: number;
@@ -46,28 +46,28 @@ export function useLocalApi(): UseLocalApiResult {
       // Fetch state
       const stateRes = await fetch(`${API_BASE}/local/state`);
       if (stateRes.ok) {
-        const { state: newState } = await stateRes.json();
-        setState(newState);
+        const data = await stateRes.json();
+        setState(data.state);
       }
 
       // Fetch config
       const configRes = await fetch(`${API_BASE}/local/config`);
       if (configRes.ok) {
-        const { displayProfile, calibrationData } = await configRes.json();
-        setConfig({ displayProfile, calibrationData });
+        const data = await configRes.json();
+        setConfig({ displayProfile: data.displayProfile, calibrationData: data.calibrationData });
       }
 
       // Fetch pairing code
       const codeRes = await fetch(`${API_BASE}/local/pairing-code`);
       if (codeRes.ok) {
-        const { code, timeRemaining: remaining } = await codeRes.json();
-        setPairingCode(code);
-        setTimeRemaining(remaining);
+        const data = await codeRes.json();
+        setPairingCode(data.code);
+        setTimeRemaining(data.timeRemaining);
       }
 
       setError(null);
       setIsLoading(false);
-    } catch (err) {
+    } catch {
       // Silently handle connection errors (agent might not be running)
       setIsLoading(false);
     }

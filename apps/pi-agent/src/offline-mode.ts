@@ -1,15 +1,14 @@
 // Offline Mode - Offline detection and cached state serving
 
 import { loadState, saveState, type DeviceState } from './state-store.js';
-import { loadConfig, type AgentConfig } from './config-store.js';
 
 export class OfflineMode {
-  private config: AgentConfig;
   private isOffline: boolean = false;
   private offlineState: DeviceState | null = null;
+  private reconnectAttempts: number = 0;
+  private readonly maxReconnectAttempts = 5;
   
-  constructor(config: AgentConfig) {
-    this.config = config;
+  constructor() {
     this.offlineState = loadState();
   }
   
@@ -18,7 +17,16 @@ export class OfflineMode {
    */
   checkOfflineStatus(isConnected: boolean): boolean {
     const wasOffline = this.isOffline;
-    this.isOffline = !isConnected && this.config.offlineMode;
+    
+    if (!isConnected) {
+      this.reconnectAttempts++;
+      if (this.reconnectAttempts >= this.maxReconnectAttempts) {
+        this.isOffline = true;
+      }
+    } else {
+      this.reconnectAttempts = 0;
+      this.isOffline = false;
+    }
     
     if (this.isOffline && !wasOffline) {
       console.log('Entering offline mode');
@@ -93,5 +101,12 @@ export class OfflineMode {
       console.log('Would sync offline state with server');
       this.offlineState = null;
     }
+  }
+  
+  /**
+   * Reset reconnect attempts
+   */
+  resetReconnectAttempts(): void {
+    this.reconnectAttempts = 0;
   }
 }

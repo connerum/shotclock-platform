@@ -3,12 +3,8 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
-import { exec } from 'child_process';
-import { promisify } from 'util';
-import type { UpdateStatus, UpdateCheckResult, UpdateInstallResult, FirmwareRelease } from '@shotclock/shared/types';
+import type { UpdateStatus, FirmwareRelease } from '@shotclock/shared/types';
 import { sendUpdateStatus } from './socket-client.js';
-
-const execAsync = promisify(exec);
 
 interface UpdateState {
   status: UpdateStatus;
@@ -71,7 +67,7 @@ export class UpdateManager {
     return { ...this.state };
   }
   
-  async checkForUpdates(): Promise<UpdateCheckResult> {
+  async checkForUpdates(): Promise<{ available: boolean; currentVersion: string; latestVersion?: string; release?: FirmwareRelease; error?: string }> {
     try {
       this.state.status = 'checking';
       this.broadcastStatus();
@@ -83,10 +79,10 @@ export class UpdateManager {
         throw new Error('Failed to fetch update manifest');
       }
       
-      const { manifest } = await response.json();
+      const data = await response.json() as { manifest: { latestVersion: string; releases: FirmwareRelease[] } };
       
-      this.state.latestVersion = manifest.latestVersion;
-      this.state.release = manifest.releases[0];
+      this.state.latestVersion = data.manifest.latestVersion;
+      this.state.release = data.manifest.releases[0];
       
       if (this.state.latestVersion && this.state.latestVersion !== this.state.currentVersion) {
         this.state.status = 'idle';
@@ -121,7 +117,7 @@ export class UpdateManager {
     }
   }
   
-  async installUpdate(version: string): Promise<UpdateInstallResult> {
+  async installUpdate(version: string): Promise<{ success: boolean; version: string; error?: string }> {
     try {
       if (this.state.latestVersion !== version) {
         throw new Error('Version not available');
@@ -139,15 +135,12 @@ export class UpdateManager {
       
       // Download the update
       const downloadPath = path.join(this.updateDir, `shotclock-${version}.tar.gz`);
-      await this.downloadFile(release.downloadUrl, downloadPath, release.size);
+      await this.downloadFile(release.downloadUrl, downloadPath);
       
-      // Verify checksum
+      // Verify checksum - placeholder
       this.state.status = 'staged';
       this.state.progress = 100;
       this.broadcastStatus();
-      
-      // In production, would verify checksum and extract
-      // For now, just mark as staged
       
       return {
         success: true,
@@ -166,20 +159,16 @@ export class UpdateManager {
     }
   }
   
-  private async downloadFile(url: string, destPath: string, expectedSize: number): Promise<void> {
-    return new Promise((resolve, reject) => {
-      // Placeholder for actual download
-      // In production, would use fetch or axios to download
-      console.log(`Downloading ${url} to ${destPath}`);
-      
-      // Simulate download
-      this.state.progress = 50;
-      this.broadcastStatus();
-      
-      setTimeout(() => {
-        resolve();
-      }, 1000);
-    });
+  private async downloadFile(url: string, destPath: string): Promise<void> {
+    console.log(`Downloading ${url} to ${destPath}`);
+    
+    // In production, would use fetch to download the file
+    // For now, simulate download progress
+    this.state.progress = 50;
+    this.broadcastStatus();
+    
+    // Simulate async operation
+    await new Promise(resolve => setTimeout(resolve, 1000));
   }
   
   private broadcastStatus(): void {
@@ -203,7 +192,6 @@ export class UpdateManager {
       // 3. Replace files
       // 4. Restart
       
-      // For now, just mark complete
       this.state.status = 'idle';
       this.state.completedAt = Date.now();
       this.saveState();
@@ -218,7 +206,7 @@ export class UpdateManager {
     }
   }
   
-  getUpdateHistory(): any[] {
+  getUpdateHistory(): Array<{ version: string; installedAt: number }> {
     // Return history of updates
     return [];
   }

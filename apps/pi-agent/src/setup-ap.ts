@@ -1,19 +1,25 @@
 // Setup AP - hostapd + dnsmasq management for setup access point
 
 import * as fs from 'fs';
-import * as path from 'path';
 import { exec } from 'child_process';
 import { promisify } from 'util';
-import type { CaptivePortalConfig } from '@shotclock/shared/types';
 
 const execAsync = promisify(exec);
+
+interface CaptivePortalConfig {
+  apSsid: string;
+  apPassword: string;
+  apChannel: number;
+  serverIp: string;
+  serverPort: number;
+}
 
 const DEFAULT_AP_CONFIG: CaptivePortalConfig = {
   apSsid: 'Shotclock-Setup',
   apPassword: 'shotclock123',
   apChannel: 6,
   serverIp: '192.168.4.1',
-  serverPort: 3001,
+  serverPort: 8080,
 };
 
 const HOSTAPD_CONF = `/etc/hostapd/hostapd.conf`;
@@ -47,10 +53,10 @@ export class SetupAP {
       await this.setupNat();
       
       // Start hostapd
-      await execAsync('sudo systemctl start hostapd');
+      await execAsync('systemctl start hostapd');
       
       // Start dnsmasq
-      await execAsync('sudo systemctl start dnsmasq');
+      await execAsync('systemctl start dnsmasq');
       
       this.isRunning = true;
       console.log(`Setup AP started: ${this.config.apSsid}`);
@@ -68,8 +74,8 @@ export class SetupAP {
     try {
       console.log('Stopping setup AP...');
       
-      await execAsync('sudo systemctl stop hostapd', { timeout: 5000 }).catch(() => {});
-      await execAsync('sudo systemctl stop dnsmasq', { timeout: 5000 }).catch(() => {});
+      await execAsync('systemctl stop hostapd').catch(() => {});
+      await execAsync('systemctl stop dnsmasq').catch(() => {});
       
       this.isRunning = false;
       console.log('Setup AP stopped');
@@ -117,7 +123,7 @@ rsn_pairwise=CCMP
 `.trim();
 
     await fs.promises.writeFile(HOSTAPD_CONF, config);
-    await execAsync(`sudo systemctl unmask hostapd`);
+    await execAsync('systemctl unmask hostapd');
   }
 
   private async configureDnsmasq(): Promise<void> {
@@ -134,9 +140,9 @@ address=/#/${this.config.serverIp}
 
   private async setupNat(): Promise<void> {
     try {
-      await execAsync('sudo iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE');
-      await execAsync('sudo iptables -A FORWARD -i wlan0 -o eth0 -j ACCEPT');
-      await execAsync('sudo iptables -A FORWARD -i eth0 -o wlan0 -m state --state RELATED,ESTABLISHED -j ACCEPT');
+      await execAsync('iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE');
+      await execAsync('iptables -A FORWARD -i wlan0 -o eth0 -j ACCEPT');
+      await execAsync('iptables -A FORWARD -i eth0 -o wlan0 -m state --state RELATED,ESTABLISHED -j ACCEPT');
     } catch (error) {
       console.error('NAT setup error (may be expected):', error);
     }
