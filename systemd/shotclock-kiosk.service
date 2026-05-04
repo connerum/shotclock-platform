@@ -1,0 +1,30 @@
+[Unit]
+Description=Shotclock Pi Kiosk Service
+Documentation=https://docs.shotclock.local
+After=network.target shotclock-agent.service
+Requires=shotclock-agent.service
+
+[Service]
+Type=simple
+User=shotclock
+Group=shotclock
+WorkingDirectory=/opt/shotclock/current
+ExecStart=/bin/bash /opt/shotclock/current/scripts/launch-kiosk.sh
+Restart=on-failure
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=shotclock-kiosk
+
+# The kiosk needs access to display
+Environment=DISPLAY=:0
+
+# Hardening
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/shotclock /home/shotclock/.shotclock
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

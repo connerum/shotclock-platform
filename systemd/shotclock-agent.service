@@ -1,0 +1,29 @@
+[Unit]
+Description=Shotclock Pi Agent Service
+Documentation=https://docs.shotclock.local
+After=network.target
+
+[Service]
+Type=simple
+User=shotclock
+Group=shotclock
+WorkingDirectory=/opt/shotclock/current
+Environment=NODE_ENV=production
+EnvironmentFile=/opt/shotclock/shared/.env
+ExecStartPre=/bin/sleep 5
+ExecStart=/usr/bin/node /opt/shotclock/current/apps/pi-agent/dist/index.js
+Restart=on-failure
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=shotclock-agent
+
+# Hardening
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/shotclock /home/shotclock/.shotclock
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

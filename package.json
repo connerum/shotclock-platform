@@ -1,0 +1,19 @@
+{
+  "name": "shotclock-platform",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Shotclock Platform - Sports Scoreboard & Display Management System",
+  "scripts": {
+    "dev": "pnpm -r --parallel dev",
+    "build": "pnpm -r build",
+    "clean": "pnpm -r --parallel clean && rm -rf node_modules"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "typescript": "^5.3.3"
+  },
+  "engines": {
+    "node": ">=20.0.0",
+    "pnpm": ">=8.0.0"
+  }
+}

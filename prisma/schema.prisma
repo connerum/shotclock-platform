@@ -1,0 +1,132 @@
+// Prisma schema for Shotclock Platform
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Organization {
+  id        String   @id @default(uuid())
+  name      String
+  slug      String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  venues Venue[]
+  users  User[]
+  devices Device[]
+}
+
+model Venue {
+  id              String       @id @default(uuid())
+  name            String
+  slug            String       @unique
+  address         String?
+  organizationId  String
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  devices      Device[]
+}
+
+model Device {
+  id               String        @id @default(uuid())
+  name             String
+  deviceId         String        @unique
+  organizationId   String?
+  venueId          String?
+  pairingCode      String?
+  pairingCodeExp   DateTime?
+  firmwareVersion  String?
+  controllerType   String        @default("generic")
+  displayProfile   Json?
+  displayState     Json?
+  calibrationData  Json?
+  mode             String        @default("setup")
+  status           String        @default("offline")
+  lastSeen         DateTime?
+  isOnline         Boolean       @default(false)
+  capabilities     String[]
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+
+  organization Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+  venue        Venue?        @relation(fields: [venueId], references: [id], onDelete: SetNull)
+  updates      DeviceUpdate[]
+}
+
+model DisplayState {
+  id          String   @id @default(uuid())
+  deviceId    String   @unique
+  mode        String
+  timerState  Json?
+  mediaAssetId String?
+  updatedAt   DateTime @updatedAt
+
+  device Device @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+}
+
+model MediaAsset {
+  id           String   @id @default(uuid())
+  filename     String
+  url          String
+  mimeType     String
+  size         Int
+  duration     Int?
+  organizationId String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+}
+
+model FirmwareRelease {
+  id            String   @id @default(uuid())
+  version       String   @unique
+  releaseDate   DateTime @default(now())
+  downloadUrl   String
+  checksum      String
+  size          Int
+  notes         String?
+  isMandatory   Boolean  @default(false)
+  minServerVersion String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  updates DeviceUpdate[]
+}
+
+model DeviceUpdate {
+  id            String   @id @default(uuid())
+  deviceId      String
+  firmwareId    String
+  currentVersion String
+  targetVersion String
+  status        String   @default("pending")
+  startedAt     DateTime?
+  completedAt   DateTime?
+  error         String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  device   Device         @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  firmware FirmwareRelease @relation(fields: [firmwareId], references: [id], onDelete: Cascade)
+}
+
+model User {
+  id             String       @id @default(uuid())
+  email          String       @unique
+  passwordHash   String?
+  name           String?
+  role           String       @default("viewer")
+  organizationId String?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  organization Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+}
