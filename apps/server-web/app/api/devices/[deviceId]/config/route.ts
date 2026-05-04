@@ -1,57 +1,73 @@
-// GET /api/devices/[deviceId]/config - Get display config
-// PATCH /api/devices/[deviceId]/config - Update display config
+// GET /api/devices/[deviceId]/config → return device.configJson as DisplayProfile
+// PATCH /api/devices/[deviceId]/config → update configJson, emit device:config:update to device socket
 
 import { NextRequest, NextResponse } from 'next/server';
+import { prisma } from '@/lib/prisma';
+import { getServerIO } from '@/lib/socket';
 
 interface RouteParams {
   params: { deviceId: string };
 }
 
-export async function GET(request: NextRequest, { params }: RouteParams) {
-  const { deviceId } = params;
-  
-  const config = {
-    deviceId,
-    displayProfile: {
-      id: 'default-generic',
-      name: 'Default Generic Display',
-      controllerType: 'generic',
-      viewport: { x: 0, y: 0, width: 1920, height: 1080, rotation: 0, scaleX: 1, scaleY: 1 },
-      safeZone: { top: 40, right: 40, bottom: 40, left: 40 },
-      fontSize: { shotClock: 200, gameClock: 120, score: 150, period: 80, label: 40 },
-      colors: {
-        background: '#000000',
-        foreground: '#ffffff',
-        accent: '#00ff00',
-        homeTeam: '#ff0000',
-        awayTeam: '#0000ff',
-        warning: '#ffff00',
-        danger: '#ff0000',
-      },
-    },
-    brightness: 100,
-    orientation: 'landscape',
-  };
-  
-  return NextResponse.json({ config });
+export async function GET(_request: NextRequest, { params }: RouteParams) {
+  try {
+    const { deviceId } = params;
+
+    const device = await prisma.device.findUnique({
+      where: { deviceId },
+    });
+
+    if (!device) {
+      return NextResponse.json({ error: 'Device not found' }, { status: 404 });
+    }
+
+    const config = {
+      displayProfile: device.displayProfile ? JSON.parse(device.displayProfile) : null,
+      calibrationData: device.calibrationData ? JSON.parse(device.calibrationData) : null,
+    };
+
+    return NextResponse.json({ config });
+  } catch (error) {
+    console.error('Error fetching config:', error);
+    return NextResponse.json({ error: 'Failed to fetch config' }, { status: 500 });
+  }
 }
 
 export async function PATCH(request: NextRequest, { params }: RouteParams) {
   try {
     const { deviceId } = params;
     const body = await request.json();
+
+    const updateData: any = {};
     
-    const updatedConfig = {
-      deviceId,
-      ...body,
-      updatedAt: new Date().toISOString(),
-    };
-    
-    return NextResponse.json({ config: updatedConfig });
+    if (body.displayProfile !== undefined) {
+      updateData.displayProfile = JSON.stringify(body.displayProfile);
+    }
+    if (body.calibrationData !== undefined) {
+      updateData.calibrationData = JSON.stringify(body.calibrationData);
+    }
+
+    await prisma.device.update({
+      where: { deviceId },
+      data: updateData,
+    });
+
+    // Emit config update to device via Socket.IO
+    const io = getServerIO();
+    if (io) {
+      io.to(`device:${deviceId}`).emit('config:update', {
+        displayProfile: body.displayProfile,
+        brightness: body.brightness,
+        orientation: body.orientation,
+      });
+    }
+
+    return NextResponse.json({ 
+      success: true,
+      displayProfile: body.displayProfile,
+    });
   } catch (error) {
-    return NextResponse.json(
-      { error: 'Invalid request body' },
-      { status: 400 }
-    );
+    console.error('Error updating config:', error);
+    return NextResponse.json({ error: 'Failed to update config' }, { status: 500 });
   }
 }

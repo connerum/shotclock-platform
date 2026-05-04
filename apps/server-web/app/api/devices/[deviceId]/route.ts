@@ -1,64 +1,77 @@
-// GET /api/devices/[deviceId] - Get device details
-// PATCH /api/devices/[deviceId] - Update device
+// GET /api/devices/[deviceId] → device with config/state
+// PATCH /api/devices/[deviceId] → update name, venueId, organizationId, controllerType, softwareVersion
 
 import { NextRequest, NextResponse } from 'next/server';
+import { prisma } from '@/lib/prisma';
 
 interface RouteParams {
   params: { deviceId: string };
 }
 
-export async function GET(request: NextRequest, { params }: RouteParams) {
-  const { deviceId } = params;
-  
-  // In production, fetch from Prisma
-  const device = {
-    id: deviceId,
-    name: 'Shotclock Display 1',
-    deviceId,
-    status: 'online',
-    mode: 'shot-clock',
-    firmwareVersion: '0.1.0',
-    controllerType: 'generic',
-    displayProfile: {
-      id: 'default-generic',
-      name: 'Default Generic Display',
-      controllerType: 'generic',
-      viewport: { x: 0, y: 0, width: 1920, height: 1080, rotation: 0, scaleX: 1, scaleY: 1 },
-      safeZone: { top: 40, right: 40, bottom: 40, left: 40 },
-      fontSize: { shotClock: 200, gameClock: 120, score: 150, period: 80, label: 40 },
-      colors: {
-        background: '#000000',
-        foreground: '#ffffff',
-        accent: '#00ff00',
-        homeTeam: '#ff0000',
-        awayTeam: '#0000ff',
-        warning: '#ffff00',
-        danger: '#ff0000',
+export async function GET(_request: NextRequest, { params }: RouteParams) {
+  try {
+    const { deviceId } = params;
+
+    const device = await prisma.device.findUnique({
+      where: { deviceId },
+      include: {
+        organization: true,
+        venue: true,
+        state: true,
+        updates: {
+          orderBy: { createdAt: 'desc' },
+          take: 1,
+        },
       },
-    },
-    lastSeen: new Date().toISOString(),
-  };
-  
-  return NextResponse.json({ device });
+    });
+
+    if (!device) {
+      return NextResponse.json({ error: 'Device not found' }, { status: 404 });
+    }
+
+    const parsedDevice = {
+      ...device,
+      displayProfile: device.displayProfile ? JSON.parse(device.displayProfile) : null,
+      displayState: device.displayState ? JSON.parse(device.displayState) : null,
+      calibrationData: device.calibrationData ? JSON.parse(device.calibrationData) : null,
+      capabilities: JSON.parse(device.capabilities || '[]'),
+      timerState: device.state?.timerState ? JSON.parse(device.state.timerState) : null,
+    };
+
+    return NextResponse.json({ device: parsedDevice });
+  } catch (error) {
+    console.error('Error fetching device:', error);
+    return NextResponse.json({ error: 'Failed to fetch device' }, { status: 500 });
+  }
 }
 
 export async function PATCH(request: NextRequest, { params }: RouteParams) {
   try {
     const { deviceId } = params;
     const body = await request.json();
+
+    const updateData: any = {};
     
-    // In production, update in Prisma
-    const updatedDevice = {
-      id: deviceId,
-      ...body,
-      updatedAt: new Date().toISOString(),
-    };
-    
-    return NextResponse.json({ device: updatedDevice });
+    if (body.name !== undefined) updateData.name = body.name;
+    if (body.venueId !== undefined) updateData.venueId = body.venueId;
+    if (body.organizationId !== undefined) updateData.organizationId = body.organizationId;
+    if (body.controllerType !== undefined) updateData.controllerType = body.controllerType;
+    if (body.firmwareVersion !== undefined) updateData.firmwareVersion = body.firmwareVersion;
+    if (body.mode !== undefined) updateData.mode = body.mode;
+    if (body.status !== undefined) updateData.status = body.status;
+
+    const device = await prisma.device.update({
+      where: { deviceId },
+      data: updateData,
+      include: {
+        organization: true,
+        venue: true,
+      },
+    });
+
+    return NextResponse.json({ device });
   } catch (error) {
-    return NextResponse.json(
-      { error: 'Invalid request body' },
-      { status: 400 }
-    );
+    console.error('Error updating device:', error);
+    return NextResponse.json({ error: 'Failed to update device' }, { status: 500 });
   }
 }

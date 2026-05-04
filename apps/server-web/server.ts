@@ -1,13 +1,16 @@
-// Custom Next.js server with Socket.IO
+// Custom Next.js server with Socket.IO and Prisma
 
 import { createServer } from 'http';
-import { Server as SocketIOServer } from 'socket.io';
-import next from 'next';
 import { parse } from 'url';
+import next from 'next';
+import { Server as SocketIOServer } from 'socket.io';
+import { DeviceToServerEvents, ServerToDeviceEvents } from '@shotclock/shared/socket';
+import { setupSocketServer, TypedServer } from './socket/server';
+import { setServerIO } from './lib/socket';
 
 const dev = process.env.NODE_ENV !== 'production';
 const hostname = process.env.HOSTNAME || 'localhost';
-const port = parseInt(process.env.PORT || '3000', 10);
+const port = parseInt(process.env.PORT || '3030', 10);
 
 const app = next({ dev, hostname, port });
 const handle = app.getRequestHandler();
@@ -26,13 +29,20 @@ app.prepare().then(() => {
     path: '/socket.io',
   });
 
-  // Import socket handlers after io is created
-  import('./socket/server.js').then(({ setupSocketServer }) => {
-    setupSocketServer(io);
-  });
+  // Store io instance globally for API routes
+  (global as any).socketIO = io;
+  setServerIO(io as SocketIOServer<DeviceToServerEvents, ServerToDeviceEvents>);
+
+  // Setup Socket.IO handlers (includes device and admin handlers with Prisma integration)
+  setupSocketServer(io as TypedServer);
 
   httpServer.listen(port, () => {
     console.log(`> Ready on http://${hostname}:${port}`);
     console.log(`> Socket.IO server running on path /socket.io`);
   });
 });
+
+// Export helper for API routes to access Socket.IO instance
+export function getServerIO() {
+  return (global as any).socketIO as SocketIOServer<DeviceToServerEvents, ServerToDeviceEvents>;
+}

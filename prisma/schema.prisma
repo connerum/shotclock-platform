@@ -5,8 +5,8 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider = "sqlite"
+  url      = "file:./dev.db"
 }
 
 model Organization {
@@ -16,9 +16,10 @@ model Organization {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  venues Venue[]
-  users  User[]
-  devices Device[]
+  venues      Venue[]
+  users       User[]
+  devices     Device[]
+  mediaAssets MediaAsset[]
 }
 
 model Venue {
@@ -44,43 +45,44 @@ model Device {
   pairingCodeExp   DateTime?
   firmwareVersion  String?
   controllerType   String        @default("generic")
-  displayProfile   Json?
-  displayState     Json?
-  calibrationData  Json?
+  displayProfile   String?
+  displayState     String?
+  calibrationData  String?
   mode             String        @default("setup")
   status           String        @default("offline")
   lastSeen         DateTime?
   isOnline         Boolean       @default(false)
-  capabilities     String[]
+  capabilities     String        @default("[]")
   createdAt        DateTime      @default(now())
   updatedAt        DateTime      @updatedAt
 
   organization Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
   venue        Venue?        @relation(fields: [venueId], references: [id], onDelete: SetNull)
   updates      DeviceUpdate[]
+  state        DisplayState?
 }
 
 model DisplayState {
-  id          String   @id @default(uuid())
-  deviceId    String   @unique
-  mode        String
-  timerState  Json?
+  id           String   @id @default(uuid())
+  deviceId     String   @unique
+  mode         String
+  timerState   String?
   mediaAssetId String?
-  updatedAt   DateTime @updatedAt
+  updatedAt    DateTime @updatedAt
 
   device Device @relation(fields: [deviceId], references: [id], onDelete: Cascade)
 }
 
 model MediaAsset {
-  id           String   @id @default(uuid())
-  filename     String
-  url          String
-  mimeType     String
-  size         Int
-  duration     Int?
+  id             String   @id @default(uuid())
+  filename       String
+  url            String
+  mimeType       String
+  size           Int
+  duration       Int?
   organizationId String
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 }

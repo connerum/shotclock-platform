@@ -1,41 +1,56 @@
-// POST /api/pair - Initiate device pairing
+// POST /api/pair → create pairing record, return { success: true, pairingCode }
+// Generate 6-digit code, store in Device.pairingCode
 
 import { NextRequest, NextResponse } from 'next/server';
+import { prisma } from '@/lib/prisma';
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    
-    const { deviceName, organizationId, venueId, controllerType } = body;
-    
+    const { deviceName, organizationId, venueId, controllerType, deviceId } = body;
+
     if (!deviceName) {
       return NextResponse.json(
         { error: 'Missing required field: deviceName' },
         { status: 400 }
       );
     }
-    
-    // Generate pairing code
+
+    // Generate 6-digit pairing code
     const pairingCode = Math.floor(100000 + Math.random() * 900000).toString();
-    
-    // In production, this would create in Prisma
-    const pairingRequest = {
-      id: Math.random().toString(36).substring(7),
-      deviceName,
+    const pairingCodeExp = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+
+    // Create or update device with pairing code
+    const device = await prisma.device.upsert({
+      where: { deviceId: deviceId || `temp-${Date.now()}` },
+      update: {
+        pairingCode,
+        pairingCodeExp,
+        status: 'unpaired',
+      },
+      create: {
+        deviceId: deviceId || `temp-${Date.now()}`,
+        name: deviceName,
+        organizationId: organizationId || null,
+        venueId: venueId || null,
+        controllerType: controllerType || 'generic',
+        pairingCode,
+        pairingCodeExp,
+        status: 'unpaired',
+      },
+    });
+
+    return NextResponse.json({
+      success: true,
       pairingCode,
-      pairingCodeExp: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(), // 24 hours
-      organizationId,
-      venueId,
-      controllerType: controllerType || 'generic',
-      status: 'pending',
-      createdAt: new Date().toISOString(),
-    };
-    
-    return NextResponse.json({ pairing: pairingRequest }, { status: 201 });
+      pairingCodeExp: pairingCodeExp.toISOString(),
+      deviceId: device.deviceId,
+    }, { status: 201 });
   } catch (error) {
+    console.error('Error creating pairing:', error);
     return NextResponse.json(
-      { error: 'Invalid request body' },
-      { status: 400 }
+      { error: 'Failed to create pairing' },
+      { status: 500 }
     );
   }
 }

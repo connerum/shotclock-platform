@@ -2,88 +2,85 @@
 
 import type { ServerToDeviceEvents } from '@shotclock/shared/socket';
 import type { TypedServer } from '../server.js';
-import type { TimerStatePayload, DisplayConfigPayload, DeviceMode } from '@shotclock/shared/types';
+import type { TimerState, DisplayConfigPayload, DeviceMode } from '@shotclock/shared/types';
 
-export function emitToDevice(
-  io: TypedServer,
-  deviceSocketId: string,
-  event: keyof ServerToDeviceEvents,
-  ...args: any[]
-): boolean {
-  const deviceNamespace = io.of('/device');
-  const socket = deviceNamespace.sockets.get(deviceSocketId);
-  
-  if (socket) {
-    (socket as any).emit(event, ...args);
+export function emitStateUpdate(io: TypedServer, deviceId: string, state: TimerState): boolean {
+  try {
+    io.to(`device:${deviceId}`).emit('state:update', state);
     return true;
+  } catch (error) {
+    console.error(`Failed to emit state:update to device ${deviceId}:`, error);
+    return false;
   }
-  return false;
 }
 
-export function emitStateUpdate(
-  io: TypedServer,
-  deviceSocketId: string,
-  state: TimerStatePayload
-): boolean {
-  return emitToDevice(io, deviceSocketId, 'state:update', state);
+export function emitConfigUpdate(io: TypedServer, deviceId: string, config: DisplayConfigPayload): boolean {
+  try {
+    io.to(`device:${deviceId}`).emit('config:update', config);
+    return true;
+  } catch (error) {
+    console.error(`Failed to emit config:update to device ${deviceId}:`, error);
+    return false;
+  }
 }
 
-export function emitConfigUpdate(
-  io: TypedServer,
-  deviceSocketId: string,
-  config: DisplayConfigPayload
-): boolean {
-  return emitToDevice(io, deviceSocketId, 'config:update', config);
+export function emitModeSet(io: TypedServer, deviceId: string, mode: DeviceMode): boolean {
+  try {
+    io.to(`device:${deviceId}`).emit('mode:set', mode);
+    return true;
+  } catch (error) {
+    console.error(`Failed to emit mode:set to device ${deviceId}:`, error);
+    return false;
+  }
 }
 
-export function emitModeSet(
-  io: TypedServer,
-  deviceSocketId: string,
-  mode: DeviceMode
-): boolean {
-  return emitToDevice(io, deviceSocketId, 'mode:set', mode);
+export function emitUpdateCheck(io: TypedServer, deviceId: string): boolean {
+  try {
+    io.to(`device:${deviceId}`).emit('update:check');
+    return true;
+  } catch (error) {
+    console.error(`Failed to emit update:check to device ${deviceId}:`, error);
+    return false;
+  }
 }
 
-export function emitUpdateCheck(
-  io: TypedServer,
-  deviceSocketId: string
-): boolean {
-  return emitToDevice(io, deviceSocketId, 'update:check');
+export function emitUpdateInstall(io: TypedServer, deviceId: string, version: string): boolean {
+  try {
+    io.to(`device:${deviceId}`).emit('update:install', version);
+    return true;
+  } catch (error) {
+    console.error(`Failed to emit update:install to device ${deviceId}:`, error);
+    return false;
+  }
 }
 
-export function emitUpdateInstall(
-  io: TypedServer,
-  deviceSocketId: string,
-  version: string
-): boolean {
-  return emitToDevice(io, deviceSocketId, 'update:install', version);
+export function emitReboot(io: TypedServer, deviceId: string): boolean {
+  try {
+    io.to(`device:${deviceId}`).emit('reboot');
+    return true;
+  } catch (error) {
+    console.error(`Failed to emit reboot to device ${deviceId}:`, error);
+    return false;
+  }
 }
 
-export function emitReboot(
-  io: TypedServer,
-  deviceSocketId: string
-): boolean {
-  return emitToDevice(io, deviceSocketId, 'reboot');
-}
-
-export function emitPing(
-  io: TypedServer,
-  deviceSocketId: string
-): boolean {
-  return emitToDevice(io, deviceSocketId, 'ping');
+export function emitPing(io: TypedServer, deviceId: string): boolean {
+  try {
+    io.to(`device:${deviceId}`).emit('ping');
+    return true;
+  } catch (error) {
+    console.error(`Failed to emit ping to device ${deviceId}:`, error);
+    return false;
+  }
 }
 
 // Broadcast to all connected devices
-export function broadcastToAllDevices(
-  io: TypedServer,
-  event: keyof ServerToDeviceEvents,
-  ...args: any[]
-): number {
+export function broadcastToAllDevices(io: TypedServer, event: keyof ServerToDeviceEvents): number {
   const deviceNamespace = io.of('/device');
   let count = 0;
   
   deviceNamespace.sockets.forEach((socket) => {
-    (socket as any).emit(event, ...args);
+    (socket as any).emit(event);
     count++;
   });
   

@@ -1,25 +1,45 @@
-// GET /api/updates/manifest - Get update manifest
+// GET /api/updates/manifest → return update manifest for all active channels
+// Returns { updateAvailable: boolean, version, channel, packageUrl, checksum, notes }
+// Based on latest active FirmwareRelease
 
 import { NextResponse } from 'next/server';
+import { prisma } from '@/lib/prisma';
 
 export async function GET() {
-  const manifest = {
-    latestVersion: '0.1.0',
-    minServerVersion: '0.1.0',
-    releases: [
-      {
-        version: '0.1.0',
-        releaseDate: '2024-01-01T00:00:00Z',
-        downloadUrl: 'https://releases.shotclock.local/0.1.0',
-        checksum: 'sha256:abc123def456',
-        size: 52428800,
-        notes: 'Initial release with core shot clock functionality',
-        isMandatory: false,
+  try {
+    // Get all firmware releases ordered by release date
+    const releases = await prisma.firmwareRelease.findMany({
+      orderBy: { releaseDate: 'desc' },
+    });
+
+    if (releases.length === 0) {
+      return NextResponse.json({
+        updateAvailable: false,
+        latestVersion: null,
+        releases: [],
         minServerVersion: '0.1.0',
-      },
-    ],
-    updatedAt: new Date().toISOString(),
-  };
-  
-  return NextResponse.json({ manifest });
+      });
+    }
+
+    const latestRelease = releases[0];
+
+    return NextResponse.json({
+      updateAvailable: true,
+      latestVersion: latestRelease.version,
+      releases: releases.map(r => ({
+        version: r.version,
+        releaseDate: r.releaseDate.toISOString(),
+        downloadUrl: r.downloadUrl,
+        checksum: r.checksum,
+        size: r.size,
+        notes: r.notes,
+        isMandatory: r.isMandatory,
+        minServerVersion: r.minServerVersion,
+      })),
+      minServerVersion: latestRelease.minServerVersion || '0.1.0',
+    });
+  } catch (error) {
+    console.error('Error fetching manifest:', error);
+    return NextResponse.json({ error: 'Failed to fetch manifest' }, { status: 500 });
+  }
 }

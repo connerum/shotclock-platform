@@ -1,9 +1,18 @@
 // Admin socket event handlers
 
-import type { TypedSocket, TypedServer } from '../server.js';
-import { emitToDevice } from '../emitters/to-device.js';
+import type { TypedServer } from '../server.js';
+import { Socket } from 'socket.io';
+import { 
+  emitStateUpdate, 
+  emitConfigUpdate, 
+  emitModeSet, 
+  emitUpdateCheck, 
+  emitUpdateInstall, 
+  emitReboot, 
+  emitPing 
+} from '../emitters/to-device.js';
 
-export function setupAdminHandlers(socket: TypedSocket, io: TypedServer): void {
+export function setupAdminHandlers(socket: Socket, io: TypedServer): void {
   // Handle admin requesting device list
   socket.on('admin:get-devices', async () => {
     const deviceNamespace = io.of('/device');
@@ -12,9 +21,9 @@ export function setupAdminHandlers(socket: TypedSocket, io: TypedServer): void {
     deviceNamespace.sockets.forEach((devSocket) => {
       devices.push({
         socketId: devSocket.id,
-        deviceId: devSocket.data.deviceId,
-        deviceName: devSocket.data.deviceName,
-        firmwareVersion: devSocket.data.firmwareVersion,
+        deviceId: (devSocket as any).data.deviceId,
+        deviceName: (devSocket as any).data.deviceName,
+        firmwareVersion: (devSocket as any).data.firmwareVersion,
       });
     });
     
@@ -23,40 +32,42 @@ export function setupAdminHandlers(socket: TypedSocket, io: TypedServer): void {
 
   // Handle admin sending command to device
   socket.on('admin:send-command', async (data: {
-    deviceSocketId: string;
+    deviceId: string;
     command: string;
     payload?: any;
   }) => {
-    console.log('Admin command to device:', data.deviceSocketId, data.command);
+    console.log('Admin command to device:', data.deviceId, data.command);
+    
+    let success = false;
     
     switch (data.command) {
       case 'state:update':
-        emitToDevice(io, data.deviceSocketId, 'state:update', data.payload);
+        success = emitStateUpdate(io, data.deviceId, data.payload);
         break;
       case 'config:update':
-        emitToDevice(io, data.deviceSocketId, 'config:update', data.payload);
+        success = emitConfigUpdate(io, data.deviceId, data.payload);
         break;
       case 'mode:set':
-        emitToDevice(io, data.deviceSocketId, 'mode:set', data.payload);
+        success = emitModeSet(io, data.deviceId, data.payload);
         break;
       case 'update:check':
-        emitToDevice(io, data.deviceSocketId, 'update:check');
+        success = emitUpdateCheck(io, data.deviceId);
         break;
       case 'update:install':
-        emitToDevice(io, data.deviceSocketId, 'update:install', data.payload.version);
+        success = emitUpdateInstall(io, data.deviceId, data.payload?.version);
         break;
       case 'reboot':
-        emitToDevice(io, data.deviceSocketId, 'reboot');
+        success = emitReboot(io, data.deviceId);
         break;
       case 'ping':
-        emitToDevice(io, data.deviceSocketId, 'ping');
+        success = emitPing(io, data.deviceId);
         break;
     }
     
     socket.emit('admin:command-sent', {
-      deviceSocketId: data.deviceSocketId,
+      deviceId: data.deviceId,
       command: data.command,
-      success: true,
+      success,
     });
   });
 

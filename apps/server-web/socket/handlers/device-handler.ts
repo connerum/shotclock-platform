@@ -1,34 +1,83 @@
-// Device socket event handlers
+// Device socket event handlers with Prisma integration
 
 import type { TypedSocket, TypedServer } from '../server.js';
 import type { HelloPayload, HeartbeatPayload, UpdateStatusPayload } from '@shotclock/shared/types';
+import { PrismaClient } from '@prisma/client';
+
+const prisma = new PrismaClient();
 
 export function setupDeviceHandlers(socket: TypedSocket, io: TypedServer): void {
   // Handle device hello
   socket.on('device:hello', async (data: HelloPayload) => {
     console.log('Device hello:', data.deviceId, data.deviceName);
     
-    // Acknowledge hello
-    socket.emit('device:config:ack', { success: true });
-    
-    // Store device info in socket data
-    socket.data.deviceId = data.deviceId;
-    socket.data.deviceName = data.deviceName;
-    socket.data.firmwareVersion = data.firmwareVersion;
+    try {
+      // Update or create device in database
+      await prisma.device.upsert({
+        where: { deviceId: data.deviceId },
+        update: {
+          name: data.deviceName,
+          firmwareVersion: data.firmwareVersion,
+          controllerType: data.controllerType,
+          capabilities: JSON.stringify(data.capabilities || []),
+          displayProfile: JSON.stringify(data.displayProfile),
+          isOnline: true,
+          lastSeen: new Date(),
+          status: 'online',
+        },
+        create: {
+          deviceId: data.deviceId,
+          name: data.deviceName,
+          firmwareVersion: data.firmwareVersion,
+          controllerType: data.controllerType,
+          capabilities: JSON.stringify(data.capabilities || []),
+          displayProfile: JSON.stringify(data.displayProfile),
+          isOnline: true,
+          lastSeen: new Date(),
+          status: 'online',
+        },
+      });
+      
+      // Join device room for targeted messaging
+      socket.join(`device:${data.deviceId}`);
+      socket.data.deviceId = data.deviceId;
+      
+      // Send initial config to device after hello
+      (socket as any).emit('config:update', {
+        displayProfile: data.displayProfile,
+      });
+    } catch (error) {
+      console.error('Error handling device hello:', error);
+    }
   });
 
   // Handle device heartbeat
   socket.on('device:heartbeat', async (data: HeartbeatPayload) => {
     console.log('Device heartbeat:', data.deviceId, data.mode);
     
-    // Broadcast to admins
-    const adminNamespace = io.of('/admin');
-    adminNamespace.emit('admin:device-status', {
-      deviceId: data.deviceId,
-      mode: data.mode,
-      status: data,
-      timestamp: Date.now(),
-    });
+    try {
+      // Update last seen and mode
+      await prisma.device.update({
+        where: { deviceId: data.deviceId },
+        data: {
+          lastSeen: new Date(),
+          mode: data.mode.type,
+          isOnline: true,
+          status: 'online',
+        },
+      }).catch(() => {}); // Ignore if device doesn't exist
+      
+      // Broadcast to admins
+      const adminNamespace = io.of('/admin') as any;
+      adminNamespace.emit('admin:device-status', {
+        deviceId: data.deviceId,
+        mode: data.mode,
+        status: data,
+        timestamp: Date.now(),
+      });
+    } catch (error) {
+      console.error('Error handling heartbeat:', error);
+    }
   });
 
   // Handle state acknowledgment
@@ -46,27 +95,65 @@ export function setupDeviceHandlers(socket: TypedSocket, io: TypedServer): void 
   });
 
   // Handle update status
-  socket.on('device:update:status', (data: UpdateStatusPayload) => {
+  socket.on('device:update:status', async (data: UpdateStatusPayload) => {
     console.log('Device update status:', data.deviceId, data.status, data.progress);
     
-    // Broadcast to admins
-    const adminNamespace = io.of('/admin');
-    adminNamespace.emit('admin:update-status', {
-      deviceId: data.deviceId,
-      status: data,
-      timestamp: Date.now(),
-    });
+    try {
+      // Find or create device update record
+      const existingUpdate = await prisma.deviceUpdate.findFirst({
+        where: { deviceId: data.deviceId },
+        orderBy: { createdAt: 'desc' },
+      });
+
+      if (existingUpdate) {
+        await prisma.deviceUpdate.update({
+          where: { id: existingUpdate.id },
+          data: {
+            status: data.status,
+            error: data.error,
+            completedAt: data.status === 'idle' ? new Date() : undefined,
+          },
+        });
+      }
+      
+      // Broadcast to admins
+      const adminNamespace = io.of('/admin') as any;
+      adminNamespace.emit('admin:update-status', {
+        deviceId: data.deviceId,
+        status: data,
+        timestamp: Date.now(),
+      });
+    } catch (error) {
+      console.error('Error handling update status:', error);
+    }
   });
 
   // Handle disconnect
-  socket.on('disconnect', () => {
+  socket.on('disconnect', async () => {
     console.log('Device disconnected:', socket.id, socket.data.deviceId);
     
+    const deviceId = socket.data.deviceId;
+    
+    if (deviceId) {
+      try {
+        // Mark device as offline
+        await prisma.device.update({
+          where: { deviceId },
+          data: {
+            isOnline: false,
+            status: 'offline',
+          },
+        }).catch(() => {});
+      } catch (error) {
+        console.error('Error marking device offline:', error);
+      }
+    }
+    
     // Broadcast to admins
-    const adminNamespace = io.of('/admin');
-    if (socket.data.deviceId) {
+    const adminNamespace = io.of('/admin') as any;
+    if (deviceId) {
       adminNamespace.emit('admin:device-offline', {
-        deviceId: socket.data.deviceId,
+        deviceId,
         timestamp: Date.now(),
       });
     }
