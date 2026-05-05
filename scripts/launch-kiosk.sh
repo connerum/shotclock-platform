@@ -6,6 +6,7 @@ set -e
 export DISPLAY="${DISPLAY:-:0}"
 AGENT_LOCAL_API_PORT="${AGENT_LOCAL_API_PORT:-3001}"
 KIOSK_URL="${KIOSK_URL:-http://127.0.0.1:${AGENT_LOCAL_API_PORT}/}"
+KIOSK_START_TIMEOUT="${KIOSK_START_TIMEOUT:-120}"
 
 echo "Launching Shotclock Kiosk..."
 
@@ -55,6 +56,36 @@ chown "$KIOSK_RUN_USER:$KIOSK_RUN_USER" "$USER_DATA_DIR"
 if command -v xset >/dev/null 2>&1; then
   runuser -u "$KIOSK_RUN_USER" -- env DISPLAY="$DISPLAY" XAUTHORITY="$XAUTHORITY" xset s off -dpms s noblank >/dev/null 2>&1 || true
 fi
+
+wait_for_kiosk_url() {
+  local deadline=$((SECONDS + KIOSK_START_TIMEOUT))
+
+  echo "Waiting up to ${KIOSK_START_TIMEOUT}s for kiosk URL: ${KIOSK_URL}"
+  while [ "$SECONDS" -lt "$deadline" ]; do
+    if command -v curl >/dev/null 2>&1; then
+      if curl -fsS --max-time 2 "$KIOSK_URL" >/dev/null 2>&1; then
+        echo "Kiosk URL is ready"
+        return 0
+      fi
+    elif command -v wget >/dev/null 2>&1; then
+      if wget -q --timeout=2 --tries=1 -O /dev/null "$KIOSK_URL" >/dev/null 2>&1; then
+        echo "Kiosk URL is ready"
+        return 0
+      fi
+    else
+      # If no HTTP probe exists, avoid failing the kiosk outright.
+      sleep 8
+      return 0
+    fi
+
+    sleep 1
+  done
+
+  echo "Kiosk URL did not become ready before timeout"
+  return 1
+}
+
+wait_for_kiosk_url
 
 CHROMIUM_ARGS=(
   --kiosk
