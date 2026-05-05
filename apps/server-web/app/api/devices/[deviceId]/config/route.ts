@@ -57,6 +57,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     if (io) {
       io.of('/device').to(`device:${deviceId}`).emit('config:update', {
         displayProfile: body.displayProfile,
+        calibrationData: body.calibrationData,
         brightness: body.brightness,
         orientation: body.orientation,
       });

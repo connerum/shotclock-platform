@@ -85,7 +85,10 @@ export function setupSocketClient(
   socket.on('config:update', (configUpdate) => {
     console.log('Received config update');
     try {
-      saveState({ displayProfile: configUpdate.displayProfile });
+      saveState({
+        displayProfile: configUpdate.displayProfile,
+        ...(configUpdate.calibrationData && { calibrationData: configUpdate.calibrationData }),
+      });
       sendConfigAck(true);
     } catch (error) {
       console.error('Failed to apply config update:', error);

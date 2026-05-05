@@ -13,15 +13,17 @@ export default function ViewportCanvas({ displayProfile, children }: ViewportCan
 
   return (
     <div
-      className="w-full h-full overflow-hidden"
+      className="w-full h-full overflow-hidden relative"
       style={{
         backgroundColor: cssVariables['--color-background'],
         ...cssVariables,
       }}
     >
       <div
-        className="w-full h-full"
+        className="absolute left-0 top-0 overflow-hidden"
         style={{
+          width: 'calc(var(--viewport-width) * 1px)',
+          height: 'calc(var(--viewport-height) * 1px)',
           transform,
           transformOrigin: 'top left',
         }}

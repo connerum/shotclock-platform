@@ -17,6 +17,9 @@ export function setupDeviceHandlers(socket: TypedSocket, io: TypedServer): void 
       });
 
       const isPaired = isDevicePaired(existingDevice);
+      const storedDisplayProfile = parseJsonField(existingDevice?.displayProfile);
+      const storedCalibrationData = parseJsonField(existingDevice?.calibrationData);
+      const displayProfile = storedDisplayProfile || data.displayProfile;
       const pairingCodeExp = data.pairingCodeExpiresAt
         ? new Date(data.pairingCodeExpiresAt)
         : data.pairingCode
@@ -31,7 +34,7 @@ export function setupDeviceHandlers(socket: TypedSocket, io: TypedServer): void 
           firmwareVersion: data.firmwareVersion,
           controllerType: data.controllerType,
           capabilities: JSON.stringify(data.capabilities || []),
-          displayProfile: JSON.stringify(data.displayProfile),
+          displayProfile: JSON.stringify(displayProfile),
           ...(data.pairingCode && !isPaired ? {
             pairingCode: data.pairingCode,
             pairingCodeExp,
@@ -66,7 +69,8 @@ export function setupDeviceHandlers(socket: TypedSocket, io: TypedServer): void 
       
       // Send initial config to device after hello
       (socket as any).emit('config:update', {
-        displayProfile: data.displayProfile,
+        displayProfile,
+        ...(storedCalibrationData && { calibrationData: storedCalibrationData }),
       });
 
       if (isDevicePaired(device)) {
@@ -209,4 +213,14 @@ export function setupDeviceHandlers(socket: TypedSocket, io: TypedServer): void 
 function isDevicePaired(device: { status: string; mode: string; pairingCode: string | null } | null | undefined): boolean {
   if (!device) return false;
   return device.status === 'paired' || (!device.pairingCode && device.mode !== 'setup');
+}
+
+function parseJsonField(value: string | null | undefined): any | null {
+  if (!value) return null;
+
+  try {
+    return JSON.parse(value);
+  } catch {
+    return null;
+  }
 }

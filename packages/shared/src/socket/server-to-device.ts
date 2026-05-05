@@ -1,6 +1,6 @@
 // Server -> Device socket events
 
-import type { TimerState, DisplayProfile, DeviceMode, PairingResponse } from '../types/index.js';
+import type { TimerState, DisplayProfile, DeviceMode, PairingResponse, CalibrationData } from '../types/index.js';
 
 export interface ServerToDeviceEvents {
   'state:update': (state: TimerState) => void;
@@ -15,6 +15,7 @@ export interface ServerToDeviceEvents {
 
 export interface DisplayConfigPayload {
   displayProfile: DisplayProfile;
+  calibrationData?: CalibrationData;
   brightness?: number;
   orientation?: 'landscape' | 'portrait';
 }

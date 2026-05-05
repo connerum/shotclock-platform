@@ -3,20 +3,13 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
-import type { DeviceMode, TimerState, DisplayProfile } from '@shotclock/shared/types';
+import type { DeviceMode, TimerState, DisplayProfile, CalibrationData } from '@shotclock/shared/types';
 
 export interface DeviceState {
   mode: DeviceMode;
   timerState?: TimerState;
   displayProfile: DisplayProfile;
-  calibrationData?: {
-    x: number;
-    y: number;
-    scaleX: number;
-    scaleY: number;
-    rotation: number;
-    timestamp: number;
-  };
+  calibrationData?: CalibrationData;
   lastUpdated: number;
 }
 

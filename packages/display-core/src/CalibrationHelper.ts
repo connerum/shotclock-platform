@@ -45,6 +45,8 @@ export function resetCalibration(): CalibrationData {
   return {
     x: 0,
     y: 0,
+    width: 1920,
+    height: 1080,
     scaleX: 1,
     scaleY: 1,
     rotation: 0,
@@ -118,6 +120,8 @@ export function createCalibrationFromCorners(
   const calibration: CalibrationData = {
     x,
     y,
+    width: expectedWidth,
+    height: expectedHeight,
     scaleX,
     scaleY,
     rotation,
@@ -142,10 +146,11 @@ export function validateCalibration(calibration: CalibrationData): CalibrationRe
                        calibration.scaleY > 0.01 && calibration.scaleY < 100;
   
   const isValidRotation = calibration.rotation >= -180 && calibration.rotation <= 180;
+  const isValidSize = calibration.width > 0 && calibration.height > 0;
   
   const isValidTimestamp = calibration.timestamp > 0 && calibration.timestamp <= Date.now();
   
-  const isValid = isValidScale && isValidRotation && isValidTimestamp;
+  const isValid = isValidScale && isValidRotation && isValidSize && isValidTimestamp;
   
   return {
     calibration,
@@ -161,6 +166,8 @@ export function mergeCalibration(base: CalibrationData, overlay: CalibrationData
   return {
     x: base.x + overlay.x,
     y: base.y + overlay.y,
+    width: overlay.width,
+    height: overlay.height,
     scaleX: base.scaleX * overlay.scaleX,
     scaleY: base.scaleY * overlay.scaleY,
     rotation: base.rotation + overlay.rotation,

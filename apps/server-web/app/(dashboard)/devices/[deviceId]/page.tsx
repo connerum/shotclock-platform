@@ -1,8 +1,9 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import type { PointerEvent as ReactPointerEvent } from 'react';
 import Link from 'next/link';
-import { DeviceMode, TimerState, DisplayProfile } from '@shotclock/shared/types';
+import { DeviceMode, TimerState, DisplayProfile, CalibrationData } from '@shotclock/shared/types';
 
 interface Device {
   id: string;
@@ -17,10 +18,47 @@ interface Device {
   organization?: { name: string } | null;
   venue?: { name: string } | null;
   displayProfile?: DisplayProfile | null;
-  calibrationData?: { x: number; y: number; scaleX: number; scaleY: number } | null;
+  calibrationData?: Partial<CalibrationData> | null;
 }
 
 const DEVICE_MODES = ['setup', 'pairing', 'offline', 'shot-clock', 'media', 'calibration', 'blank'];
+const CALIBRATION_CANVAS_WIDTH = 1920;
+const CALIBRATION_CANVAS_HEIGHT = 1080;
+const MIN_CALIBRATION_SIZE = 24;
+
+type CalibrationBox = {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  scaleX: number;
+  scaleY: number;
+};
+
+type CalibrationInteraction =
+  | { type: 'draw'; startX: number; startY: number }
+  | { type: 'move'; startX: number; startY: number; startBox: CalibrationBox }
+  | { type: 'resize'; handle: string; startX: number; startY: number; startBox: CalibrationBox };
+
+function clamp(value: number, min: number, max: number) {
+  return Math.max(min, Math.min(max, value));
+}
+
+function clampCalibrationBox(box: CalibrationBox): CalibrationBox {
+  const width = clamp(Math.round(box.width), MIN_CALIBRATION_SIZE, CALIBRATION_CANVAS_WIDTH);
+  const height = clamp(Math.round(box.height), MIN_CALIBRATION_SIZE, CALIBRATION_CANVAS_HEIGHT);
+  const x = clamp(Math.round(box.x), 0, CALIBRATION_CANVAS_WIDTH - width);
+  const y = clamp(Math.round(box.y), 0, CALIBRATION_CANVAS_HEIGHT - height);
+
+  return {
+    x,
+    y,
+    width,
+    height,
+    scaleX: 1,
+    scaleY: 1,
+  };
+}
 
 export default function DeviceDetailPage({ params }: { params: { deviceId: string } }) {
   const deviceId = params.deviceId;
@@ -39,14 +77,17 @@ export default function DeviceDetailPage({ params }: { params: { deviceId: strin
   const [timerRunning, setTimerRunning] = useState(false);
   
   // Calibration state
+  const calibrationStageRef = useRef<HTMLDivElement | null>(null);
+  const calibrationInteractionRef = useRef<CalibrationInteraction | null>(null);
   const [calibration, setCalibration] = useState({
     x: 0,
     y: 0,
-    width: 1920,
-    height: 1080,
-    scaleX: 1.0,
-    scaleY: 1.0,
+    width: CALIBRATION_CANVAS_WIDTH,
+    height: CALIBRATION_CANVAS_HEIGHT,
+    scaleX: 1,
+    scaleY: 1,
   });
+  const [savedCalibration, setSavedCalibration] = useState<CalibrationBox>(calibration);
   
   // Update status
   const [updateStatus, setUpdateStatus] = useState<string>('idle');
@@ -63,16 +104,18 @@ export default function DeviceDetailPage({ params }: { params: { deviceId: strin
       setDevice(data.device);
       
       // Initialize calibration from device
-      if (data.device.calibrationData) {
-        setCalibration({
-          x: data.device.calibrationData.x || 0,
-          y: data.device.calibrationData.y || 0,
-          width: data.device.displayProfile?.viewport?.width || 1920,
-          height: data.device.displayProfile?.viewport?.height || 1080,
-          scaleX: data.device.calibrationData.scaleX || 1.0,
-          scaleY: data.device.calibrationData.scaleY || 1.0,
-        });
-      }
+      const viewport = data.device.displayProfile?.viewport;
+      const calibrationData = data.device.calibrationData || {};
+      const nextCalibration = clampCalibrationBox({
+        x: calibrationData.x ?? viewport?.x ?? 0,
+        y: calibrationData.y ?? viewport?.y ?? 0,
+        width: calibrationData.width ?? viewport?.width ?? CALIBRATION_CANVAS_WIDTH,
+        height: calibrationData.height ?? viewport?.height ?? CALIBRATION_CANVAS_HEIGHT,
+        scaleX: calibrationData.scaleX ?? viewport?.scaleX ?? 1,
+        scaleY: calibrationData.scaleY ?? viewport?.scaleY ?? 1,
+      });
+      setCalibration(nextCalibration);
+      setSavedCalibration(nextCalibration);
     } catch (err) {
       setError('Failed to load device');
       console.error(err);
@@ -156,25 +199,150 @@ export default function DeviceDetailPage({ params }: { params: { deviceId: strin
     setTimerRunning(false);
   };
 
+  const calibrationBoxStyle = useMemo(() => ({
+    left: `${(calibration.x / CALIBRATION_CANVAS_WIDTH) * 100}%`,
+    top: `${(calibration.y / CALIBRATION_CANVAS_HEIGHT) * 100}%`,
+    width: `${(calibration.width / CALIBRATION_CANVAS_WIDTH) * 100}%`,
+    height: `${(calibration.height / CALIBRATION_CANVAS_HEIGHT) * 100}%`,
+  }), [calibration]);
+
+  const calibrationChanged =
+    calibration.x !== savedCalibration.x ||
+    calibration.y !== savedCalibration.y ||
+    calibration.width !== savedCalibration.width ||
+    calibration.height !== savedCalibration.height;
+
+  const getCalibrationPoint = (event: ReactPointerEvent<HTMLDivElement>) => {
+    const rect = calibrationStageRef.current?.getBoundingClientRect();
+    if (!rect) return { x: 0, y: 0 };
+
+    return {
+      x: clamp(((event.clientX - rect.left) / rect.width) * CALIBRATION_CANVAS_WIDTH, 0, CALIBRATION_CANVAS_WIDTH),
+      y: clamp(((event.clientY - rect.top) / rect.height) * CALIBRATION_CANVAS_HEIGHT, 0, CALIBRATION_CANVAS_HEIGHT),
+    };
+  };
+
+  const startDrawCalibrationBox = (event: ReactPointerEvent<HTMLDivElement>) => {
+    const point = getCalibrationPoint(event);
+    calibrationInteractionRef.current = { type: 'draw', startX: point.x, startY: point.y };
+    event.currentTarget.setPointerCapture(event.pointerId);
+    setCalibration(clampCalibrationBox({
+      x: point.x,
+      y: point.y,
+      width: MIN_CALIBRATION_SIZE,
+      height: MIN_CALIBRATION_SIZE,
+      scaleX: 1,
+      scaleY: 1,
+    }));
+  };
+
+  const startMoveCalibrationBox = (event: ReactPointerEvent<HTMLDivElement>) => {
+    event.stopPropagation();
+    const point = getCalibrationPoint(event);
+    calibrationInteractionRef.current = {
+      type: 'move',
+      startX: point.x,
+      startY: point.y,
+      startBox: calibration,
+    };
+    calibrationStageRef.current?.setPointerCapture(event.pointerId);
+  };
+
+  const startResizeCalibrationBox = (event: ReactPointerEvent<HTMLDivElement>, handle: string) => {
+    event.stopPropagation();
+    const point = getCalibrationPoint(event);
+    calibrationInteractionRef.current = {
+      type: 'resize',
+      handle,
+      startX: point.x,
+      startY: point.y,
+      startBox: calibration,
+    };
+    calibrationStageRef.current?.setPointerCapture(event.pointerId);
+  };
+
+  const updateCalibrationInteraction = (event: ReactPointerEvent<HTMLDivElement>) => {
+    const interaction = calibrationInteractionRef.current;
+    if (!interaction) return;
+
+    const point = getCalibrationPoint(event);
+
+    if (interaction.type === 'draw') {
+      const x = Math.min(interaction.startX, point.x);
+      const y = Math.min(interaction.startY, point.y);
+      setCalibration(clampCalibrationBox({
+        x,
+        y,
+        width: Math.abs(point.x - interaction.startX),
+        height: Math.abs(point.y - interaction.startY),
+        scaleX: 1,
+        scaleY: 1,
+      }));
+      return;
+    }
+
+    if (interaction.type === 'move') {
+      setCalibration(clampCalibrationBox({
+        ...interaction.startBox,
+        x: interaction.startBox.x + point.x - interaction.startX,
+        y: interaction.startBox.y + point.y - interaction.startY,
+      }));
+      return;
+    }
+
+    const nextBox = { ...interaction.startBox };
+    const deltaX = point.x - interaction.startX;
+    const deltaY = point.y - interaction.startY;
+
+    if (interaction.handle.includes('w')) {
+      nextBox.x = interaction.startBox.x + deltaX;
+      nextBox.width = interaction.startBox.width - deltaX;
+    }
+    if (interaction.handle.includes('e')) {
+      nextBox.width = interaction.startBox.width + deltaX;
+    }
+    if (interaction.handle.includes('n')) {
+      nextBox.y = interaction.startBox.y + deltaY;
+      nextBox.height = interaction.startBox.height - deltaY;
+    }
+    if (interaction.handle.includes('s')) {
+      nextBox.height = interaction.startBox.height + deltaY;
+    }
+
+    setCalibration(clampCalibrationBox(nextBox));
+  };
+
+  const endCalibrationInteraction = (event: ReactPointerEvent<HTMLDivElement>) => {
+    calibrationInteractionRef.current = null;
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+  };
+
   const saveCalibration = async () => {
     setSaving(true);
     try {
+      const viewport = {
+        x: calibration.x,
+        y: calibration.y,
+        width: calibration.width,
+        height: calibration.height,
+        rotation: 0,
+        scaleX: 1,
+        scaleY: 1,
+      };
       const displayProfile: DisplayProfile = {
         id: device?.displayProfile?.id || 'default',
         name: device?.displayProfile?.name || 'Default',
         controllerType: device?.controllerType as any || 'generic',
-        viewport: {
-          x: calibration.x,
-          y: calibration.y,
-          width: calibration.width,
-          height: calibration.height,
-          rotation: 0,
-          scaleX: calibration.scaleX,
-          scaleY: calibration.scaleY,
-        },
+        viewport,
         safeZone: device?.displayProfile?.safeZone || { top: 40, right: 40, bottom: 40, left: 40 },
         fontSize: device?.displayProfile?.fontSize || { shotClock: 200, gameClock: 120, score: 150, period: 80, label: 40 },
         colors: device?.displayProfile?.colors || { background: '#000000', foreground: '#ffffff', accent: '#00ff00', homeTeam: '#ff0000', awayTeam: '#0000ff', warning: '#ffff00', danger: '#ff0000' },
+      };
+      const calibrationData: CalibrationData = {
+        ...viewport,
+        timestamp: Date.now(),
       };
 
       const res = await fetch(`/api/devices/${deviceId}/config`, {
@@ -182,12 +350,13 @@ export default function DeviceDetailPage({ params }: { params: { deviceId: strin
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           displayProfile,
-          calibrationData: { x: calibration.x, y: calibration.y, scaleX: calibration.scaleX, scaleY: calibration.scaleY },
+          calibrationData,
         }),
       });
       
       if (res.ok) {
-        setDevice(prev => prev ? { ...prev, displayProfile, calibrationData: { x: calibration.x, y: calibration.y, scaleX: calibration.scaleX, scaleY: calibration.scaleY } } : null);
+        setSavedCalibration(calibration);
+        setDevice(prev => prev ? { ...prev, displayProfile, calibrationData } : null);
       }
     } finally {
       setSaving(false);
@@ -195,14 +364,14 @@ export default function DeviceDetailPage({ params }: { params: { deviceId: strin
   };
 
   const resetCalibration = () => {
-    setCalibration({
+    setCalibration(clampCalibrationBox({
       x: 0,
       y: 0,
-      width: 1920,
-      height: 1080,
-      scaleX: 1.0,
-      scaleY: 1.0,
-    });
+      width: CALIBRATION_CANVAS_WIDTH,
+      height: CALIBRATION_CANVAS_HEIGHT,
+      scaleX: 1,
+      scaleY: 1,
+    }));
   };
 
   const showTestPattern = async () => {
@@ -462,94 +631,88 @@ export default function DeviceDetailPage({ params }: { params: { deviceId: strin
         <div className="bg-gray-900 rounded-lg p-6">
           <h2 className="text-xl font-semibold mb-4">Display Calibration</h2>
           <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm text-gray-400 mb-1">X Offset</label>
-                <input
-                  type="range"
-                  min="0"
-                  max="1920"
-                  value={calibration.x}
-                  onChange={(e) => setCalibration({ ...calibration, x: parseInt(e.target.value) })}
-                  className="w-full"
-                />
-                <input
-                  type="number"
-                  value={calibration.x}
-                  onChange={(e) => setCalibration({ ...calibration, x: parseInt(e.target.value) || 0 })}
-                  className="w-full bg-gray-800 rounded px-2 py-1 mt-1"
-                />
+            <div
+              ref={calibrationStageRef}
+              onPointerDown={startDrawCalibrationBox}
+              onPointerMove={updateCalibrationInteraction}
+              onPointerUp={endCalibrationInteraction}
+              onPointerCancel={endCalibrationInteraction}
+              className="relative aspect-video w-full overflow-hidden rounded border border-gray-700 bg-black touch-none select-none cursor-crosshair"
+            >
+              <div className="absolute inset-0 opacity-35">
+                {[...Array(11)].map((_, index) => (
+                  <div
+                    key={`v-${index}`}
+                    className="absolute top-0 h-full border-l border-gray-600"
+                    style={{ left: `${index * 10}%` }}
+                  />
+                ))}
+                {[...Array(11)].map((_, index) => (
+                  <div
+                    key={`h-${index}`}
+                    className="absolute left-0 w-full border-t border-gray-600"
+                    style={{ top: `${index * 10}%` }}
+                  />
+                ))}
               </div>
-              <div>
-                <label className="block text-sm text-gray-400 mb-1">Y Offset</label>
-                <input
-                  type="range"
-                  min="0"
-                  max="1080"
-                  value={calibration.y}
-                  onChange={(e) => setCalibration({ ...calibration, y: parseInt(e.target.value) })}
-                  className="w-full"
-                />
-                <input
-                  type="number"
-                  value={calibration.y}
-                  onChange={(e) => setCalibration({ ...calibration, y: parseInt(e.target.value) || 0 })}
-                  className="w-full bg-gray-800 rounded px-2 py-1 mt-1"
-                />
-              </div>
-              <div>
-                <label className="block text-sm text-gray-400 mb-1">Width</label>
-                <input
-                  type="range"
-                  min="100"
-                  max="1920"
-                  value={calibration.width}
-                  onChange={(e) => setCalibration({ ...calibration, width: parseInt(e.target.value) })}
-                  className="w-full"
-                />
-                <input
-                  type="number"
-                  value={calibration.width}
-                  onChange={(e) => setCalibration({ ...calibration, width: parseInt(e.target.value) || 100 })}
-                  className="w-full bg-gray-800 rounded px-2 py-1 mt-1"
-                />
-              </div>
-              <div>
-                <label className="block text-sm text-gray-400 mb-1">Height</label>
-                <input
-                  type="range"
-                  min="100"
-                  max="1080"
-                  value={calibration.height}
-                  onChange={(e) => setCalibration({ ...calibration, height: parseInt(e.target.value) })}
-                  className="w-full"
-                />
-                <input
-                  type="number"
-                  value={calibration.height}
-                  onChange={(e) => setCalibration({ ...calibration, height: parseInt(e.target.value) || 100 })}
-                  className="w-full bg-gray-800 rounded px-2 py-1 mt-1"
-                />
+              <div className="absolute left-1/2 top-0 h-full border-l border-green-500/50" />
+              <div className="absolute left-0 top-1/2 w-full border-t border-green-500/50" />
+              <div
+                onPointerDown={startMoveCalibrationBox}
+                className="absolute border-2 border-green-400 bg-green-500/10 cursor-move"
+                style={calibrationBoxStyle}
+              >
+                <div className="absolute inset-0 flex items-center justify-center text-xs font-mono text-green-200 pointer-events-none">
+                  {calibration.width} x {calibration.height}
+                </div>
+                {[
+                  ['nw', '-left-2 -top-2 cursor-nwse-resize'],
+                  ['n', 'left-1/2 -top-2 -translate-x-1/2 cursor-ns-resize'],
+                  ['ne', '-right-2 -top-2 cursor-nesw-resize'],
+                  ['e', '-right-2 top-1/2 -translate-y-1/2 cursor-ew-resize'],
+                  ['se', '-right-2 -bottom-2 cursor-nwse-resize'],
+                  ['s', 'left-1/2 -bottom-2 -translate-x-1/2 cursor-ns-resize'],
+                  ['sw', '-left-2 -bottom-2 cursor-nesw-resize'],
+                  ['w', '-left-2 top-1/2 -translate-y-1/2 cursor-ew-resize'],
+                ].map(([handle, position]) => (
+                  <div
+                    key={handle}
+                    onPointerDown={(event) => startResizeCalibrationBox(event, handle)}
+                    className={`absolute h-4 w-4 rounded-sm border border-black bg-green-400 ${position}`}
+                  />
+                ))}
               </div>
             </div>
-            <div>
-              <label className="block text-sm text-gray-400 mb-1">Scale</label>
-              <input
-                type="range"
-                min="50"
-                max="300"
-                value={calibration.scaleX * 100}
-                onChange={(e) => setCalibration({ ...calibration, scaleX: parseInt(e.target.value) / 100, scaleY: parseInt(e.target.value) / 100 })}
-                className="w-full"
-              />
-              <input
-                type="number"
-                step="0.01"
-                value={calibration.scaleX}
-                onChange={(e) => setCalibration({ ...calibration, scaleX: parseFloat(e.target.value) || 1, scaleY: parseFloat(e.target.value) || 1 })}
-                className="w-full bg-gray-800 rounded px-2 py-1 mt-1"
-              />
+
+            <div className="grid grid-cols-4 gap-2 text-center text-sm">
+              <div className="rounded bg-gray-800 p-3">
+                <div className="text-gray-400">X</div>
+                <div className="mt-1 font-mono text-lg">{calibration.x}</div>
+              </div>
+              <div className="rounded bg-gray-800 p-3">
+                <div className="text-gray-400">Y</div>
+                <div className="mt-1 font-mono text-lg">{calibration.y}</div>
+              </div>
+              <div className="rounded bg-gray-800 p-3">
+                <div className="text-gray-400">Width</div>
+                <div className="mt-1 font-mono text-lg">{calibration.width}</div>
+              </div>
+              <div className="rounded bg-gray-800 p-3">
+                <div className="text-gray-400">Height</div>
+                <div className="mt-1 font-mono text-lg">{calibration.height}</div>
+              </div>
             </div>
+
+            <div className="rounded border border-gray-800 bg-gray-950 p-3 text-xs text-gray-400">
+              <div className="mb-2 font-medium text-gray-300">Saved calibration</div>
+              <div className="grid grid-cols-4 gap-2 font-mono">
+                <span>X {savedCalibration.x}</span>
+                <span>Y {savedCalibration.y}</span>
+                <span>W {savedCalibration.width}</span>
+                <span>H {savedCalibration.height}</span>
+              </div>
+            </div>
+
             <div className="flex space-x-2 pt-2">
               <button 
                 onClick={showTestPattern}
@@ -569,7 +732,7 @@ export default function DeviceDetailPage({ params }: { params: { deviceId: strin
               disabled={saving}
               className="w-full bg-green-600 hover:bg-green-700 py-2 rounded font-medium disabled:opacity-50"
             >
-              {saving ? 'Saving...' : 'Save Calibration'}
+              {saving ? 'Saving...' : calibrationChanged ? 'Save Calibration' : 'Calibration Saved'}
             </button>
           </div>
         </div>

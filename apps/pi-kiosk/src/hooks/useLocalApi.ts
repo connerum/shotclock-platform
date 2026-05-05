@@ -1,7 +1,7 @@
 // useLocalApi hook - Polls /local/state, /local/config
 
 import { useState, useEffect, useCallback } from 'react';
-import type { TimerState, DeviceMode, DisplayProfile } from '@shotclock/shared/types';
+import type { TimerState, DeviceMode, DisplayProfile, CalibrationData } from '@shotclock/shared/types';
 
 interface LocalApiState {
   mode?: DeviceMode;
@@ -10,14 +10,7 @@ interface LocalApiState {
 
 interface LocalApiConfig {
   displayProfile: DisplayProfile;
-  calibrationData?: {
-    x: number;
-    y: number;
-    scaleX: number;
-    scaleY: number;
-    rotation: number;
-    timestamp: number;
-  };
+  calibrationData?: CalibrationData;
 }
 
 interface UseLocalApiResult {

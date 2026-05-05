@@ -74,6 +74,8 @@ export interface ColorConfig {
 export interface CalibrationData {
   x: number;
   y: number;
+  width: number;
+  height: number;
   scaleX: number;
   scaleY: number;
   rotation: number;
@@ -199,6 +201,7 @@ export interface HeartbeatPayload {
 
 export interface DisplayConfigPayload {
   displayProfile: DisplayProfile;
+  calibrationData?: CalibrationData;
   brightness?: number;
   orientation?: 'landscape' | 'portrait';
 }
