@@ -295,26 +295,29 @@ async function persistTimerCommand(
 }
 
 async function resetDeviceRecordAfterFactoryReset(deviceId: string): Promise<void> {
-  await prisma.displayState.delete({
+  const device = await prisma.device.findUnique({
     where: { deviceId },
-  }).catch(() => {});
+    select: { id: true, deviceId: true },
+  });
 
-  await prisma.device.update({
-    where: { deviceId },
-    data: {
-      ownerUserId: null,
-      organizationId: null,
-      venueId: null,
-      pairingCode: null,
-      pairingCodeExp: null,
-      displayProfile: null,
-      displayState: null,
-      calibrationData: null,
-      mode: 'setup',
-      status: 'offline',
-      isOnline: false,
-    },
-  }).catch((error) => {
-    console.warn(`Unable to reset server device record for ${deviceId}`, error);
+  if (!device) return;
+
+  await prisma.$transaction([
+    prisma.displayState.deleteMany({
+      where: { deviceId },
+    }),
+    prisma.deviceUpdate.deleteMany({
+      where: {
+        OR: [
+          { deviceId: device.id },
+          { deviceId },
+        ],
+      },
+    }),
+    prisma.device.delete({
+      where: { deviceId },
+    }),
+  ]).catch((error) => {
+    console.warn(`Unable to remove server device record for ${deviceId}`, error);
   });
 }

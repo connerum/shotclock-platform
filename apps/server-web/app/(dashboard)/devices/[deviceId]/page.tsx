@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { PointerEvent as ReactPointerEvent } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { DeviceMode, TimerState, DisplayProfile, CalibrationData } from '@shotclock/shared/types';
 
 interface Device {
@@ -62,6 +63,7 @@ function clampCalibrationBox(box: CalibrationBox): CalibrationBox {
 
 export default function DeviceDetailPage({ params }: { params: { deviceId: string } }) {
   const deviceId = params.deviceId;
+  const router = useRouter();
   
   const [device, setDevice] = useState<Device | null>(null);
   const [loading, setLoading] = useState(true);
@@ -478,7 +480,9 @@ export default function DeviceDetailPage({ params }: { params: { deviceId: strin
     setFactoryResetting(true);
     const success = await sendCommand('factory_reset');
     if (success) {
-      setDevice(prev => prev ? { ...prev, mode: 'setup', status: 'offline', isOnline: false } : null);
+      router.push('/devices');
+      router.refresh();
+      return;
     }
     setFactoryResetting(false);
   };

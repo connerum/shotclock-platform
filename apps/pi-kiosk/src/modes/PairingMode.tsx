@@ -27,41 +27,33 @@ export default function PairingMode() {
 
   if (isLoading) {
     return (
-      <div className="w-full h-full flex items-center justify-center bg-black text-white">
-        <p className="text-2xl">Loading...</p>
+      <div className="flex h-full w-full items-center justify-center bg-black text-white">
+        <p className="font-mono text-[min(11cqw,14cqh)]">Loading</p>
       </div>
     );
   }
 
   return (
-    <div className="w-full h-full flex flex-col items-center justify-center bg-black text-white p-8">
-      <div className="text-center">
-        <h1 className="text-4xl font-bold text-green-500 mb-4">Pairing Mode</h1>
-        <p className="text-gray-400 mb-8">Enter this code on the Shotclock dashboard</p>
-        
-        <div className="bg-gray-900 rounded-lg p-12 mb-8">
-          <p className="text-2xl font-mono tracking-widest">
-            {displayCode.split('').map((char, i) => (
-              <span
-                key={i}
-                className={`inline-block mx-1 ${
-                  char !== '-' ? 'text-green-400' : 'text-gray-600'
-                }`}
-                style={{
-                  fontSize: '8rem',
-                  minWidth: '5rem',
-                  textAlign: 'center',
-                }}
-              >
-                {char}
-              </span>
-            ))}
-          </p>
+    <div
+      className="grid h-full w-full grid-rows-[22%_48%_16%_14%] overflow-hidden bg-black px-2 py-1 text-center text-white"
+      style={{ containerType: 'size' }}
+    >
+      <div className="flex min-h-0 items-center justify-center overflow-hidden font-bold uppercase leading-none tracking-normal text-green-500 text-[min(9cqw,12cqh)]">
+        Pairing
+      </div>
+
+      <div className="flex min-h-0 items-center justify-center overflow-hidden rounded border border-green-500/50 bg-gray-950 px-1">
+        <div className="font-mono font-black leading-none tracking-[0.08em] tabular-nums text-green-400 text-[min(17cqw,38cqh)]">
+          {displayCode}
         </div>
-        
-        <div className="text-gray-500">
-          <p>Code expires in: <span className="text-yellow-400 font-mono">{formattedTime}</span></p>
-        </div>
+      </div>
+
+      <div className="flex min-h-0 items-center justify-center overflow-hidden leading-none text-gray-300 text-[min(5.5cqw,8cqh)]">
+        Enter on dashboard
+      </div>
+
+      <div className="flex min-h-0 items-center justify-center overflow-hidden font-mono leading-none text-yellow-400 text-[min(5cqw,7cqh)]">
+        {formattedTime}
       </div>
     </div>
   );

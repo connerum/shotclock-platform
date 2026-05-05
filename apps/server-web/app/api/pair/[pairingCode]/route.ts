@@ -33,7 +33,7 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
       });
     }
 
-    if (device.ownerUserId && !canAccessDevice(auth, device)) {
+    if (device.status === 'paired' && device.ownerUserId && !canAccessDevice(auth, device)) {
       return NextResponse.json({
         valid: false,
         error: 'Invalid or expired pairing code',
@@ -84,7 +84,7 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
       }, { status: 404 });
     }
 
-    if (device.ownerUserId && !canAccessDevice(auth, device)) {
+    if (device.status === 'paired' && device.ownerUserId && !canAccessDevice(auth, device)) {
       return NextResponse.json({
         success: false,
         error: 'Invalid pairing code',

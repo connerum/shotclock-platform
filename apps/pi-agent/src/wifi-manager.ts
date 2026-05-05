@@ -209,7 +209,12 @@ export class WiFiManager {
 
     try {
       await execFileAsync('nmcli', args, { timeout: 45000 });
-      return this.waitForConnection(ssid, 20000);
+      const connected = await this.waitForConnection(ssid, 20000);
+      if (connected) {
+        const activeProfile = await this.getActiveConnectionName();
+        await this.normalizeSystemWifiProfile(activeProfile || ssid);
+      }
+      return connected;
     } catch (error) {
       console.warn(`Scan-based WiFi connect failed for ${ssid}:`, this.formatCommandError(error));
       return false;
@@ -239,6 +244,8 @@ export class WiFiManager {
       profileName,
       'connection.autoconnect',
       'yes',
+      'connection.permissions',
+      '',
       '802-11-wireless.hidden',
       'yes',
       'ipv4.method',
@@ -254,6 +261,8 @@ export class WiFiManager {
         profileName,
         '802-11-wireless-security.key-mgmt',
         'wpa-psk',
+        '802-11-wireless-security.psk-flags',
+        '0',
         '802-11-wireless-security.psk',
         password,
       ]);
@@ -263,13 +272,51 @@ export class WiFiManager {
       await execFileAsync('nmcli', ['connection', 'up', profileName], { timeout: 60000 });
       const connectedByProfile = await this.waitForConnection(profileName, 30000);
       if (connectedByProfile) {
+        await this.normalizeSystemWifiProfile(profileName);
         return true;
       }
-      return this.waitForConnection(ssid, 30000);
+      const connectedBySsid = await this.waitForConnection(ssid, 30000);
+      if (connectedBySsid) {
+        await this.normalizeSystemWifiProfile(profileName);
+      }
+      return connectedBySsid;
     } catch (error) {
       console.error(`Profile-based WiFi connect failed for ${ssid}:`, this.formatCommandError(error));
       return false;
     }
+  }
+
+  private async getActiveConnectionName(): Promise<string | null> {
+    try {
+      const { stdout } = await execFileAsync('nmcli', ['-t', '-f', 'GENERAL.CONNECTION', 'device', 'show', this.iface]);
+      const line = stdout.split('\n').find((entry) => entry.startsWith('GENERAL.CONNECTION:'));
+      const value = line?.slice('GENERAL.CONNECTION:'.length).trim();
+      return value && value !== '--' ? value : null;
+    } catch {
+      return null;
+    }
+  }
+
+  private async normalizeSystemWifiProfile(profileName: string): Promise<void> {
+    await execFileAsync('nmcli', [
+      'connection',
+      'modify',
+      profileName,
+      'connection.autoconnect',
+      'yes',
+      'connection.permissions',
+      '',
+    ]).catch((error) => {
+      console.warn(`Failed to normalize WiFi profile ${profileName}:`, this.formatCommandError(error));
+    });
+
+    await execFileAsync('nmcli', [
+      'connection',
+      'modify',
+      profileName,
+      '802-11-wireless-security.psk-flags',
+      '0',
+    ]).catch(() => {});
   }
 
   private async waitForManagedDevice(timeoutMs: number): Promise<void> {

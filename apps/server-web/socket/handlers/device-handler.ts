@@ -16,7 +16,9 @@ export function setupDeviceHandlers(socket: TypedSocket, io: TypedServer): void 
         where: { deviceId: data.deviceId },
       });
 
-      const isPaired = isDevicePaired(existingDevice);
+      const shouldAcceptPairingCode = Boolean(data.pairingCode) &&
+        (!existingDevice?.ownerUserId || existingDevice.status !== 'paired');
+      const isPaired = isDevicePaired(existingDevice) && !shouldAcceptPairingCode;
       const storedDisplayProfile = parseJsonField(existingDevice?.displayProfile);
       const storedCalibrationData = parseJsonField(existingDevice?.calibrationData);
       const displayProfile = storedDisplayProfile || data.displayProfile;
@@ -35,11 +37,12 @@ export function setupDeviceHandlers(socket: TypedSocket, io: TypedServer): void 
           controllerType: data.controllerType,
           capabilities: JSON.stringify(data.capabilities || []),
           displayProfile: JSON.stringify(displayProfile),
-          ...(data.pairingCode && !isPaired ? {
+          ...(data.pairingCode && shouldAcceptPairingCode ? {
             pairingCode: data.pairingCode,
             pairingCodeExp,
             status: 'unpaired',
             mode: 'pairing',
+            ownerUserId: null,
           } : {}),
           isOnline: true,
           lastSeen: new Date(),
@@ -105,6 +108,11 @@ export function setupDeviceHandlers(socket: TypedSocket, io: TypedServer): void 
       const nextMode = isPaired && ['setup', 'pairing'].includes(data.mode.type)
         ? existingPairedMode
         : data.mode.type;
+      const nextStatus = isPaired
+        ? 'paired'
+        : existingDevice?.pairingCode || data.mode.type === 'pairing'
+          ? 'unpaired'
+          : 'online';
 
       // Update last seen and mode
       await prisma.device.update({
@@ -113,7 +121,7 @@ export function setupDeviceHandlers(socket: TypedSocket, io: TypedServer): void 
           lastSeen: new Date(),
           mode: nextMode,
           isOnline: true,
-          status: isPaired ? 'paired' : 'online',
+          status: nextStatus,
         },
       }).catch(() => {}); // Ignore if device doesn't exist
       
@@ -212,7 +220,7 @@ export function setupDeviceHandlers(socket: TypedSocket, io: TypedServer): void 
 
 function isDevicePaired(device: { status: string; mode: string; pairingCode: string | null } | null | undefined): boolean {
   if (!device) return false;
-  return device.status === 'paired' || (!device.pairingCode && device.mode !== 'setup');
+  return device.status === 'paired';
 }
 
 function parseJsonField(value: string | null | undefined): any | null {

@@ -72,6 +72,8 @@ CHROMIUM_ARGS=(
   --disable-default-apps
   --no-first-run
   --noerrdialogs
+  --password-store=basic
+  --use-mock-keychain
   --ignore-gpu-blocklist
   --user-data-dir="$USER_DATA_DIR"
   "$KIOSK_URL"

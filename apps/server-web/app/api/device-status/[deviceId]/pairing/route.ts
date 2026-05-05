@@ -28,7 +28,7 @@ export async function GET(_request: Request, { params }: RouteParams) {
         deviceId: device.deviceId,
         status: device.status,
         mode: device.mode,
-        isPaired: device.status === 'paired' || (!device.pairingCode && device.mode !== 'setup'),
+        isPaired: device.status === 'paired',
         organizationId: device.organizationId,
         venueId: device.venueId,
       },
