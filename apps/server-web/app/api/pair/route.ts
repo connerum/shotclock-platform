@@ -3,9 +3,13 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { requireApiUser } from '@/lib/auth';
 
 export async function POST(request: NextRequest) {
   try {
+    const auth = await requireApiUser();
+    if (auth instanceof Response) return auth;
+
     const body = await request.json();
     const { deviceName, organizationId, venueId, controllerType, deviceId } = body;
 
@@ -27,6 +31,7 @@ export async function POST(request: NextRequest) {
         pairingCode,
         pairingCodeExp,
         status: 'unpaired',
+        ownerUserId: auth.id,
       },
       create: {
         deviceId: deviceId || `temp-${Date.now()}`,
@@ -37,6 +42,7 @@ export async function POST(request: NextRequest) {
         pairingCode,
         pairingCodeExp,
         status: 'unpaired',
+        ownerUserId: auth.id,
       },
     });
 

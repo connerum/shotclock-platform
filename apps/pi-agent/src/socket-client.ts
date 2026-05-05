@@ -189,7 +189,7 @@ export function startPairingReconciliation(identity: DeviceIdentity, config: Age
     inFlight = true;
     try {
       const serverUrl = config.serverUrl.replace(/\/$/, '');
-      const response = await fetch(`${serverUrl}/api/devices/${identity.deviceId}`, {
+      const response = await fetch(`${serverUrl}/api/device-status/${identity.deviceId}/pairing`, {
         headers: { Accept: 'application/json' },
       });
 
@@ -202,14 +202,14 @@ export function startPairingReconciliation(identity: DeviceIdentity, config: Age
           mode?: string;
           organizationId?: string | null;
           venueId?: string | null;
-          pairingCode?: string | null;
+          isPaired?: boolean;
         };
       };
       const device = data.device;
 
       if (
         device?.deviceId === identity.deviceId &&
-        (device.status === 'paired' || (!device.pairingCode && device.mode !== 'setup'))
+        (device.isPaired || device.status === 'paired' || device.mode === 'shot-clock')
       ) {
         applyPairingComplete({
           success: true,

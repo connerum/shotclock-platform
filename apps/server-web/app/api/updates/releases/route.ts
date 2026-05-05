@@ -3,9 +3,13 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { requireApiUser } from '@/lib/auth';
 
 export async function GET() {
   try {
+    const auth = await requireApiUser();
+    if (auth instanceof Response) return auth;
+
     const releases = await prisma.firmwareRelease.findMany({
       orderBy: { releaseDate: 'desc' },
     });
@@ -19,6 +23,9 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
+    const auth = await requireApiUser();
+    if (auth instanceof Response) return auth;
+
     const body = await request.json();
     const { version, downloadUrl, checksum, size, notes, isMandatory, minServerVersion } = body;
 

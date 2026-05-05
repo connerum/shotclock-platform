@@ -4,6 +4,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getServerIO } from '@/lib/socket';
+import { canAccessDevice, requireApiUser } from '@/lib/auth';
 
 interface RouteParams {
   params: { deviceId: string };
@@ -11,6 +12,9 @@ interface RouteParams {
 
 export async function GET(_request: NextRequest, { params }: RouteParams) {
   try {
+    const auth = await requireApiUser();
+    if (auth instanceof Response) return auth;
+
     const { deviceId } = params;
 
     const device = await prisma.device.findUnique({
@@ -18,6 +22,10 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
     });
 
     if (!device) {
+      return NextResponse.json({ error: 'Device not found' }, { status: 404 });
+    }
+
+    if (!canAccessDevice(auth, device)) {
       return NextResponse.json({ error: 'Device not found' }, { status: 404 });
     }
 
@@ -35,8 +43,20 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
 
 export async function PATCH(request: NextRequest, { params }: RouteParams) {
   try {
+    const auth = await requireApiUser();
+    if (auth instanceof Response) return auth;
+
     const { deviceId } = params;
     const body = await request.json();
+
+    const device = await prisma.device.findUnique({
+      where: { deviceId },
+      select: { ownerUserId: true },
+    });
+
+    if (!device || !canAccessDevice(auth, device)) {
+      return NextResponse.json({ error: 'Device not found' }, { status: 404 });
+    }
 
     const updateData: any = {};
     

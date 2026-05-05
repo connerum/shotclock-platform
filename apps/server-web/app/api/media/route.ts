@@ -5,9 +5,13 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { writeFile, mkdir } from 'fs/promises';
 import { join } from 'path';
+import { requireApiUser } from '@/lib/auth';
 
 export async function GET() {
   try {
+    const auth = await requireApiUser();
+    if (auth instanceof Response) return auth;
+
     const mediaAssets = await prisma.mediaAsset.findMany({
       orderBy: { createdAt: 'desc' },
     });
@@ -21,6 +25,9 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
+    const auth = await requireApiUser();
+    if (auth instanceof Response) return auth;
+
     const formData = await request.formData();
     const file = formData.get('file') as File | null;
     const organizationId = formData.get('organizationId') as string | null;

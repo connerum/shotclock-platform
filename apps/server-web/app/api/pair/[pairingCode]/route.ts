@@ -5,6 +5,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getServerIO } from '@/lib/socket';
+import { canAccessDevice, requireApiUser } from '@/lib/auth';
 
 interface RouteParams {
   params: { pairingCode: string };
@@ -12,6 +13,9 @@ interface RouteParams {
 
 export async function GET(_request: NextRequest, { params }: RouteParams) {
   try {
+    const auth = await requireApiUser();
+    if (auth instanceof Response) return auth;
+
     const { pairingCode } = params;
 
     // Find device with this pairing code
@@ -23,6 +27,13 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
     });
 
     if (!device) {
+      return NextResponse.json({
+        valid: false,
+        error: 'Invalid or expired pairing code',
+      });
+    }
+
+    if (device.ownerUserId && !canAccessDevice(auth, device)) {
       return NextResponse.json({
         valid: false,
         error: 'Invalid or expired pairing code',
@@ -54,6 +65,9 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
 
 export async function POST(_request: NextRequest, { params }: RouteParams) {
   try {
+    const auth = await requireApiUser();
+    if (auth instanceof Response) return auth;
+
     const { pairingCode } = params;
 
     const device = await prisma.device.findFirst({
@@ -64,6 +78,13 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
     });
 
     if (!device) {
+      return NextResponse.json({
+        success: false,
+        error: 'Invalid pairing code',
+      }, { status: 404 });
+    }
+
+    if (device.ownerUserId && !canAccessDevice(auth, device)) {
       return NextResponse.json({
         success: false,
         error: 'Invalid pairing code',
@@ -84,6 +105,7 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
         mode: 'shot-clock',
         pairingCode: null,
         pairingCodeExp: null,
+        ownerUserId: device.ownerUserId || auth.id,
       },
     });
 

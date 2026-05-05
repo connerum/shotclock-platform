@@ -1,12 +1,15 @@
 // Dashboard layout with navigation
 
 import Link from 'next/link';
+import { requireUser } from '@/lib/auth';
 
-export default function DashboardLayout({
+export default async function DashboardLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const user = await requireUser();
+
   return (
     <div className="cc-shell">
       <nav className="cc-header">
@@ -38,9 +41,16 @@ export default function DashboardLayout({
                 </Link>
               </div>
             </div>
-            <div className="cc-status cc-status-muted px-3 py-1 text-xs font-semibold">
-              <span className="cc-dot"></span>
-              Platform v0.1.0
+            <div className="flex items-center gap-3">
+              <div className="hidden text-right text-xs text-white/50 sm:block">
+                <div className="font-semibold text-white/70">{user.email}</div>
+                <div>{user.role === 'super' ? 'Super Admin' : 'User'}</div>
+              </div>
+              <form action="/api/auth/logout" method="post">
+                <button className="cc-btn cc-btn-secondary px-3 py-1.5 text-xs" type="submit">
+                  Sign Out
+                </button>
+              </form>
             </div>
           </div>
         </div>

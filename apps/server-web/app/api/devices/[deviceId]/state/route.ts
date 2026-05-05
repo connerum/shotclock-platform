@@ -5,6 +5,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getServerIO } from '@/lib/socket';
 import { TimerState } from '@shotclock/shared/types';
+import { canAccessDevice, requireApiUser } from '@/lib/auth';
 
 interface RouteParams {
   params: { deviceId: string };
@@ -12,7 +13,19 @@ interface RouteParams {
 
 export async function GET(_request: NextRequest, { params }: RouteParams) {
   try {
+    const auth = await requireApiUser();
+    if (auth instanceof Response) return auth;
+
     const { deviceId } = params;
+
+    const device = await prisma.device.findUnique({
+      where: { deviceId },
+      select: { ownerUserId: true },
+    });
+
+    if (!device || !canAccessDevice(auth, device)) {
+      return NextResponse.json({ error: 'Device not found' }, { status: 404 });
+    }
 
     const state = await prisma.displayState.findUnique({
       where: { deviceId },
@@ -42,9 +55,21 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
 
 export async function POST(request: NextRequest, { params }: RouteParams) {
   try {
+    const auth = await requireApiUser();
+    if (auth instanceof Response) return auth;
+
     const { deviceId } = params;
     const body = await request.json();
     const { mode, timerState, mediaAssetId } = body;
+
+    const device = await prisma.device.findUnique({
+      where: { deviceId },
+      select: { ownerUserId: true },
+    });
+
+    if (!device || !canAccessDevice(auth, device)) {
+      return NextResponse.json({ error: 'Device not found' }, { status: 404 });
+    }
 
     // Upsert the display state
     const state = await prisma.displayState.upsert({

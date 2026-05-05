@@ -5,6 +5,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getServerIO } from '@/lib/socket';
 import { DeviceMode, TimerState } from '@shotclock/shared/types';
+import { canAccessDevice, requireApiUser } from '@/lib/auth';
 
 interface RouteParams {
   params: { deviceId: string };
@@ -12,6 +13,9 @@ interface RouteParams {
 
 export async function POST(request: NextRequest, { params }: RouteParams) {
   try {
+    const auth = await requireApiUser();
+    if (auth instanceof Response) return auth;
+
     const { deviceId } = params;
     const body = await request.json();
     const { type, payload } = body;
@@ -25,10 +29,17 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
     const device = await prisma.device.findUnique({
       where: { deviceId },
-      select: { deviceId: true },
+      select: { deviceId: true, ownerUserId: true },
     });
 
     if (!device) {
+      return NextResponse.json(
+        { error: `Device not found: ${deviceId}` },
+        { status: 404 }
+      );
+    }
+
+    if (!canAccessDevice(auth, device)) {
       return NextResponse.json(
         { error: `Device not found: ${deviceId}` },
         { status: 404 }

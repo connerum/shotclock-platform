@@ -41,6 +41,7 @@ model Device {
   deviceId         String        @unique
   organizationId   String?
   venueId          String?
+  ownerUserId      String?
   pairingCode      String?
   pairingCodeExp   DateTime?
   firmwareVersion  String?
@@ -58,8 +59,11 @@ model Device {
 
   organization Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
   venue        Venue?        @relation(fields: [venueId], references: [id], onDelete: SetNull)
+  ownerUser    User?         @relation(fields: [ownerUserId], references: [id], onDelete: SetNull)
   updates      DeviceUpdate[]
   state        DisplayState?
+
+  @@index([ownerUserId])
 }
 
 model DisplayState {
@@ -131,4 +135,5 @@ model User {
   updatedAt      DateTime     @updatedAt
 
   organization Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+  devices      Device[]
 }

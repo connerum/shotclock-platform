@@ -3,10 +3,15 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { requireApiUser, scopedDeviceWhere } from '@/lib/auth';
 
 export async function GET() {
   try {
+    const auth = await requireApiUser();
+    if (auth instanceof Response) return auth;
+
     const devices = await prisma.device.findMany({
+      where: scopedDeviceWhere(auth),
       include: {
         organization: true,
         venue: true,
@@ -35,6 +40,9 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
+    const auth = await requireApiUser();
+    if (auth instanceof Response) return auth;
+
     const body = await request.json();
     const { deviceId, name, organizationId, venueId, controllerType } = body;
 
@@ -55,6 +63,7 @@ export async function POST(request: NextRequest) {
         name,
         organizationId: organizationId || null,
         venueId: venueId || null,
+        ownerUserId: auth.id,
         controllerType: controllerType || 'generic',
         pairingCode,
         pairingCodeExp,
