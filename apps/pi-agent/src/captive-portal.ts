@@ -5,6 +5,7 @@ import { setupAP } from './setup-ap.js';
 import { wifiManager } from './wifi-manager.js';
 import { saveConfig } from './config-store.js';
 import { markAsPaired } from './identity.js';
+import { saveState } from './state-store.js';
 
 interface SetupState {
   step: 'initial' | 'ap_created' | 'network_selected' | 'network_connected' | 'complete';
@@ -84,6 +85,7 @@ export async function startCaptivePortal(config: Partial<CaptivePortalConfig> = 
       }
       
       setupState = { ...setupState, step: 'network_selected', ssid };
+      saveState({ mode: { type: 'offline' } });
 
       res.json({
         success: true,
@@ -292,13 +294,15 @@ async function connectToWifiFromPortal(ssid: string, password?: string): Promise
       ssid,
       password,
     };
-    saveConfig({ mode: 'online' });
+    saveConfig({ mode: 'pairing' });
+    saveState({ mode: { type: 'pairing' } });
     stopCaptivePortal();
     return;
   }
 
   console.error(`Setup portal failed to connect to WiFi: ${ssid}`);
   setupState = { ...setupState, step: 'ap_created', ssid: undefined, password: undefined };
+  saveState({ mode: { type: 'setup' } });
   await setupAP.start();
 }
 

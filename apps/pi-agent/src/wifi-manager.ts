@@ -1,10 +1,11 @@
 // WiFi Manager - Network management wrapper using nmcli
 
-import { exec } from 'child_process';
+import { exec, execFile } from 'child_process';
 import { promisify } from 'util';
 import type { WiFiNetwork, WiFiSecurity } from '@shotclock/shared/types';
 
 const execAsync = promisify(exec);
+const execFileAsync = promisify(execFile);
 
 export class WiFiManager {
   private iface = 'wlan0';
@@ -47,15 +48,25 @@ export class WiFiManager {
   async connect(ssid: string, password?: string): Promise<boolean> {
     try {
       console.log(`Connecting to WiFi: ${ssid}`);
-      
+
+      await this.prepareClientMode();
+
+      const args = ['dev', 'wifi', 'connect', ssid];
       if (password) {
-        await execAsync(`nmcli dev wifi connect "${ssid}" password "${password}" ifname ${this.iface}`);
-      } else {
-        await execAsync(`nmcli dev wifi connect "${ssid}" ifname ${this.iface}`);
+        args.push('password', password);
       }
-      
-      console.log(`Connected to ${ssid}`);
-      return true;
+      args.push('ifname', this.iface);
+
+      await execFileAsync('nmcli', args, { timeout: 45000 });
+
+      const connected = await this.waitForConnection(ssid, 20000);
+      if (connected) {
+        console.log(`Connected to ${ssid}`);
+        return true;
+      }
+
+      console.error(`WiFi command completed, but ${this.iface} did not report a connection to ${ssid}`);
+      return false;
     } catch (error) {
       console.error(`Failed to connect to ${ssid}:`, error);
       return false;
@@ -93,7 +104,7 @@ export class WiFiManager {
    */
   async getStatus(): Promise<{ connected: boolean; ssid?: string; ip?: string }> {
     try {
-      const { stdout } = await execAsync(`nmcli -t -f ACTIVE,SSID,IP4.ADDRESS dev show ${this.iface}`);
+      const { stdout } = await execFileAsync('nmcli', ['-t', '-f', 'GENERAL.STATE,GENERAL.CONNECTION,IP4.ADDRESS', 'device', 'show', this.iface]);
       const lines = stdout.split('\n').filter(Boolean);
       
       let connected = false;
@@ -101,12 +112,16 @@ export class WiFiManager {
       let ip: string | undefined;
       
       for (const line of lines) {
-        const [key, value] = line.split(':');
-        if (key === 'ACTIVE') {
-          connected = value === 'yes';
-        } else if (key === 'SSID') {
+        const separatorIndex = line.indexOf(':');
+        if (separatorIndex === -1) continue;
+
+        const key = line.slice(0, separatorIndex);
+        const value = line.slice(separatorIndex + 1);
+        if (key === 'GENERAL.STATE') {
+          connected = value.includes('(connected)') || value.startsWith('100');
+        } else if (key === 'GENERAL.CONNECTION' && value !== '--') {
           ssid = value;
-        } else if (key === 'IP4.ADDRESS') {
+        } else if (key === 'IP4.ADDRESS[1]' || key === 'IP4.ADDRESS') {
           ip = value.split('/')[0];
         }
       }
@@ -149,6 +164,52 @@ export class WiFiManager {
     if (s.includes('wpa2')) return 'wpa2';
     if (s === '' || s === '--') return 'open';
     return 'unknown';
+  }
+
+  private async prepareClientMode(): Promise<void> {
+    await execFileAsync('rfkill', ['unblock', 'wifi']).catch(() => {});
+    await execFileAsync('ip', ['addr', 'flush', 'dev', this.iface]).catch(() => {});
+    await execFileAsync('ip', ['link', 'set', this.iface, 'up']).catch(() => {});
+    await execFileAsync('nmcli', ['device', 'set', this.iface, 'managed', 'yes']);
+    await execFileAsync('nmcli', ['radio', 'wifi', 'on']);
+    await this.waitForManagedDevice(15000);
+    await execFileAsync('nmcli', ['device', 'wifi', 'rescan', 'ifname', this.iface], { timeout: 15000 }).catch(() => {});
+  }
+
+  private async waitForManagedDevice(timeoutMs: number): Promise<void> {
+    const deadline = Date.now() + timeoutMs;
+    let lastState = '';
+
+    while (Date.now() < deadline) {
+      const { stdout } = await execFileAsync('nmcli', ['-t', '-f', 'GENERAL.STATE', 'device', 'show', this.iface]).catch((error: any) => ({
+        stdout: error.stdout || '',
+      }));
+      lastState = stdout.trim();
+      if (!lastState.includes('unmanaged')) {
+        return;
+      }
+      await this.sleep(500);
+    }
+
+    throw new Error(`${this.iface} stayed unmanaged after AP shutdown: ${lastState}`);
+  }
+
+  private async waitForConnection(ssid: string, timeoutMs: number): Promise<boolean> {
+    const deadline = Date.now() + timeoutMs;
+
+    while (Date.now() < deadline) {
+      const status = await this.getStatus();
+      if (status.connected && status.ssid === ssid && status.ip) {
+        return true;
+      }
+      await this.sleep(1000);
+    }
+
+    return false;
+  }
+
+  private sleep(ms: number): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, ms));
   }
 }
 
