@@ -9,6 +9,7 @@ import { loadState, saveState, setConfigPreview } from './state-store.js';
 import { saveConfig } from './config-store.js';
 import { getPairingCode, clearPairingCode } from './pairing-code.js';
 import type { UpdateManager } from './update-manager.js';
+import { finishFactoryResetAndReboot, prepareFactoryReset, rebootSystem } from './factory-reset.js';
 
 export type TypedSocket = Socket<ServerToDeviceEvents, DeviceToDeviceEvents>;
 
@@ -150,12 +151,26 @@ export function setupSocketClient(
     }
   });
 
+  socket.on('factory:reset', async (ack) => {
+    console.log('Received factory reset command');
+    try {
+      await prepareFactoryReset();
+      acknowledge(ack, { success: true });
+      finishFactoryResetAndReboot();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.error('Factory reset failed:', error);
+      acknowledge(ack, { success: false, error: message });
+    }
+  });
+
   // Handle reboot command
   socket.on('reboot', (ack) => {
     console.log('Received reboot command');
     acknowledge(ack, { success: true });
-    // In production, would execute system reboot
-    process.exit(0);
+    setTimeout(() => {
+      void rebootSystem();
+    }, 500);
   });
 
   // Handle ping

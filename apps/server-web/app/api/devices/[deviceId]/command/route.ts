@@ -1,5 +1,5 @@
 // POST /api/devices/[deviceId]/command → dispatch command to device via Socket.IO
-// Commands: set_mode, set_timer, update_config, reboot, check_update, install_update
+// Commands: set_mode, set_timer, update_config, factory_reset, reboot, check_update, install_update
 
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
@@ -188,6 +188,22 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         });
       }
 
+      case 'factory_reset': {
+        const ack = await emitDeviceCommand(deviceNamespace, room, 'factory:reset');
+        if (!ack.success) {
+          return commandAckError(ack);
+        }
+
+        await resetDeviceRecordAfterFactoryReset(deviceId);
+
+        return NextResponse.json({
+          success: true,
+          command: type,
+          acknowledged: true,
+          dispatchedAt: new Date().toISOString(),
+        });
+      }
+
       default:
         return NextResponse.json(
           { error: `Unknown command type: ${type}` },
@@ -276,4 +292,29 @@ async function persistTimerCommand(
   } catch (error) {
     console.warn(`Unable to persist Device display state for ${deviceId}; live command was still dispatched`, error);
   }
+}
+
+async function resetDeviceRecordAfterFactoryReset(deviceId: string): Promise<void> {
+  await prisma.displayState.delete({
+    where: { deviceId },
+  }).catch(() => {});
+
+  await prisma.device.update({
+    where: { deviceId },
+    data: {
+      ownerUserId: null,
+      organizationId: null,
+      venueId: null,
+      pairingCode: null,
+      pairingCodeExp: null,
+      displayProfile: null,
+      displayState: null,
+      calibrationData: null,
+      mode: 'setup',
+      status: 'offline',
+      isOnline: false,
+    },
+  }).catch((error) => {
+    console.warn(`Unable to reset server device record for ${deviceId}`, error);
+  });
 }

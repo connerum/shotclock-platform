@@ -157,6 +157,31 @@ export class WiFiManager {
     }
   }
 
+  async forgetSavedWifiNetworks(): Promise<void> {
+    try {
+      const { stdout } = await execFileAsync('nmcli', ['-t', '-f', 'NAME,TYPE', 'connection', 'show']);
+      const wifiProfiles = stdout
+        .split('\n')
+        .filter(Boolean)
+        .map((line) => {
+          const [name, type] = line.split(':');
+          return { name, type };
+        })
+        .filter((profile) => profile.name && profile.type === '802-11-wireless');
+
+      for (const profile of wifiProfiles) {
+        console.log(`Forgetting saved WiFi profile: ${profile.name}`);
+        await execFileAsync('nmcli', ['connection', 'delete', profile.name]).catch((error) => {
+          console.warn(`Failed to delete WiFi profile ${profile.name}:`, this.formatCommandError(error));
+        });
+      }
+
+      await execFileAsync('nmcli', ['dev', 'disconnect', this.iface]).catch(() => {});
+    } catch (error) {
+      console.warn('Failed to forget saved WiFi profiles:', this.formatCommandError(error));
+    }
+  }
+
   private parseSecurity(security: string): WiFiSecurity {
     const s = security?.toLowerCase() || '';
     if (s.includes('wpa3')) return 'wpa3';

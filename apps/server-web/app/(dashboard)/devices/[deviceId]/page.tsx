@@ -68,6 +68,7 @@ export default function DeviceDetailPage({ params }: { params: { deviceId: strin
   const [error, setError] = useState<string | null>(null);
   const [commandError, setCommandError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [factoryResetting, setFactoryResetting] = useState(false);
   
   // Timer state
   const [shotClock, setShotClock] = useState(24);
@@ -468,6 +469,20 @@ export default function DeviceDetailPage({ params }: { params: { deviceId: strin
   // Suppress unused warning
   void installUpdate;
 
+  const factoryReset = async () => {
+    const confirmed = window.confirm(
+      'Factory reset this display? This clears pairing, saved WiFi, calibration, timer state, and reboots the Pi.'
+    );
+    if (!confirmed) return;
+
+    setFactoryResetting(true);
+    const success = await sendCommand('factory_reset');
+    if (success) {
+      setDevice(prev => prev ? { ...prev, mode: 'setup', status: 'offline', isOnline: false } : null);
+    }
+    setFactoryResetting(false);
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -842,6 +857,24 @@ export default function DeviceDetailPage({ params }: { params: { deviceId: strin
               Check for Updates
             </button>
           </div>
+        </div>
+      </div>
+
+      <div className="mt-6 rounded-lg border border-red-900/70 bg-red-950/30 p-6">
+        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          <div>
+            <h2 className="text-xl font-semibold text-red-100">Factory Reset</h2>
+            <p className="mt-2 max-w-3xl text-sm text-red-200/80">
+              Clears pairing, owner access, saved WiFi profiles, calibration, and timer state. The Pi will reboot into setup mode.
+            </p>
+          </div>
+          <button
+            onClick={factoryReset}
+            disabled={factoryResetting || saving}
+            className="rounded bg-red-600 px-5 py-3 font-medium text-white hover:bg-red-700 disabled:opacity-50"
+          >
+            {factoryResetting ? 'Resetting...' : 'Factory Reset'}
+          </button>
         </div>
       </div>
     </div>

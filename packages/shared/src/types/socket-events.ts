@@ -220,6 +220,7 @@ export interface ServerToDeviceEvents {
   'pairing:complete': (payload: PairingResponse, ack?: (response: DeviceCommandAck) => void) => void;
   'update:check': (ack?: (response: DeviceCommandAck) => void) => void;
   'update:install': (version: string, ack?: (response: DeviceCommandAck) => void) => void;
+  'factory:reset': (ack?: (response: DeviceCommandAck) => void) => void;
   'reboot': (ack?: (response: DeviceCommandAck) => void) => void;
   'ping': (ack?: (response: DeviceCommandAck) => void) => void;
 }
