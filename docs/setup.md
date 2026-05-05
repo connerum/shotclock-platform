@@ -90,7 +90,7 @@ sudo ./scripts/install-pi.sh
 
 ### 3. Configure WiFi
 
-1. The Pi will create a setup AP named "Shotclock-Setup"
+1. The Pi will create a setup AP named like "Shotclock-Setup-1e4b35" while it is unpaired
 2. Connect to it with password "shotclock123"
 3. Open http://192.168.4.1:8080 in a browser
 4. Select your WiFi network and enter credentials

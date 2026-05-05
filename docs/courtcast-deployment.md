@@ -283,7 +283,10 @@ AGENT_LOCAL_API_PORT=3001
 DEVICE_NAME=Shotclock Display 01
 SETUP_AP_SSID=Shotclock-Setup
 SETUP_AP_PASSWORD=shotclock123
+KIOSK_USER=admin
 ```
+
+Set `KIOSK_USER` to the Pi desktop login user that owns the HDMI session. On `display-40091`, that user is `admin`.
 
 If `/opt/shotclock/shared/.env` still does not exist, the install script did not finish. Create the directory manually only as a recovery step:
 
@@ -306,6 +309,8 @@ Point services at this checkout:
 
 ```bash
 sudo ln -sfn ~/shotclock-platform /opt/shotclock/current
+sudo cp systemd/shotclock-agent.service /etc/systemd/system/shotclock-agent.service
+sudo cp systemd/shotclock-kiosk.service /etc/systemd/system/shotclock-kiosk.service
 sudo systemctl daemon-reload
 sudo systemctl enable shotclock-agent
 sudo systemctl enable shotclock-kiosk

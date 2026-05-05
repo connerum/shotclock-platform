@@ -13,6 +13,7 @@ interface CaptivePortalConfig {
   apChannel: number;
   apInterface: string;
   wanInterface: string;
+  apCountry: string;
   serverIp: string;
   serverPort: number;
 }
@@ -23,11 +24,13 @@ const DEFAULT_AP_CONFIG: CaptivePortalConfig = {
   apChannel: 6,
   apInterface: 'wlan0',
   wanInterface: 'eth0',
+  apCountry: process.env.SETUP_AP_COUNTRY || process.env.WIFI_COUNTRY || 'US',
   serverIp: '192.168.4.1',
   serverPort: 8080,
 };
 
 const HOSTAPD_CONF = `/etc/hostapd/hostapd.conf`;
+const HOSTAPD_DEFAULTS = `/etc/default/hostapd`;
 const DNSMASQ_CONF = `/etc/dnsmasq.d/shotclock-setup.conf`;
 
 export class SetupAP {
@@ -43,7 +46,9 @@ export class SetupAP {
    */
   async start(): Promise<boolean> {
     try {
-      console.log('Starting setup AP...');
+      console.log(`Starting setup AP: ${this.config.apSsid}`);
+
+      await this.stopApServices();
       
       // Configure hostapd
       await this.configureHostapd();
@@ -52,6 +57,7 @@ export class SetupAP {
       await this.configureDnsmasq();
 
       // Bring the AP interface up and assign the address dnsmasq/portal bind to.
+      await this.releaseApInterface();
       await this.configureApInterface();
       
       // Enable IP forwarding
@@ -61,10 +67,10 @@ export class SetupAP {
       await this.setupNat();
       
       // Start hostapd
-      await execAsync('systemctl start hostapd');
+      await this.restartService('hostapd');
       
       // Start dnsmasq
-      await execAsync('systemctl start dnsmasq');
+      await this.restartService('dnsmasq');
       
       this.isRunning = true;
       console.log(`Setup AP started: ${this.config.apSsid}`);
@@ -82,9 +88,9 @@ export class SetupAP {
     try {
       console.log('Stopping setup AP...');
       
-      await execAsync('systemctl stop hostapd').catch(() => {});
-      await execAsync('systemctl stop dnsmasq').catch(() => {});
+      await this.stopApServices();
       await this.removeApAddress().catch(() => {});
+      await this.restoreClientInterface().catch(() => {});
       
       this.isRunning = false;
       console.log('Setup AP stopped');
@@ -116,13 +122,16 @@ export class SetupAP {
 
   private async configureHostapd(): Promise<void> {
     const apInterface = this.getSafeInterfaceName(this.config.apInterface);
+    const country = this.getSafeCountryCode(this.config.apCountry);
     const config = `
 interface=${apInterface}
 driver=nl80211
 ssid=${this.config.apSsid}
 hw_mode=g
 channel=${this.config.apChannel}
-wmm_enabled=0
+wmm_enabled=1
+country_code=${country}
+ieee80211d=1
 macaddr_acl=0
 auth_algs=1
 ignore_broadcast_ssid=0
@@ -132,7 +141,9 @@ wpa_key_mgmt=WPA-PSK
 rsn_pairwise=CCMP
 `.trim();
 
+    await fs.promises.mkdir('/etc/hostapd', { recursive: true });
     await fs.promises.writeFile(HOSTAPD_CONF, config);
+    await fs.promises.writeFile(HOSTAPD_DEFAULTS, `DAEMON_CONF="${HOSTAPD_CONF}"\n`);
     await execAsync('systemctl unmask hostapd');
   }
 
@@ -148,7 +159,20 @@ address=/#/${serverIp}
 listen-address=${serverIp}
 `.trim();
 
+    await fs.promises.mkdir('/etc/dnsmasq.d', { recursive: true });
     await fs.promises.writeFile(DNSMASQ_CONF, config);
+  }
+
+  private async releaseApInterface(): Promise<void> {
+    const iface = this.getSafeInterfaceName(this.config.apInterface);
+    const country = this.getSafeCountryCode(this.config.apCountry);
+
+    await execFileAsync('rfkill', ['unblock', 'wifi']).catch(() => {});
+    await execFileAsync('iw', ['reg', 'set', country]).catch(() => {});
+    await execFileAsync('nmcli', ['radio', 'wifi', 'on']).catch(() => {});
+    await execFileAsync('nmcli', ['device', 'disconnect', iface]).catch(() => {});
+    await execFileAsync('nmcli', ['device', 'set', iface, 'managed', 'no']).catch(() => {});
+    await execFileAsync('systemctl', ['stop', `wpa_supplicant@${iface}.service`]).catch(() => {});
   }
 
   private async configureApInterface(): Promise<void> {
@@ -171,6 +195,12 @@ listen-address=${serverIp}
     const iface = this.getSafeInterfaceName(this.config.apInterface);
     const serverIp = this.getSafeIpv4Address(this.config.serverIp);
     await execFileAsync('ip', ['addr', 'del', `${serverIp}/24`, 'dev', iface]);
+  }
+
+  private async restoreClientInterface(): Promise<void> {
+    const iface = this.getSafeInterfaceName(this.config.apInterface);
+    await execFileAsync('nmcli', ['device', 'set', iface, 'managed', 'yes']).catch(() => {});
+    await execFileAsync('nmcli', ['radio', 'wifi', 'on']).catch(() => {});
   }
 
   private async setupNat(): Promise<void> {
@@ -200,6 +230,32 @@ listen-address=${serverIp}
       throw new Error(`Invalid IPv4 address: ${address}`);
     }
     return address;
+  }
+
+  private getSafeCountryCode(country: string): string {
+    const normalized = country.toUpperCase();
+    if (!/^[A-Z]{2}$/.test(normalized)) {
+      throw new Error(`Invalid WiFi country code: ${country}`);
+    }
+    return normalized;
+  }
+
+  private async stopApServices(): Promise<void> {
+    await execFileAsync('systemctl', ['stop', 'dnsmasq']).catch(() => {});
+    await execFileAsync('systemctl', ['stop', 'hostapd']).catch(() => {});
+  }
+
+  private async restartService(service: string): Promise<void> {
+    await execFileAsync('systemctl', ['restart', service]);
+    try {
+      await execFileAsync('systemctl', ['is-active', '--quiet', service]);
+    } catch {
+      const { stdout, stderr } = await execFileAsync('systemctl', ['status', service, '--no-pager', '-l']).catch((statusError: any) => ({
+        stdout: statusError.stdout || '',
+        stderr: statusError.stderr || '',
+      }));
+      throw new Error(`${service} failed to start\n${stdout}${stderr}`);
+    }
   }
 
   /**

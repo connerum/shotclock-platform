@@ -37,7 +37,7 @@ When a new Shotclock Pi boots for the first time (or is reset), it creates a loc
                     │         Client Device                    │
                     │  (Phone/Tablet/Computer)                 │
                     │                                          │
-                    │  Connects to Shotclock-Setup             │
+                    │  Connects to Shotclock-Setup-xxxxxx      │
                     │  Opens http://192.168.4.1 automatically  │
                     │  (or captive portal detection)           │
                     └─────────────────────────────────────────┘
@@ -49,7 +49,7 @@ The access point is configured with these defaults:
 
 | Setting       | Default Value       |
 |---------------|---------------------|
-| SSID          | Shotclock-Setup     |
+| SSID          | Shotclock-Setup-xxxxxx |
 | Password      | shotclock123        |
 | Channel       | 6                   |
 | IP Address    | 192.168.4.1         |
@@ -176,7 +176,7 @@ If auto-detection fails:
 ## Troubleshooting
 
 ### Portal doesn't load
-1. Verify you're connected to Shotclock-Setup
+1. Verify you're connected to the setup AP named like `Shotclock-Setup-xxxxxx`
 2. Check if Pi is broadcasting the AP
 3. Try accessing http://192.168.4.1 directly
 

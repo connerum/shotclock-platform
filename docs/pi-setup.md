@@ -93,7 +93,7 @@ else
 fi
 
 # Install WiFi/AP and networking tools
-apt-get install -y network-manager hostapd dnsmasq iproute2 iptables rfkill
+apt-get install -y network-manager hostapd dnsmasq iproute2 iptables rfkill iw wireless-regdb
 ```
 
 The repository installer already handles the Chromium package name difference. If `scripts/install-pi.sh` fails with `Package chromium-browser is not available` or `Unable to locate package libgconf-2-4`, pull the latest repo and rerun it:
@@ -165,7 +165,12 @@ AGENT_LOCAL_API_PORT=3001
 DEVICE_NAME=Shotclock Display 01
 SETUP_AP_SSID=Shotclock-Setup
 SETUP_AP_PASSWORD=shotclock123
+KIOSK_USER=admin
 ```
+
+`KIOSK_USER` should be the Raspberry Pi desktop login user that owns the active HDMI session. On the current field Pi this is `admin`. The kiosk service starts as root, then launches Chromium as this user so it can attach to the visible desktop session.
+
+The setup AP is only broadcast while the device is unpaired. Its SSID is the configured prefix plus the first six characters of the unique device ID suffix, for example `Shotclock-Setup-1e4b35`.
 
 ### 3. Enable Services
 
@@ -218,6 +223,40 @@ curl -X POST http://localhost:3001/local/config \
    hdmi_group=1
    hdmi_mode=16
    ```
+3. Confirm the kiosk is using the updated service file:
+   ```bash
+   sudo systemctl cat shotclock-kiosk
+   ```
+   It should show `User=root`, `Group=root`, and `EnvironmentFile=-/opt/shotclock/shared/.env`.
+4. If the log shows `status=200/CHDIR` or `Changing to the requested working directory failed`, reinstall the service file and set the kiosk user:
+   ```bash
+   cd ~/shotclock-platform
+   sudo cp systemd/shotclock-kiosk.service /etc/systemd/system/shotclock-kiosk.service
+   grep -q '^KIOSK_USER=' /opt/shotclock/shared/.env \
+     && sudo sed -i 's/^KIOSK_USER=.*/KIOSK_USER=admin/' /opt/shotclock/shared/.env \
+     || echo 'KIOSK_USER=admin' | sudo tee -a /opt/shotclock/shared/.env
+   sudo systemctl daemon-reload
+   sudo systemctl reset-failed shotclock-kiosk
+   sudo systemctl restart shotclock-kiosk
+   ```
+5. To exit kiosk mode from SSH:
+   ```bash
+   sudo systemctl stop shotclock-kiosk
+   ```
+
+### Setup AP is not visible
+
+The setup AP is expected only before the Pi is paired. If the device is already paired, the agent starts in online mode and does not advertise the setup AP.
+
+For an unpaired device, check AP startup:
+
+```bash
+journalctl -u shotclock-agent -n 120 --no-pager -l
+systemctl status hostapd dnsmasq --no-pager -l
+ip addr show wlan0
+```
+
+The agent should log `Starting setup AP: Shotclock-Setup-...`, `hostapd` and `dnsmasq` should be active, and `wlan0` should have `192.168.4.1/24`. If `hostapd` fails, the agent service now fails instead of continuing as healthy.
 
 ### WiFi won't connect
 
