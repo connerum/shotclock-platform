@@ -156,8 +156,9 @@ All items must pass before deployment is considered complete.
 - [ ] Node.js 22 is installed
 - [ ] pnpm is installed globally
 - [ ] Chromium and dependencies are installed (`chromium-browser` on older Raspberry Pi OS, `chromium` on Debian/Raspberry Pi OS Trixie)
-- [ ] NetworkManager, hostapd, dnsmasq are installed
+- [ ] NetworkManager, hostapd, dnsmasq, iproute2, iptables, and rfkill are installed
 - [ ] `/opt/shotclock` directory structure is created
+- [ ] `/home/shotclock/.shotclock` exists before services start
 - [ ] Config templates are copied to `/opt/shotclock/shared/config/`
 - [ ] `shotclock` user is created
 - [ ] Ownership is set correctly
@@ -181,9 +182,10 @@ All items must pass before deployment is considered complete.
 
 - [ ] AP mode starts when device is in setup mode
 - [ ] SSID "Shotclock-Setup" (or configured name) is broadcast
+- [ ] `wlan0` has `192.168.4.1/24` while setup AP is active
 - [ ] DHCP serves IP addresses in 192.168.4.0/24 range
 - [ ] DNS redirects all requests to 192.168.4.1
-- [ ] Portal page loads when connecting to AP
+- [ ] Portal page loads at `http://192.168.4.1:8080` when connecting to AP
 - [ ] WiFi network list populates
 - [ ] WiFi connection can be initiated
 - [ ] Setup completion transitions device out of setup mode

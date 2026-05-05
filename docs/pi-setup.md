@@ -85,17 +85,15 @@ apt-get install -y nodejs
 
 # Install Chromium for kiosk mode
 # Bookworm/Bullseye may provide chromium-browser; Trixie provides chromium.
-if apt-cache show chromium-browser >/dev/null 2>&1; then
+CHROMIUM_BROWSER_CANDIDATE="$(apt-cache policy chromium-browser | awk '/Candidate:/ {print $2}')"
+if [ -n "$CHROMIUM_BROWSER_CANDIDATE" ] && [ "$CHROMIUM_BROWSER_CANDIDATE" != "(none)" ]; then
   apt-get install -y chromium-browser chromium-sandbox
 else
   apt-get install -y chromium chromium-sandbox
 fi
 
-# Install NetworkManager for WiFi management
-apt-get install -y network-manager
-
-# Install hostapd and dnsmasq for captive portal
-apt-get install -y hostapd dnsmasq
+# Install WiFi/AP and networking tools
+apt-get install -y network-manager hostapd dnsmasq iproute2 iptables rfkill
 ```
 
 The repository installer already handles the Chromium package name difference. If `scripts/install-pi.sh` fails with `Package chromium-browser is not available` or `Unable to locate package libgconf-2-4`, pull the latest repo and rerun it:
@@ -106,7 +104,7 @@ git pull
 sudo ./scripts/install-pi.sh
 ```
 
-That failure happens before `/opt/shotclock/shared` is created, so editing `/opt/shotclock/shared/.env` will also fail until the installer completes.
+That failure happens before `/opt/shotclock/shared` is created, so editing `/opt/shotclock/shared/.env` will also fail until the installer completes. The current installer also creates `/home/shotclock/.shotclock` before systemd starts so service namespace setup does not fail on a missing state directory.
 
 ### 2. Configure NetworkManager
 

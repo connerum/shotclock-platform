@@ -59,15 +59,19 @@ async function main() {
     saveConfig({ mode: 'setup' });
     
     // Start setup AP
-    await setupAP.start();
+    const apStarted = await setupAP.start();
     
-    // Start captive portal for WiFi setup
-    startCaptivePortal({
-      apSsid: `${config.setupApSsid}-${identity.deviceId.substring(0, 6)}`,
-      apPassword: config.setupApPassword,
-    });
-    
-    console.log('Setup AP started - waiting for WiFi configuration...');
+    if (apStarted) {
+      // Start captive portal for WiFi setup
+      startCaptivePortal({
+        apSsid: `${config.setupApSsid}-${identity.deviceId.substring(0, 6)}`,
+        apPassword: config.setupApPassword,
+      });
+
+      console.log('Setup AP started - waiting for WiFi configuration...');
+    } else {
+      console.error('Setup AP failed to start; local API will continue without captive portal');
+    }
   } else {
     // Device is paired - connect to server
     console.log('Device is paired - connecting to server...');

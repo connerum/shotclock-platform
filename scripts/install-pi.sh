@@ -38,9 +38,22 @@ fi
 
 echo ""
 echo "[4/12] Installing Chromium and required deps..."
-CHROMIUM_PACKAGE="chromium-browser"
-if ! apt-cache show chromium-browser >/dev/null 2>&1; then
-  CHROMIUM_PACKAGE="chromium"
+package_is_installable() {
+  local pkg="$1"
+  apt-cache policy "$pkg" 2>/dev/null | awk '/Candidate:/ { found=1; if ($2 != "(none)") exit 0; exit 1 } END { if (!found) exit 1 }'
+}
+
+CHROMIUM_PACKAGE=""
+for candidate in chromium-browser chromium; do
+  if package_is_installable "$candidate"; then
+    CHROMIUM_PACKAGE="$candidate"
+    break
+  fi
+done
+
+if [ -z "$CHROMIUM_PACKAGE" ]; then
+  echo "No installable Chromium package found. Expected chromium-browser or chromium."
+  exit 1
 fi
 
 CHROMIUM_DEPS=(
@@ -64,7 +77,7 @@ CHROMIUM_DEPS=(
 # Install what is available instead of failing the whole setup on stale names.
 AVAILABLE_CHROMIUM_DEPS=()
 for pkg in "${CHROMIUM_DEPS[@]}"; do
-  if apt-cache show "$pkg" >/dev/null 2>&1; then
+  if package_is_installable "$pkg"; then
     AVAILABLE_CHROMIUM_DEPS+=("$pkg")
   else
     echo "Skipping unavailable package: $pkg"
@@ -75,7 +88,7 @@ apt-get install -y "${AVAILABLE_CHROMIUM_DEPS[@]}"
 
 echo ""
 echo "[5/12] Installing NetworkManager, hostapd, dnsmasq..."
-apt-get install -y network-manager hostapd dnsmasq
+apt-get install -y network-manager hostapd dnsmasq iproute2 iptables rfkill
 
 echo ""
 echo "[6/12] Creating /opt/shotclock directory structure..."
@@ -115,7 +128,9 @@ fi
 
 echo ""
 echo "[9/12] Setting ownership..."
+mkdir -p /home/shotclock/.shotclock
 chown -R shotclock:shotclock /opt/shotclock
+chown -R shotclock:shotclock /home/shotclock/.shotclock
 
 echo ""
 echo "[10/12] Installing systemd service files..."

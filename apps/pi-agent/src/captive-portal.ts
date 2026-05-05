@@ -31,34 +31,44 @@ const DEFAULT_CONFIG: CaptivePortalConfig = {
 const portalApp = express();
 let server: ReturnType<typeof portalApp.listen> | null = null;
 let setupState: SetupState = { step: 'initial' };
+let routesRegistered = false;
+let activePortalConfig: CaptivePortalConfig = DEFAULT_CONFIG;
 
 /**
  * Start the captive portal server
  */
 export function startCaptivePortal(config: Partial<CaptivePortalConfig> = {}): void {
   const portalConfig = { ...DEFAULT_CONFIG, ...config };
+  activePortalConfig = portalConfig;
+  setupState = { ...setupState, step: 'ap_created' };
+
+  if (server) {
+    console.log(`Captive portal already running at http://${portalConfig.serverIp}:${portalConfig.serverPort}`);
+    return;
+  }
   
-  portalApp.use(express.json());
+  if (!routesRegistered) {
+    portalApp.use(express.json());
   
-  // Setup state endpoint
-  portalApp.get('/api/setup/status', (_req: Request, res: Response) => {
-    res.json({ state: setupState, configured: setupState.step === 'complete' });
-  });
+    // Setup state endpoint
+    portalApp.get('/api/setup/status', (_req: Request, res: Response) => {
+      res.json({ state: setupState, configured: setupState.step === 'complete' });
+    });
   
-  // WiFi networks endpoint
-  portalApp.get('/api/wifi/networks', async (_req: Request, res: Response) => {
-    try {
-      const networks = await wifiManager.scan();
-      res.json({ networks });
-    } catch (error) {
-      res.status(500).json({ error: 'Failed to scan networks' });
-    }
-  });
+    // WiFi networks endpoint
+    portalApp.get('/api/wifi/networks', async (_req: Request, res: Response) => {
+      try {
+        const networks = await wifiManager.scan();
+        res.json({ networks });
+      } catch (error) {
+        res.status(500).json({ error: 'Failed to scan networks' });
+      }
+    });
   
-  // WiFi connect endpoint
-  portalApp.post('/api/wifi/connect', async (req: Request, res: Response) => {
-    try {
-      const { ssid, password } = req.body;
+    // WiFi connect endpoint
+    portalApp.post('/api/wifi/connect', async (req: Request, res: Response) => {
+      try {
+        const { ssid, password } = req.body;
       
       if (!ssid) {
         res.status(400).json({ error: 'SSID is required' });
@@ -85,10 +95,10 @@ export function startCaptivePortal(config: Partial<CaptivePortalConfig> = {}): v
     }
   });
   
-  // WiFi forget endpoint
-  portalApp.post('/api/wifi/forget', async (req: Request, res: Response) => {
-    try {
-      const { ssid } = req.body;
+    // WiFi forget endpoint
+    portalApp.post('/api/wifi/forget', async (req: Request, res: Response) => {
+      try {
+        const { ssid } = req.body;
       
       if (!ssid) {
         res.status(400).json({ error: 'SSID is required' });
@@ -102,10 +112,10 @@ export function startCaptivePortal(config: Partial<CaptivePortalConfig> = {}): v
     }
   });
   
-  // Setup complete endpoint
-  portalApp.post('/api/setup/complete', (req: Request, res: Response) => {
-    try {
-      const { organizationId, venueId } = req.body;
+    // Setup complete endpoint
+    portalApp.post('/api/setup/complete', (req: Request, res: Response) => {
+      try {
+        const { organizationId, venueId } = req.body;
       
       // Update config to go online
       saveConfig({ mode: 'online' });
@@ -126,9 +136,9 @@ export function startCaptivePortal(config: Partial<CaptivePortalConfig> = {}): v
     }
   });
   
-  // Fallback to setup page
-  portalApp.get('/setup', (_req: Request, res: Response) => {
-    res.send(`<!DOCTYPE html>
+    // Fallback to setup page
+    portalApp.get('/setup', (_req: Request, res: Response) => {
+      res.send(`<!DOCTYPE html>
 <html>
 <head>
   <title>Shotclock Setup</title>
@@ -148,8 +158,8 @@ export function startCaptivePortal(config: Partial<CaptivePortalConfig> = {}): v
 <body>
   <h1>Shotclock Setup</h1>
   <div class="info">
-    <p><strong>Connect to: ${portalConfig.apSsid}</strong></p>
-    <p>Password: ${portalConfig.apPassword}</p>
+    <p><strong>Connect to: ${activePortalConfig.apSsid}</strong></p>
+    <p>Password: ${activePortalConfig.apPassword}</p>
   </div>
   <div id="status" class="status">
     <p><strong>Step:</strong> <span id="step">${setupState.step}</span></p>
@@ -197,11 +207,12 @@ export function startCaptivePortal(config: Partial<CaptivePortalConfig> = {}): v
   </script>
 </body>
 </html>`);
-  });
+    });
+
+    routesRegistered = true;
+  }
   
-  server = portalApp.listen(portalConfig.serverPort, portalConfig.serverIp, () => {
-    console.log(`Captive portal running at http://${portalConfig.serverIp}:${portalConfig.serverPort}`);
-  });
+  listen(portalConfig.serverIp, portalConfig);
 }
 
 /**
@@ -212,4 +223,24 @@ export function stopCaptivePortal(): void {
     server.close();
     server = null;
   }
+}
+
+function listen(host: string, portalConfig: CaptivePortalConfig): void {
+  server = portalApp.listen(portalConfig.serverPort, host, () => {
+    const displayHost = host === '0.0.0.0' ? portalConfig.serverIp : host;
+    console.log(`Captive portal running at http://${displayHost}:${portalConfig.serverPort}`);
+  });
+
+  server.once('error', (error: NodeJS.ErrnoException) => {
+    server?.close();
+    server = null;
+
+    if (error.code === 'EADDRNOTAVAIL' && host === portalConfig.serverIp) {
+      console.warn(`Captive portal could not bind ${portalConfig.serverIp}; falling back to 0.0.0.0`);
+      listen('0.0.0.0', portalConfig);
+      return;
+    }
+
+    console.error('Captive portal failed to start:', error);
+  });
 }

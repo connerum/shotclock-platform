@@ -18,7 +18,7 @@ When a new Shotclock Pi boots for the first time (or is reset), it creates a loc
 │                                                                 │
 │   ┌──────────────┐         ┌──────────────────────────────────┐│
 │   │  hostapd     │         │  Captive Portal Server           ││
-│   │  (AP Mode)   │────────▶│  http://192.168.4.1:3001         ││
+│   │  (AP Mode)   │────────▶│  http://192.168.4.1:8080         ││
 │   │              │         │                                  ││
 │   │  wlan0       │         │  - Setup status page            ││
 │   │  192.168.4.1 │         │  - WiFi network selection        ││
@@ -54,6 +54,7 @@ The access point is configured with these defaults:
 | Channel       | 6                   |
 | IP Address    | 192.168.4.1         |
 | DHCP Range    | 192.168.4.10-100    |
+| Portal URL    | http://192.168.4.1:8080 |
 
 ## Portal Pages
 
@@ -152,7 +153,7 @@ Modern devices detect captive portals automatically:
 ### Manual Connection
 If auto-detection fails:
 1. Open browser
-2. Navigate to `http://192.168.4.1:3001`
+2. Navigate to `http://192.168.4.1:8080`
 3. Follow setup steps
 
 ## Security Considerations
