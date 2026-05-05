@@ -8,37 +8,39 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   return (
-    <div className="min-h-screen bg-black text-white">
-      <nav className="bg-gray-900 border-b border-gray-800">
+    <div className="cc-shell">
+      <nav className="cc-header">
         <div className="max-w-7xl mx-auto px-4">
           <div className="flex items-center justify-between h-16">
             <div className="flex items-center space-x-8">
-              <Link href="/" className="text-xl font-bold text-green-500">
-                Shotclock
+              <Link href="/" className="flex items-center gap-3">
+                <span className="cc-logo-mark">C</span>
+                <span className="cc-logo-text">Court<span>Cast</span></span>
               </Link>
               <div className="flex space-x-4">
                 <Link
                   href="/devices"
-                  className="px-3 py-2 rounded-md text-sm font-medium hover:bg-gray-800"
+                  className="cc-nav-link px-3 py-2"
                 >
                   Devices
                 </Link>
                 <Link
                   href="/pair"
-                  className="px-3 py-2 rounded-md text-sm font-medium hover:bg-gray-800"
+                  className="cc-nav-link px-3 py-2"
                 >
                   Pair
                 </Link>
                 <Link
                   href="/releases"
-                  className="px-3 py-2 rounded-md text-sm font-medium hover:bg-gray-800"
+                  className="cc-nav-link px-3 py-2"
                 >
                   Releases
                 </Link>
               </div>
             </div>
-            <div className="text-sm text-gray-400">
-              Shotclock Platform v0.1.0
+            <div className="cc-status cc-status-muted px-3 py-1 text-xs font-semibold">
+              <span className="cc-dot"></span>
+              Platform v0.1.0
             </div>
           </div>
         </div>

@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'Shotclock Platform',
+  title: 'CourtCast',
   description: 'Sports Scoreboard & Display Management System',
 };
 

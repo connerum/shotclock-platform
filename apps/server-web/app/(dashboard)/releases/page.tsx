@@ -101,24 +101,27 @@ export default function ReleasesPage() {
   return (
     <div>
       <div className="flex justify-between items-center mb-8">
-        <h1 className="text-3xl font-bold">Firmware Releases</h1>
+        <div>
+          <h1 className="text-3xl font-bold">Firmware Releases</h1>
+          <p className="mt-1 text-sm text-white/50">Publish and track display update packages</p>
+        </div>
         <button
           onClick={() => setShowForm(!showForm)}
-          className="bg-green-600 hover:bg-green-700 px-4 py-2 rounded-md text-sm font-medium"
+          className={`cc-btn px-4 py-2 text-sm ${showForm ? 'cc-btn-secondary' : 'cc-btn-primary'}`}
         >
           {showForm ? 'Cancel' : 'Upload New Release'}
         </button>
       </div>
 
       {error && (
-        <div className="bg-red-900/50 border border-red-700 rounded-lg p-4 mb-6">
+        <div className="cc-card border-red-500/40 bg-red-500/10 p-4 mb-6">
           <p className="text-red-400">{error}</p>
         </div>
       )}
 
       {/* Create Release Form */}
       {showForm && (
-        <div className="bg-gray-900 rounded-lg p-6 mb-8">
+        <div className="cc-card p-6 mb-8">
           <h2 className="text-xl font-semibold mb-4">Create New Release</h2>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
@@ -130,7 +133,7 @@ export default function ReleasesPage() {
                   onChange={(e) => setFormData({ ...formData, version: e.target.value })}
                   placeholder="1.0.0"
                   required
-                  className="w-full bg-gray-800 rounded px-3 py-2"
+                  className="w-full rounded px-3 py-2"
                 />
               </div>
               <div>
@@ -141,7 +144,7 @@ export default function ReleasesPage() {
                   onChange={(e) => setFormData({ ...formData, downloadUrl: e.target.value })}
                   placeholder="https://..."
                   required
-                  className="w-full bg-gray-800 rounded px-3 py-2"
+                  className="w-full rounded px-3 py-2"
                 />
               </div>
               <div>
@@ -152,7 +155,7 @@ export default function ReleasesPage() {
                   onChange={(e) => setFormData({ ...formData, checksum: e.target.value })}
                   placeholder="sha256:..."
                   required
-                  className="w-full bg-gray-800 rounded px-3 py-2"
+                  className="w-full rounded px-3 py-2"
                 />
               </div>
               <div>
@@ -163,7 +166,7 @@ export default function ReleasesPage() {
                   onChange={(e) => setFormData({ ...formData, size: e.target.value })}
                   placeholder="52428800"
                   required
-                  className="w-full bg-gray-800 rounded px-3 py-2"
+                  className="w-full rounded px-3 py-2"
                 />
               </div>
             </div>
@@ -174,7 +177,7 @@ export default function ReleasesPage() {
                 onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
                 placeholder="What's new in this release..."
                 rows={3}
-                className="w-full bg-gray-800 rounded px-3 py-2"
+                className="w-full rounded px-3 py-2"
               />
             </div>
             <div className="flex items-center">
@@ -192,7 +195,7 @@ export default function ReleasesPage() {
             <button
               type="submit"
               disabled={saving}
-              className="bg-green-600 hover:bg-green-700 px-6 py-2 rounded font-medium disabled:opacity-50"
+              className="cc-btn cc-btn-primary px-6 py-2 disabled:opacity-50"
             >
               {saving ? 'Creating...' : 'Create Release'}
             </button>
@@ -202,13 +205,13 @@ export default function ReleasesPage() {
 
       {/* Releases Table */}
       {releases.length === 0 ? (
-        <div className="bg-gray-900 rounded-lg p-8 text-center">
+        <div className="cc-card p-8 text-center">
           <p className="text-gray-400">No releases found</p>
         </div>
       ) : (
-        <div className="bg-gray-900 rounded-lg overflow-hidden">
+        <div className="cc-card overflow-hidden">
           <table className="w-full">
-            <thead className="bg-gray-800">
+            <thead className="bg-white/5">
               <tr>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
                   Version
@@ -234,12 +237,12 @@ export default function ReleasesPage() {
                     <div className="flex items-center">
                       <span className="font-mono">{release.version}</span>
                       {release.isMandatory && (
-                        <span className="ml-2 px-2 py-0.5 text-xs rounded bg-red-900 text-red-200">
+                        <span className="ml-2 cc-status cc-status-warn px-2 py-0.5 text-xs">
                           Mandatory
                         </span>
                       )}
                       {index === 0 && (
-                        <span className="ml-2 px-2 py-0.5 text-xs rounded bg-green-900 text-green-200">
+                        <span className="ml-2 cc-status px-2 py-0.5 text-xs">
                           Latest
                         </span>
                       )}
@@ -253,11 +256,12 @@ export default function ReleasesPage() {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     {index === 0 ? (
-                      <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
+                      <span className="cc-status px-2 text-xs font-semibold">
+                        <span className="cc-dot"></span>
                         Latest
                       </span>
                     ) : (
-                      <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-100 text-gray-800">
+                      <span className="cc-status cc-status-muted px-2 text-xs font-semibold">
                         Archived
                       </span>
                     )}
