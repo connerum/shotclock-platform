@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, use } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { DeviceMode, TimerState, DisplayProfile } from '@shotclock/shared/types';
 
@@ -22,9 +22,8 @@ interface Device {
 
 const DEVICE_MODES = ['setup', 'pairing', 'offline', 'shot-clock', 'media', 'calibration', 'blank'];
 
-export default function DeviceDetailPage({ params }: { params: Promise<{ deviceId: string }> }) {
-  const resolvedParams = use(params);
-  const deviceId = resolvedParams.deviceId;
+export default function DeviceDetailPage({ params }: { params: { deviceId: string } }) {
+  const deviceId = params.deviceId;
   
   const [device, setDevice] = useState<Device | null>(null);
   const [loading, setLoading] = useState(true);

@@ -71,6 +71,7 @@ CHROMIUM_DEPS=(
   libpango-1.0-0
   libcairo2
   libpangocairo-1.0-0
+  x11-xserver-utils
 )
 
 # Debian/Raspberry Pi OS releases rename or remove a few compatibility packages.

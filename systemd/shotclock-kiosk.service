@@ -6,9 +6,13 @@ Requires=shotclock-agent.service
 
 [Service]
 Type=simple
-User=shotclock
-Group=shotclock
+# Chromium must attach to the active graphical login session. The launcher runs
+# as root only long enough to find that session, then drops to KIOSK_USER or the
+# active desktop user before starting Chromium.
+User=root
+Group=root
 WorkingDirectory=/opt/shotclock/current
+EnvironmentFile=-/opt/shotclock/shared/.env
 ExecStart=/bin/bash /opt/shotclock/current/scripts/launch-kiosk.sh
 Restart=on-failure
 RestartSec=10
@@ -20,9 +24,9 @@ SyslogIdentifier=shotclock-kiosk
 Environment=DISPLAY=:0
 
 # Hardening
-NoNewPrivileges=true
-ProtectSystem=strict
-ProtectHome=true
+NoNewPrivileges=false
+ProtectSystem=false
+ProtectHome=false
 ReadWritePaths=/opt/shotclock /home/shotclock/.shotclock
 PrivateTmp=true
 
