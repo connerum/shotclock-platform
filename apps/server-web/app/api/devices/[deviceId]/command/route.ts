@@ -23,11 +23,42 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       );
     }
 
+    const device = await prisma.device.findUnique({
+      where: { deviceId },
+      select: { deviceId: true },
+    });
+
+    if (!device) {
+      return NextResponse.json(
+        { error: `Device not found: ${deviceId}` },
+        { status: 404 }
+      );
+    }
+
     const io = getServerIO();
     if (!io) {
       return NextResponse.json(
         { error: 'Socket.IO server not available' },
-        { status: 500 }
+        { status: 503 }
+      );
+    }
+
+    const room = `device:${deviceId}`;
+    const deviceNamespace = io.of('/device');
+    const connectedSockets = deviceNamespace.adapter.rooms.get(room)?.size ?? 0;
+
+    if (connectedSockets === 0) {
+      await prisma.device.update({
+        where: { deviceId },
+        data: {
+          isOnline: false,
+          status: 'offline',
+        },
+      }).catch(() => {});
+
+      return NextResponse.json(
+        { error: `Device is not connected: ${deviceId}` },
+        { status: 409 }
       );
     }
 
@@ -35,7 +66,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     switch (type) {
       case 'set_mode': {
         const mode: DeviceMode = payload?.mode || { type: 'setup' };
-        io.of('/device').to(`device:${deviceId}`).emit('mode:set', mode);
+        deviceNamespace.to(room).emit('mode:set', mode);
         
         // Update device mode in DB
         await prisma.device.update({
@@ -52,9 +83,43 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
       case 'set_timer': {
         const timerState: TimerState = payload?.timerState;
-        if (timerState) {
-          io.of('/device').to(`device:${deviceId}`).emit('state:update', timerState);
+        if (!timerState) {
+          return NextResponse.json(
+            { error: 'Missing timerState for set_timer command' },
+            { status: 400 }
+          );
         }
+
+        const displayState = {
+          mode: 'shot-clock',
+          timerState,
+          mediaAssetId: null,
+        };
+
+        await prisma.displayState.upsert({
+          where: { deviceId },
+          update: {
+            mode: displayState.mode,
+            timerState: JSON.stringify(timerState),
+            mediaAssetId: null,
+          },
+          create: {
+            deviceId,
+            mode: displayState.mode,
+            timerState: JSON.stringify(timerState),
+            mediaAssetId: null,
+          },
+        });
+
+        await prisma.device.update({
+          where: { deviceId },
+          data: {
+            mode: displayState.mode,
+            displayState: JSON.stringify(displayState),
+          },
+        });
+
+        deviceNamespace.to(room).emit('state:update', timerState);
         return NextResponse.json({
           success: true,
           command: type,
@@ -63,7 +128,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       }
 
       case 'update_config': {
-        io.of('/device').to(`device:${deviceId}`).emit('config:update', payload || {});
+        deviceNamespace.to(room).emit('config:update', payload || {});
         return NextResponse.json({
           success: true,
           command: type,
@@ -72,7 +137,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       }
 
       case 'reboot': {
-        io.of('/device').to(`device:${deviceId}`).emit('reboot');
+        deviceNamespace.to(room).emit('reboot');
         return NextResponse.json({
           success: true,
           command: type,
@@ -81,7 +146,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       }
 
       case 'check_update': {
-        io.of('/device').to(`device:${deviceId}`).emit('update:check');
+        deviceNamespace.to(room).emit('update:check');
         return NextResponse.json({
           success: true,
           command: type,
@@ -97,7 +162,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
             { status: 400 }
           );
         }
-        io.of('/device').to(`device:${deviceId}`).emit('update:install', version);
+        deviceNamespace.to(room).emit('update:install', version);
         return NextResponse.json({
           success: true,
           command: type,

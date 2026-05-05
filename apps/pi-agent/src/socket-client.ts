@@ -72,19 +72,37 @@ export function setupSocketClient(
   // Handle state update from server
   socket.on('state:update', (state) => {
     console.log('Received state update');
-    saveState({ timerState: state });
+    try {
+      saveState({ mode: { type: 'shot-clock' }, timerState: state });
+      sendStateAck(true);
+    } catch (error) {
+      console.error('Failed to apply state update:', error);
+      sendStateAck(false, error instanceof Error ? error.message : String(error));
+    }
   });
 
   // Handle config update from server
   socket.on('config:update', (configUpdate) => {
     console.log('Received config update');
-    saveState({ displayProfile: configUpdate.displayProfile });
+    try {
+      saveState({ displayProfile: configUpdate.displayProfile });
+      sendConfigAck(true);
+    } catch (error) {
+      console.error('Failed to apply config update:', error);
+      sendConfigAck(false, error instanceof Error ? error.message : String(error));
+    }
   });
 
   // Handle mode set from server
   socket.on('mode:set', (mode) => {
     console.log('Received mode set:', mode);
-    saveState({ mode });
+    try {
+      saveState({ mode });
+      sendStateAck(true);
+    } catch (error) {
+      console.error('Failed to apply mode set:', error);
+      sendStateAck(false, error instanceof Error ? error.message : String(error));
+    }
   });
 
   socket.on('pairing:complete', (payload) => {

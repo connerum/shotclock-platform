@@ -1,12 +1,18 @@
 import { Server as SocketIOServer } from 'socket.io';
 import { DeviceToServerEvents, ServerToDeviceEvents } from '@shotclock/shared/socket';
 
-let socketIO: SocketIOServer<DeviceToServerEvents, ServerToDeviceEvents> | null = null;
+type AppSocketServer = SocketIOServer<DeviceToServerEvents, ServerToDeviceEvents>;
 
-export function setServerIO(io: SocketIOServer<DeviceToServerEvents, ServerToDeviceEvents>) {
-  socketIO = io;
+declare global {
+  var __shotclockSocketIO: AppSocketServer | undefined;
+  var socketIO: AppSocketServer | undefined;
 }
 
-export function getServerIO(): SocketIOServer<DeviceToServerEvents, ServerToDeviceEvents> | null {
-  return socketIO;
+export function setServerIO(io: AppSocketServer) {
+  globalThis.__shotclockSocketIO = io;
+  globalThis.socketIO = io;
+}
+
+export function getServerIO(): AppSocketServer | null {
+  return globalThis.__shotclockSocketIO || globalThis.socketIO || null;
 }
