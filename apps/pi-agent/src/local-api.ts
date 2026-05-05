@@ -132,10 +132,11 @@ export function startLocalApi(
   
   // GET /api/setup/status - Get setup status
   app.get('/api/setup/status', (_req: Request, res: Response) => {
+    const currentConfig = loadAgentConfig();
     const setupState: SetupState = {
-      step: config.mode === 'setup' ? 'ap_created' : 'complete',
+      step: currentConfig.mode === 'setup' ? 'ap_created' : 'complete',
     };
-    res.json({ configured: config.mode !== 'setup', state: setupState });
+    res.json({ configured: currentConfig.mode !== 'setup', state: setupState });
   });
   
   // GET /api/wifi/networks - Scan for networks

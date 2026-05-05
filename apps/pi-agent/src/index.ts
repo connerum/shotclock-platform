@@ -10,6 +10,7 @@ import { UpdateManager } from './update-manager.js';
 import { OfflineMode } from './offline-mode.js';
 import { setupAP } from './setup-ap.js';
 import { saveState } from './state-store.js';
+import { getPairingCode, regeneratePairingCode } from './pairing-code.js';
 
 const AGENT_VERSION = '0.1.0';
 
@@ -37,27 +38,17 @@ async function main() {
   // Initialize offline mode
   const offlineMode = new OfflineMode();
 
-  // Setup Socket.IO client
-  const socketClient = setupSocketClient(identity, config, updateManager);
-
-  // Start heartbeat
-  const heartbeatStop = startHeartbeat();
-
   // Check if device is paired
   const paired = isPaired();
   
-  if (!paired) {
-    // Enter setup mode
-    console.log('Device not paired - entering setup mode');
-    
-    // Generate pairing code
-    const { regeneratePairingCode } = await import('./pairing-code.js');
+  if (!paired && config.mode === 'setup') {
+    console.log('Device not paired and WiFi not configured - entering setup mode');
+
     const pairingCode = regeneratePairingCode();
-    console.log(`Pairing code: ${pairingCode.code} (expires in 10 minutes)`);
-    
-    // Update config to setup mode
+    console.log(`Pairing code: ${pairingCode.code} (expires in 24 hours)`);
     saveConfig({ mode: 'setup' });
-    
+    saveState({ mode: { type: 'setup' } });
+
     const setupApSuffix = identity.deviceId.replace(/^shotclock-/, '').substring(0, 6);
     const setupApConfig = {
       apSsid: `${config.setupApSsid}-${setupApSuffix}`,
@@ -80,6 +71,13 @@ async function main() {
     } else {
       throw new Error('Setup AP failed to start; check hostapd, dnsmasq, and wlan0 logs');
     }
+  } else if (!paired) {
+    console.log('Device has WiFi configured but is not paired - entering pairing mode');
+
+    const pairingCode = getPairingCode();
+    console.log(`Pairing code: ${pairingCode?.code || 'unavailable'} (expires in 24 hours)`);
+    saveConfig({ mode: 'pairing' });
+    saveState({ mode: { type: 'pairing' } });
   } else {
     // Device is paired - connect to server
     console.log('Device is paired - connecting to server...');
@@ -88,6 +86,13 @@ async function main() {
     saveConfig({ mode: 'online' });
     saveState({ mode: { type: 'shot-clock' } });
   }
+
+  // Setup Socket.IO client after local setup state is established so hello
+  // includes the correct pairing code/mode on first connection.
+  const socketClient = setupSocketClient(identity, config, updateManager);
+
+  // Start heartbeat
+  const heartbeatStop = startHeartbeat();
 
   // Start local API server
   startLocalApi(identity, config, socketClient, updateManager, offlineMode);

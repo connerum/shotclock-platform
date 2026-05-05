@@ -46,29 +46,28 @@ export class WiFiManager {
    * Connect to a WiFi network
    */
   async connect(ssid: string, password?: string): Promise<boolean> {
+    const trimmedSsid = ssid.trim();
+
     try {
-      console.log(`Connecting to WiFi: ${ssid}`);
+      console.log(`Connecting to WiFi: ${trimmedSsid}`);
 
       await this.prepareClientMode();
 
-      const args = ['dev', 'wifi', 'connect', ssid];
-      if (password) {
-        args.push('password', password);
+      let connected = await this.connectFromScan(trimmedSsid, password);
+      if (!connected) {
+        console.log(`WiFi ${trimmedSsid} was not available in scan results; trying saved/manual profile`);
+        connected = await this.connectFromProfile(trimmedSsid, password);
       }
-      args.push('ifname', this.iface);
 
-      await execFileAsync('nmcli', args, { timeout: 45000 });
-
-      const connected = await this.waitForConnection(ssid, 20000);
       if (connected) {
-        console.log(`Connected to ${ssid}`);
+        console.log(`Connected to ${trimmedSsid}`);
         return true;
       }
 
-      console.error(`WiFi command completed, but ${this.iface} did not report a connection to ${ssid}`);
+      console.error(`WiFi commands completed, but ${this.iface} did not report a connection to ${trimmedSsid}`);
       return false;
     } catch (error) {
-      console.error(`Failed to connect to ${ssid}:`, error);
+      console.error(`Failed to connect to ${trimmedSsid}:`, error);
       return false;
     }
   }
@@ -176,6 +175,78 @@ export class WiFiManager {
     await execFileAsync('nmcli', ['device', 'wifi', 'rescan', 'ifname', this.iface], { timeout: 15000 }).catch(() => {});
   }
 
+  private async connectFromScan(ssid: string, password?: string): Promise<boolean> {
+    const args = ['dev', 'wifi', 'connect', ssid];
+    if (password) {
+      args.push('password', password);
+    }
+    args.push('ifname', this.iface);
+
+    try {
+      await execFileAsync('nmcli', args, { timeout: 45000 });
+      return this.waitForConnection(ssid, 20000);
+    } catch (error) {
+      console.warn(`Scan-based WiFi connect failed for ${ssid}:`, this.formatCommandError(error));
+      return false;
+    }
+  }
+
+  private async connectFromProfile(ssid: string, password?: string): Promise<boolean> {
+    const profileName = `shotclock-${ssid}`;
+
+    await execFileAsync('nmcli', ['connection', 'delete', profileName]).catch(() => {});
+    await execFileAsync('nmcli', [
+      'connection',
+      'add',
+      'type',
+      'wifi',
+      'ifname',
+      this.iface,
+      'con-name',
+      profileName,
+      'ssid',
+      ssid,
+    ]);
+
+    await execFileAsync('nmcli', [
+      'connection',
+      'modify',
+      profileName,
+      'connection.autoconnect',
+      'yes',
+      '802-11-wireless.hidden',
+      'yes',
+      'ipv4.method',
+      'auto',
+      'ipv6.method',
+      'auto',
+    ]);
+
+    if (password) {
+      await execFileAsync('nmcli', [
+        'connection',
+        'modify',
+        profileName,
+        '802-11-wireless-security.key-mgmt',
+        'wpa-psk',
+        '802-11-wireless-security.psk',
+        password,
+      ]);
+    }
+
+    try {
+      await execFileAsync('nmcli', ['connection', 'up', profileName], { timeout: 60000 });
+      const connectedByProfile = await this.waitForConnection(profileName, 30000);
+      if (connectedByProfile) {
+        return true;
+      }
+      return this.waitForConnection(ssid, 30000);
+    } catch (error) {
+      console.error(`Profile-based WiFi connect failed for ${ssid}:`, this.formatCommandError(error));
+      return false;
+    }
+  }
+
   private async waitForManagedDevice(timeoutMs: number): Promise<void> {
     const deadline = Date.now() + timeoutMs;
     let lastState = '';
@@ -210,6 +281,14 @@ export class WiFiManager {
 
   private sleep(ms: number): Promise<void> {
     return new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
+  private formatCommandError(error: unknown): string {
+    if (error && typeof error === 'object') {
+      const maybeError = error as { message?: string; stderr?: string; stdout?: string };
+      return [maybeError.message, maybeError.stderr, maybeError.stdout].filter(Boolean).join('\n');
+    }
+    return String(error);
   }
 }
 
