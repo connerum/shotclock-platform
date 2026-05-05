@@ -1,16 +1,16 @@
 // Server -> Device socket events
 
-import type { TimerState, DisplayProfile, DeviceMode, PairingResponse, CalibrationData } from '../types/index.js';
+import type { TimerState, DisplayProfile, DeviceMode, PairingResponse, CalibrationData, DeviceCommandAck } from '../types/index.js';
 
 export interface ServerToDeviceEvents {
-  'state:update': (state: TimerState) => void;
-  'config:update': (config: DisplayConfigPayload) => void;
-  'mode:set': (mode: DeviceMode) => void;
-  'pairing:complete': (payload: PairingResponse) => void;
-  'update:check': () => void;
-  'update:install': (version: string) => void;
-  'reboot': () => void;
-  'ping': () => void;
+  'state:update': (state: TimerState, ack?: (response: DeviceCommandAck) => void) => void;
+  'config:update': (config: DisplayConfigPayload, ack?: (response: DeviceCommandAck) => void) => void;
+  'mode:set': (mode: DeviceMode, ack?: (response: DeviceCommandAck) => void) => void;
+  'pairing:complete': (payload: PairingResponse, ack?: (response: DeviceCommandAck) => void) => void;
+  'update:check': (ack?: (response: DeviceCommandAck) => void) => void;
+  'update:install': (version: string, ack?: (response: DeviceCommandAck) => void) => void;
+  'reboot': (ack?: (response: DeviceCommandAck) => void) => void;
+  'ping': (ack?: (response: DeviceCommandAck) => void) => void;
 }
 
 export interface DisplayConfigPayload {

@@ -4,12 +4,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getServerIO } from '@/lib/socket';
-import { DeviceMode, TimerState } from '@shotclock/shared/types';
+import { DeviceCommandAck, DeviceMode, TimerState } from '@shotclock/shared/types';
 import { canAccessDevice, requireApiUser } from '@/lib/auth';
 
 interface RouteParams {
   params: { deviceId: string };
 }
+
+const COMMAND_ACK_TIMEOUT_MS = 2500;
 
 export async function POST(request: NextRequest, { params }: RouteParams) {
   try {
@@ -77,7 +79,10 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     switch (type) {
       case 'set_mode': {
         const mode: DeviceMode = payload?.mode || { type: 'setup' };
-        deviceNamespace.to(room).emit('mode:set', mode);
+        const ack = await emitDeviceCommand(deviceNamespace, room, 'mode:set', mode);
+        if (!ack.success) {
+          return commandAckError(ack);
+        }
         
         // Update device mode in DB
         await prisma.device.update({
@@ -88,6 +93,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         return NextResponse.json({
           success: true,
           command: type,
+          acknowledged: true,
           dispatchedAt: new Date().toISOString(),
         });
       }
@@ -101,66 +107,62 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
           );
         }
 
+        const ack = await emitDeviceCommand(deviceNamespace, room, 'state:update', timerState);
+        if (!ack.success) {
+          return commandAckError(ack);
+        }
+
         const displayState = {
           mode: 'shot-clock',
           timerState,
           mediaAssetId: null,
         };
 
-        await prisma.displayState.upsert({
-          where: { deviceId },
-          update: {
-            mode: displayState.mode,
-            timerState: JSON.stringify(timerState),
-            mediaAssetId: null,
-          },
-          create: {
-            deviceId,
-            mode: displayState.mode,
-            timerState: JSON.stringify(timerState),
-            mediaAssetId: null,
-          },
-        });
+        await persistTimerCommand(deviceId, displayState);
 
-        await prisma.device.update({
-          where: { deviceId },
-          data: {
-            mode: displayState.mode,
-            displayState: JSON.stringify(displayState),
-          },
-        });
-
-        deviceNamespace.to(room).emit('state:update', timerState);
         return NextResponse.json({
           success: true,
           command: type,
+          acknowledged: true,
           dispatchedAt: new Date().toISOString(),
         });
       }
 
       case 'update_config': {
-        deviceNamespace.to(room).emit('config:update', payload || {});
+        const ack = await emitDeviceCommand(deviceNamespace, room, 'config:update', payload || {});
+        if (!ack.success) {
+          return commandAckError(ack);
+        }
         return NextResponse.json({
           success: true,
           command: type,
+          acknowledged: true,
           dispatchedAt: new Date().toISOString(),
         });
       }
 
       case 'reboot': {
-        deviceNamespace.to(room).emit('reboot');
+        const ack = await emitDeviceCommand(deviceNamespace, room, 'reboot');
+        if (!ack.success) {
+          return commandAckError(ack);
+        }
         return NextResponse.json({
           success: true,
           command: type,
+          acknowledged: true,
           dispatchedAt: new Date().toISOString(),
         });
       }
 
       case 'check_update': {
-        deviceNamespace.to(room).emit('update:check');
+        const ack = await emitDeviceCommand(deviceNamespace, room, 'update:check');
+        if (!ack.success) {
+          return commandAckError(ack);
+        }
         return NextResponse.json({
           success: true,
           command: type,
+          acknowledged: true,
           dispatchedAt: new Date().toISOString(),
         });
       }
@@ -173,11 +175,15 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
             { status: 400 }
           );
         }
-        deviceNamespace.to(room).emit('update:install', version);
+        const ack = await emitDeviceCommand(deviceNamespace, room, 'update:install', version);
+        if (!ack.success) {
+          return commandAckError(ack);
+        }
         return NextResponse.json({
           success: true,
           command: type,
           version,
+          acknowledged: true,
           dispatchedAt: new Date().toISOString(),
         });
       }
@@ -194,5 +200,80 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       { error: 'Failed to dispatch command' },
       { status: 500 }
     );
+  }
+}
+
+async function emitDeviceCommand(
+  deviceNamespace: any,
+  room: string,
+  event: string,
+  payload?: unknown
+): Promise<DeviceCommandAck> {
+  return new Promise((resolve) => {
+    const args = payload === undefined ? [] : [payload];
+
+    deviceNamespace
+      .timeout(COMMAND_ACK_TIMEOUT_MS)
+      .to(room)
+      .emit(event, ...args, (error: Error | null, responses?: DeviceCommandAck[]) => {
+        if (error) {
+          resolve({
+            success: false,
+            error: `Device did not acknowledge ${event} within ${COMMAND_ACK_TIMEOUT_MS}ms`,
+          });
+          return;
+        }
+
+        const response = responses?.[0];
+        if (!response) {
+          resolve({ success: false, error: `Device returned no acknowledgement for ${event}` });
+          return;
+        }
+
+        resolve(response);
+      });
+  });
+}
+
+function commandAckError(ack: DeviceCommandAck) {
+  return NextResponse.json(
+    { success: false, error: ack.error || 'Device did not acknowledge command' },
+    { status: 504 }
+  );
+}
+
+async function persistTimerCommand(
+  deviceId: string,
+  displayState: { mode: string; timerState: TimerState; mediaAssetId: null }
+) {
+  try {
+    await prisma.displayState.upsert({
+      where: { deviceId },
+      update: {
+        mode: displayState.mode,
+        timerState: JSON.stringify(displayState.timerState),
+        mediaAssetId: null,
+      },
+      create: {
+        deviceId,
+        mode: displayState.mode,
+        timerState: JSON.stringify(displayState.timerState),
+        mediaAssetId: null,
+      },
+    });
+  } catch (error) {
+    console.warn(`Unable to persist DisplayState for ${deviceId}; live command was still dispatched`, error);
+  }
+
+  try {
+    await prisma.device.update({
+      where: { deviceId },
+      data: {
+        mode: displayState.mode,
+        displayState: JSON.stringify(displayState),
+      },
+    });
+  } catch (error) {
+    console.warn(`Unable to persist Device display state for ${deviceId}; live command was still dispatched`, error);
   }
 }

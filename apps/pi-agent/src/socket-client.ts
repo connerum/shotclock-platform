@@ -3,7 +3,7 @@
 import { io, Socket } from 'socket.io-client';
 import type { DeviceIdentity } from './identity.js';
 import type { AgentConfig } from './config-store.js';
-import type { ServerToDeviceEvents, HelloPayload, HeartbeatPayload, PairingResponse } from '@shotclock/shared/types';
+import type { ServerToDeviceEvents, HelloPayload, HeartbeatPayload, PairingResponse, DeviceCommandAck } from '@shotclock/shared/types';
 import { loadIdentity, markAsPaired, isPaired } from './identity.js';
 import { loadState, saveState, setConfigPreview } from './state-store.js';
 import { saveConfig } from './config-store.js';
@@ -70,19 +70,22 @@ export function setupSocketClient(
   });
 
   // Handle state update from server
-  socket.on('state:update', (state) => {
+  socket.on('state:update', (state, ack) => {
     console.log('Received state update');
     try {
       saveState({ mode: { type: 'shot-clock' }, timerState: state });
+      acknowledge(ack, { success: true });
       sendStateAck(true);
     } catch (error) {
       console.error('Failed to apply state update:', error);
-      sendStateAck(false, error instanceof Error ? error.message : String(error));
+      const message = error instanceof Error ? error.message : String(error);
+      acknowledge(ack, { success: false, error: message });
+      sendStateAck(false, message);
     }
   });
 
   // Handle config update from server
-  socket.on('config:update', (configUpdate) => {
+  socket.on('config:update', (configUpdate, ack) => {
     console.log('Received config update');
     try {
       const nextConfig = {
@@ -95,51 +98,70 @@ export function setupSocketClient(
       } else {
         saveState(nextConfig);
       }
+      acknowledge(ack, { success: true });
       sendConfigAck(true);
     } catch (error) {
       console.error('Failed to apply config update:', error);
-      sendConfigAck(false, error instanceof Error ? error.message : String(error));
+      const message = error instanceof Error ? error.message : String(error);
+      acknowledge(ack, { success: false, error: message });
+      sendConfigAck(false, message);
     }
   });
 
   // Handle mode set from server
-  socket.on('mode:set', (mode) => {
+  socket.on('mode:set', (mode, ack) => {
     console.log('Received mode set:', mode);
     try {
       saveState({ mode });
+      acknowledge(ack, { success: true });
       sendStateAck(true);
     } catch (error) {
       console.error('Failed to apply mode set:', error);
-      sendStateAck(false, error instanceof Error ? error.message : String(error));
+      const message = error instanceof Error ? error.message : String(error);
+      acknowledge(ack, { success: false, error: message });
+      sendStateAck(false, message);
     }
   });
 
-  socket.on('pairing:complete', (payload) => {
+  socket.on('pairing:complete', (payload, ack) => {
     applyPairingComplete(payload);
+    acknowledge(ack, { success: true });
   });
 
   // Handle update check
-  socket.on('update:check', async () => {
+  socket.on('update:check', async (ack) => {
     console.log('Received update check request');
-    await updateManager.checkForUpdates();
+    acknowledge(ack, { success: true });
+    try {
+      await updateManager.checkForUpdates();
+    } catch (error) {
+      console.error('Update check failed:', error);
+    }
   });
 
   // Handle update install
-  socket.on('update:install', async (version: string) => {
+  socket.on('update:install', async (version: string, ack) => {
     console.log('Received update install request for version:', version);
-    await updateManager.installUpdate(version);
+    acknowledge(ack, { success: true });
+    try {
+      await updateManager.installUpdate(version);
+    } catch (error) {
+      console.error('Update install failed:', error);
+    }
   });
 
   // Handle reboot command
-  socket.on('reboot', () => {
+  socket.on('reboot', (ack) => {
     console.log('Received reboot command');
+    acknowledge(ack, { success: true });
     // In production, would execute system reboot
     process.exit(0);
   });
 
   // Handle ping
-  socket.on('ping', () => {
+  socket.on('ping', (ack) => {
     console.log('Received ping');
+    acknowledge(ack, { success: true });
     if (socket) {
       socket.emit('device:heartbeat', {
         deviceId: identity.deviceId,
@@ -152,6 +174,13 @@ export function setupSocketClient(
   });
 
   return socket;
+}
+
+function acknowledge(
+  ack: ((response: DeviceCommandAck) => void) | undefined,
+  response: DeviceCommandAck
+): void {
+  if (ack) ack(response);
 }
 
 function sendHello(identity: DeviceIdentity): void {

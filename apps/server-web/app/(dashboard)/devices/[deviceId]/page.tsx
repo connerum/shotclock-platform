@@ -66,6 +66,7 @@ export default function DeviceDetailPage({ params }: { params: { deviceId: strin
   const [device, setDevice] = useState<Device | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [commandError, setCommandError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   
   // Timer state
@@ -136,14 +137,24 @@ export default function DeviceDetailPage({ params }: { params: { deviceId: strin
   };
 
   const sendCommand = async (type: string, payload?: any) => {
+    setCommandError(null);
     try {
       const res = await fetch(`/api/devices/${deviceId}/command`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ type, payload }),
       });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        const message = data?.error || `Command failed with HTTP ${res.status}`;
+        setCommandError(message);
+        console.error('Command failed:', message);
+        return false;
+      }
       return res.ok;
     } catch (err) {
+      const message = err instanceof Error ? err.message : 'Command failed';
+      setCommandError(message);
       console.error('Command failed:', err);
       return false;
     }
@@ -152,8 +163,10 @@ export default function DeviceDetailPage({ params }: { params: { deviceId: strin
   const setMode = async (mode: string) => {
     setSaving(true);
     const modePayload: DeviceMode = { type: mode as any };
-    await sendCommand('set_mode', { mode: modePayload });
-    setDevice(prev => prev ? { ...prev, mode } : null);
+    const success = await sendCommand('set_mode', { mode: modePayload });
+    if (success) {
+      setDevice(prev => prev ? { ...prev, mode } : null);
+    }
     setSaving(false);
   };
 
@@ -169,8 +182,8 @@ export default function DeviceDetailPage({ params }: { params: { deviceId: strin
       isPaused: false,
       lastUpdated: Date.now(),
     };
-    await sendCommand('set_timer', { timerState });
-    setTimerRunning(true);
+    const success = await sendCommand('set_timer', { timerState });
+    if (success) setTimerRunning(true);
   };
 
   const pauseTimer = async () => {
@@ -185,8 +198,8 @@ export default function DeviceDetailPage({ params }: { params: { deviceId: strin
       isPaused: true,
       lastUpdated: Date.now(),
     };
-    await sendCommand('set_timer', { timerState });
-    setTimerRunning(false);
+    const success = await sendCommand('set_timer', { timerState });
+    if (success) setTimerRunning(false);
   };
 
   const resetTimer = async () => {
@@ -201,13 +214,15 @@ export default function DeviceDetailPage({ params }: { params: { deviceId: strin
       isPaused: false,
       lastUpdated: Date.now(),
     };
-    await sendCommand('set_timer', { timerState });
-    setShotClock(24);
-    setGameClock(720);
-    setPeriod(1);
-    setHomeScore(0);
-    setAwayScore(0);
-    setTimerRunning(false);
+    const success = await sendCommand('set_timer', { timerState });
+    if (success) {
+      setShotClock(24);
+      setGameClock(720);
+      setPeriod(1);
+      setHomeScore(0);
+      setAwayScore(0);
+      setTimerRunning(false);
+    }
   };
 
   const calibrationBoxStyle = useMemo(() => ({
@@ -480,6 +495,11 @@ export default function DeviceDetailPage({ params }: { params: { deviceId: strin
         <Link href="/devices" className="text-gray-400 hover:text-white mb-4 inline-block">
           ← Back to Devices
         </Link>
+        {commandError && (
+          <div className="mb-4 rounded border border-red-700 bg-red-950/60 p-3 text-sm text-red-200">
+            {commandError}
+          </div>
+        )}
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold">{device.name}</h1>
