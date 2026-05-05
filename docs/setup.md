@@ -4,7 +4,7 @@ Quick start guide for setting up the Shotclock Platform.
 
 ## Prerequisites
 
-- Node.js 20+ (for development)
+- Node.js 20 LTS or 22 LTS (Node 23 is not supported)
 - pnpm 8+
 - PostgreSQL 14+ (for production)
 - Raspberry Pi OS or similar (for Pi deployment)
@@ -54,7 +54,8 @@ pnpm dev
 This starts:
 - Server Web: http://localhost:3000
 - Pi Agent API: http://localhost:3001
-- Pi Kiosk: http://localhost:3001
+- Pi Kiosk dev server: http://localhost:5173 or the next available Vite port
+- Built Pi Kiosk on device: served by the Pi Agent at http://localhost:3001/
 
 ## Pi Deployment
 
@@ -79,11 +80,19 @@ chmod +x scripts/install-pi.sh
 sudo ./scripts/install-pi.sh
 ```
 
+On Raspberry Pi OS/Debian Trixie, use the latest installer from this repo. Older installer versions may fail because Trixie provides `chromium` instead of `chromium-browser` and no longer provides `libgconf-2-4`. If the installer stops there, run:
+
+```bash
+cd shotclock-platform
+git pull
+sudo ./scripts/install-pi.sh
+```
+
 ### 3. Configure WiFi
 
 1. The Pi will create a setup AP named "Shotclock-Setup"
 2. Connect to it with password "shotclock123"
-3. Open http://192.168.4.1:3001 in a browser
+3. Open http://192.168.4.1:8080 in a browser
 4. Select your WiFi network and enter credentials
 5. Click "Complete Setup"
 

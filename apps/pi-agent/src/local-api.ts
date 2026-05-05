@@ -1,6 +1,8 @@
 // Local API - Express API on localhost:3001
 
 import express, { Request, Response } from 'express';
+import * as fs from 'fs';
+import * as path from 'path';
 import type { DeviceIdentity } from './identity.js';
 import type { AgentConfig } from './config-store.js';
 import type { TypedSocket } from './socket-client.js';
@@ -27,6 +29,7 @@ export function startLocalApi(
 ): void {
   const app = express();
   const port = config.localApiPort || 3001;
+  const kioskDistDir = resolveKioskDistDir();
   
   app.use(express.json());
   
@@ -41,7 +44,7 @@ export function startLocalApi(
       firmwareVersion: identity.firmwareVersion,
       mode: state.mode,
       status: 'running',
-      isOnline: false, // Will be connected via socket
+      isOnline: _socket.connected,
       network: netStatus,
       lastUpdated: state.lastUpdated,
     });
@@ -82,8 +85,24 @@ export function startLocalApi(
   // POST /local/config - Update config
   app.post('/local/config', (req: Request, res: Response) => {
     try {
-      const configData = saveAgentConfig(req.body);
-      res.json({ config: configData });
+      const { displayProfile, calibrationData, ...agentConfigUpdates } = req.body;
+      const configData = Object.keys(agentConfigUpdates).length > 0
+        ? saveAgentConfig(agentConfigUpdates)
+        : loadAgentConfig();
+
+      if (displayProfile || calibrationData) {
+        saveState({
+          ...(displayProfile && { displayProfile }),
+          ...(calibrationData && { calibrationData }),
+        });
+      }
+
+      const state = loadState();
+      res.json({
+        config: configData,
+        displayProfile: state.displayProfile,
+        calibrationData: state.calibrationData,
+      });
     } catch (error) {
       res.status(400).json({ error: 'Invalid config' });
     }
@@ -206,9 +225,38 @@ export function startLocalApi(
       res.status(500).json({ error: 'Update installation failed' });
     }
   });
+
+  if (kioskDistDir) {
+    app.use(express.static(kioskDistDir));
+    app.get('*', (_req: Request, res: Response) => {
+      res.sendFile(path.join(kioskDistDir, 'index.html'));
+    });
+    console.log(`Serving kiosk UI from ${kioskDistDir}`);
+  } else {
+    app.get('/', (_req: Request, res: Response) => {
+      res.status(503).send('Shotclock kiosk build not found. Run pnpm --filter @shotclock/pi-kiosk build.');
+    });
+  }
   
   // Start server
-  app.listen(port, '127.0.0.1', () => {
-    console.log(`Local API server running on http://127.0.0.1:${port}`);
+  app.listen(port, '0.0.0.0', () => {
+    console.log(`Local API server running on http://0.0.0.0:${port}`);
   });
+}
+
+function resolveKioskDistDir(): string | null {
+  const candidates = [
+    process.env.KIOSK_DIST_DIR,
+    path.join(process.cwd(), 'apps', 'pi-kiosk', 'dist'),
+    path.join(process.cwd(), 'pi-kiosk', 'dist'),
+    path.join(process.cwd(), 'pi-kiosk'),
+  ].filter(Boolean) as string[];
+
+  for (const candidate of candidates) {
+    if (fs.existsSync(path.join(candidate, 'index.html'))) {
+      return candidate;
+    }
+  }
+
+  return null;
 }

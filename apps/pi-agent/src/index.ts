@@ -9,6 +9,7 @@ import { startCaptivePortal, stopCaptivePortal } from './captive-portal.js';
 import { UpdateManager } from './update-manager.js';
 import { OfflineMode } from './offline-mode.js';
 import { setupAP } from './setup-ap.js';
+import { saveState } from './state-store.js';
 
 const AGENT_VERSION = '0.1.0';
 
@@ -73,6 +74,7 @@ async function main() {
     
     // Update mode to online
     saveConfig({ mode: 'online' });
+    saveState({ mode: { type: 'shot-clock' } });
   }
 
   // Start local API server

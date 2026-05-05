@@ -36,7 +36,7 @@ async function main() {
       pairingCodeExp: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 hours from now
       firmwareVersion: '0.1.0',
       controllerType: 'generic',
-      displayProfile: {
+      displayProfile: JSON.stringify({
         id: 'default-generic',
         name: 'Default Generic Display',
         controllerType: 'generic',
@@ -52,11 +52,11 @@ async function main() {
           warning: '#ffff00',
           danger: '#ff0000',
         },
-      },
+      }),
       mode: 'pairing',
       status: 'offline',
       isOnline: false,
-      capabilities: ['shot-clock', 'scoreboard', 'timer', 'media'],
+      capabilities: JSON.stringify(['shot-clock', 'scoreboard', 'timer', 'media']),
     },
   });
   console.log('Created device:', device.name, 'with pairing code:', device.pairingCode);
@@ -76,9 +76,9 @@ async function main() {
   // Create initial DisplayState for the device
   await prisma.displayState.create({
     data: {
-      deviceId: device.id,
+      deviceId: device.deviceId,
       mode: 'pairing',
-      timerState: {
+      timerState: JSON.stringify({
         mode: 'stop',
         homeScore: 0,
         awayScore: 0,
@@ -88,7 +88,7 @@ async function main() {
         isRunning: false,
         isPaused: false,
         lastUpdated: Date.now(),
-      },
+      }),
     },
   });
   console.log('Created initial display state for device');

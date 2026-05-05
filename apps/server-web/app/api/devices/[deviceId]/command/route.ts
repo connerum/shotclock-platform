@@ -35,7 +35,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     switch (type) {
       case 'set_mode': {
         const mode: DeviceMode = payload?.mode || { type: 'setup' };
-        io.to(`device:${deviceId}`).emit('mode:set', mode);
+        io.of('/device').to(`device:${deviceId}`).emit('mode:set', mode);
         
         // Update device mode in DB
         await prisma.device.update({
@@ -53,7 +53,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       case 'set_timer': {
         const timerState: TimerState = payload?.timerState;
         if (timerState) {
-          io.to(`device:${deviceId}`).emit('state:update', timerState);
+          io.of('/device').to(`device:${deviceId}`).emit('state:update', timerState);
         }
         return NextResponse.json({
           success: true,
@@ -63,7 +63,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       }
 
       case 'update_config': {
-        io.to(`device:${deviceId}`).emit('config:update', payload || {});
+        io.of('/device').to(`device:${deviceId}`).emit('config:update', payload || {});
         return NextResponse.json({
           success: true,
           command: type,
@@ -72,7 +72,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       }
 
       case 'reboot': {
-        io.to(`device:${deviceId}`).emit('reboot');
+        io.of('/device').to(`device:${deviceId}`).emit('reboot');
         return NextResponse.json({
           success: true,
           command: type,
@@ -81,7 +81,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       }
 
       case 'check_update': {
-        io.to(`device:${deviceId}`).emit('update:check');
+        io.of('/device').to(`device:${deviceId}`).emit('update:check');
         return NextResponse.json({
           success: true,
           command: type,
@@ -97,7 +97,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
             { status: 400 }
           );
         }
-        io.to(`device:${deviceId}`).emit('update:install', version);
+        io.of('/device').to(`device:${deviceId}`).emit('update:install', version);
         return NextResponse.json({
           success: true,
           command: type,

@@ -79,10 +79,10 @@ export class UpdateManager {
         throw new Error('Failed to fetch update manifest');
       }
       
-      const data = await response.json() as { manifest: { latestVersion: string; releases: FirmwareRelease[] } };
+      const data = await response.json() as { latestVersion: string | null; releases: FirmwareRelease[] };
       
-      this.state.latestVersion = data.manifest.latestVersion;
-      this.state.release = data.manifest.releases[0];
+      this.state.latestVersion = data.latestVersion || undefined;
+      this.state.release = data.releases[0];
       
       if (this.state.latestVersion && this.state.latestVersion !== this.state.currentVersion) {
         this.state.status = 'idle';
@@ -162,13 +162,15 @@ export class UpdateManager {
   private async downloadFile(url: string, destPath: string): Promise<void> {
     console.log(`Downloading ${url} to ${destPath}`);
     
-    // In production, would use fetch to download the file
-    // For now, simulate download progress
-    this.state.progress = 50;
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error(`Download failed with HTTP ${response.status}`);
+    }
+
+    const buffer = Buffer.from(await response.arrayBuffer());
+    await fs.promises.writeFile(destPath, buffer);
+    this.state.progress = 100;
     this.broadcastStatus();
-    
-    // Simulate async operation
-    await new Promise(resolve => setTimeout(resolve, 1000));
   }
   
   private broadcastStatus(): void {

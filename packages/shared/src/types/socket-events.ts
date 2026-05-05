@@ -184,6 +184,8 @@ export interface HelloPayload {
   controllerType: ControllerType;
   capabilities: string[];
   displayProfile: DisplayProfile;
+  pairingCode?: string;
+  pairingCodeExpiresAt?: number;
   timestamp: number;
 }
 
@@ -206,6 +208,7 @@ export interface ServerToDeviceEvents {
   'state:update': (state: TimerState) => void;
   'config:update': (config: DisplayConfigPayload) => void;
   'mode:set': (mode: DeviceMode) => void;
+  'pairing:complete': (payload: PairingResponse) => void;
   'update:check': () => void;
   'update:install': (version: string) => void;
   'reboot': () => void;

@@ -1,11 +1,12 @@
 // Server -> Device socket events
 
-import type { TimerState, DisplayProfile, DeviceMode } from '../types/index.js';
+import type { TimerState, DisplayProfile, DeviceMode, PairingResponse } from '../types/index.js';
 
 export interface ServerToDeviceEvents {
   'state:update': (state: TimerState) => void;
   'config:update': (config: DisplayConfigPayload) => void;
   'mode:set': (mode: DeviceMode) => void;
+  'pairing:complete': (payload: PairingResponse) => void;
   'update:check': () => void;
   'update:install': (version: string) => void;
   'reboot': () => void;
@@ -25,6 +26,7 @@ export function createServerToDeviceEmitter() {
     emitStateUpdate: (state: TimerState) => state,
     emitConfigUpdate: (config: DisplayConfigPayload) => config,
     emitModeSet: (mode: DeviceMode) => mode,
+    emitPairingComplete: (payload: PairingResponse) => payload,
     emitUpdateCheck: () => null,
     emitUpdateInstall: (version: string) => version,
     emitReboot: () => null,

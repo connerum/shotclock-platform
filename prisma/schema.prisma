@@ -70,7 +70,7 @@ model DisplayState {
   mediaAssetId String?
   updatedAt    DateTime @updatedAt
 
-  device Device @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  device Device @relation(fields: [deviceId], references: [deviceId], onDelete: Cascade)
 }
 
 model MediaAsset {

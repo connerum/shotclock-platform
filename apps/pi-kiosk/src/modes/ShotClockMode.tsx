@@ -1,5 +1,6 @@
 // Shot Clock Mode - Main shot clock display
 
+import { useEffect, useState } from 'react';
 import ShotClock from '../components/ShotClock';
 
 interface ShotClockModeProps {
@@ -12,15 +13,27 @@ interface ShotClockModeProps {
       awayScore: number;
       period?: number;
       isRunning: boolean;
+      lastUpdated?: number;
     };
   };
 }
 
 export default function ShotClockMode({ state }: ShotClockModeProps) {
+  const [now, setNow] = useState(Date.now());
   const timerState = state?.timerState;
+
+  useEffect(() => {
+    if (!timerState?.isRunning) return;
+
+    const interval = setInterval(() => setNow(Date.now()), 250);
+    return () => clearInterval(interval);
+  }, [timerState?.isRunning, timerState?.lastUpdated]);
   
-  const shotClock = timerState?.shotClock ?? 24;
-  const gameClock = timerState?.gameClock ?? 720;
+  const elapsedSeconds = timerState?.isRunning
+    ? Math.floor((now - (timerState.lastUpdated || now)) / 1000)
+    : 0;
+  const shotClock = Math.max(0, (timerState?.shotClock ?? 24) - elapsedSeconds);
+  const gameClock = Math.max(0, (timerState?.gameClock ?? 720) - elapsedSeconds);
   const homeScore = timerState?.homeScore ?? 0;
   const awayScore = timerState?.awayScore ?? 0;
   const period = timerState?.period ?? 1;

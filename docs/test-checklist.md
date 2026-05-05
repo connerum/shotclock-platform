@@ -155,7 +155,7 @@ All items must pass before deployment is considered complete.
 - [ ] `install-pi.sh` runs without errors on a fresh Raspberry Pi OS Lite install
 - [ ] Node.js 22 is installed
 - [ ] pnpm is installed globally
-- [ ] Chromium and dependencies are installed
+- [ ] Chromium and dependencies are installed (`chromium-browser` on older Raspberry Pi OS, `chromium` on Debian/Raspberry Pi OS Trixie)
 - [ ] NetworkManager, hostapd, dnsmasq are installed
 - [ ] `/opt/shotclock` directory structure is created
 - [ ] Config templates are copied to `/opt/shotclock/shared/config/`

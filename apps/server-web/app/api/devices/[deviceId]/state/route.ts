@@ -84,7 +84,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         isPaused: false,
         lastUpdated: Date.now(),
       };
-      io.to(`device:${deviceId}`).emit('state:update', timerStatePayload);
+      io.of('/device').to(`device:${deviceId}`).emit('state:update', timerStatePayload);
     }
 
     return NextResponse.json({ 

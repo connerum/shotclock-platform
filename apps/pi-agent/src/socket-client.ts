@@ -4,7 +4,10 @@ import { io, Socket } from 'socket.io-client';
 import type { DeviceIdentity } from './identity.js';
 import type { AgentConfig } from './config-store.js';
 import type { ServerToDeviceEvents, HelloPayload, HeartbeatPayload } from '@shotclock/shared/types';
+import { markAsPaired } from './identity.js';
 import { loadState, saveState } from './state-store.js';
+import { saveConfig } from './config-store.js';
+import { getPairingCode, clearPairingCode } from './pairing-code.js';
 import type { UpdateManager } from './update-manager.js';
 
 export type TypedSocket = Socket<ServerToDeviceEvents, DeviceToDeviceEvents>;
@@ -30,7 +33,7 @@ export function setupSocketClient(
   
   console.log(`Connecting to server: ${serverUrl}`);
   
-  socket = io(serverUrl, {
+  socket = io(`${serverUrl.replace(/\/$/, '')}/device`, {
     path: '/socket.io',
     transports: ['websocket'],
     reconnection: true,
@@ -84,6 +87,24 @@ export function setupSocketClient(
     saveState({ mode });
   });
 
+  socket.on('pairing:complete', (payload) => {
+    if (!payload.success) {
+      console.error('Pairing failed:', payload.error);
+      return;
+    }
+
+    console.log('Pairing complete');
+    markAsPaired(payload.organizationId || 'unassigned', payload.venueId || 'unassigned');
+    saveConfig({
+      mode: 'online',
+      ...(payload.serverUrl && { serverUrl: payload.serverUrl }),
+      ...(payload.organizationId && { organizationId: payload.organizationId }),
+      ...(payload.venueId && { venueId: payload.venueId }),
+    });
+    clearPairingCode();
+    saveState({ mode: { type: 'shot-clock' } });
+  });
+
   // Handle update check
   socket.on('update:check', async () => {
     console.log('Received update check request');
@@ -124,6 +145,7 @@ function sendHello(identity: DeviceIdentity): void {
   if (!socket) return;
   
   const state = loadState();
+  const pairingCode = identity.pairedAt ? null : getPairingCode();
   
   const hello: HelloPayload = {
     deviceId: identity.deviceId,
@@ -132,6 +154,8 @@ function sendHello(identity: DeviceIdentity): void {
     controllerType: identity.controllerType,
     capabilities: ['shot-clock', 'scoreboard', 'timer', 'media'],
     displayProfile: state.displayProfile,
+    pairingCode: pairingCode?.code,
+    pairingCodeExpiresAt: pairingCode?.expiresAt,
     timestamp: Date.now(),
   };
   

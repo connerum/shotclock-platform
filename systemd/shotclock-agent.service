@@ -5,10 +5,13 @@ After=network.target
 
 [Service]
 Type=simple
-User=shotclock
-Group=shotclock
+# The agent manages WiFi AP setup, dnsmasq/hostapd, and iptables. Keep HOME
+# pointed at the shotclock user's state directory while allowing root-only setup.
+User=root
+Group=root
 WorkingDirectory=/opt/shotclock/current
 Environment=NODE_ENV=production
+Environment=HOME=/home/shotclock
 EnvironmentFile=/opt/shotclock/shared/.env
 ExecStartPre=/bin/sleep 5
 ExecStart=/usr/bin/node /opt/shotclock/current/apps/pi-agent/dist/index.js
@@ -19,9 +22,9 @@ StandardError=journal
 SyslogIdentifier=shotclock-agent
 
 # Hardening
-NoNewPrivileges=true
-ProtectSystem=strict
-ProtectHome=true
+NoNewPrivileges=false
+ProtectSystem=false
+ProtectHome=false
 ReadWritePaths=/opt/shotclock /home/shotclock/.shotclock
 PrivateTmp=true
 

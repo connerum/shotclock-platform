@@ -10,7 +10,7 @@ import { setServerIO } from './lib/socket';
 
 const dev = process.env.NODE_ENV !== 'production';
 const hostname = process.env.HOSTNAME || 'localhost';
-const port = parseInt(process.env.PORT || '3030', 10);
+const port = parseInt(process.env.PORT || process.env.SERVER_PORT || '3000', 10);
 
 const app = next({ dev, hostname, port });
 const handle = app.getRequestHandler();

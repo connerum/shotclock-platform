@@ -38,7 +38,40 @@ fi
 
 echo ""
 echo "[4/12] Installing Chromium and required deps..."
-apt-get install -y chromium-browser chromium-sandbox libxss1 libgconf-2-4 libnss3 libxss1 xdg-utils libasound2 libatk-bridge2.0-0 libgtk-3-0 libxcomposite1 libxrandr2 libgbm1 libpango-1.0-0 libcairo2 libpangocairo-1.0-0
+CHROMIUM_PACKAGE="chromium-browser"
+if ! apt-cache show chromium-browser >/dev/null 2>&1; then
+  CHROMIUM_PACKAGE="chromium"
+fi
+
+CHROMIUM_DEPS=(
+  "$CHROMIUM_PACKAGE"
+  chromium-sandbox
+  libxss1
+  libnss3
+  xdg-utils
+  libasound2
+  libatk-bridge2.0-0
+  libgtk-3-0
+  libxcomposite1
+  libxrandr2
+  libgbm1
+  libpango-1.0-0
+  libcairo2
+  libpangocairo-1.0-0
+)
+
+# Debian/Raspberry Pi OS releases rename or remove a few compatibility packages.
+# Install what is available instead of failing the whole setup on stale names.
+AVAILABLE_CHROMIUM_DEPS=()
+for pkg in "${CHROMIUM_DEPS[@]}"; do
+  if apt-cache show "$pkg" >/dev/null 2>&1; then
+    AVAILABLE_CHROMIUM_DEPS+=("$pkg")
+  else
+    echo "Skipping unavailable package: $pkg"
+  fi
+done
+
+apt-get install -y "${AVAILABLE_CHROMIUM_DEPS[@]}"
 
 echo ""
 echo "[5/12] Installing NetworkManager, hostapd, dnsmasq..."
@@ -63,6 +96,10 @@ if [ -d "${SCRIPT_DIR}/config" ]; then
     fi
   done
   echo "Config templates copied to /opt/shotclock/shared/config/"
+  if [ ! -f "/opt/shotclock/shared/.env" ] && [ -f "/opt/shotclock/shared/config/agent.env" ]; then
+    cp "/opt/shotclock/shared/config/agent.env" "/opt/shotclock/shared/.env"
+    echo "Created /opt/shotclock/shared/.env from agent.env template"
+  fi
 else
   echo "Warning: config templates directory not found at ${SCRIPT_DIR}/config"
 fi
@@ -124,7 +161,7 @@ echo "       dnsmasq.conf        - Usually fine as-is"
 echo "       wpa_supplicant.conf - For client WiFi (not AP mode)"
 echo "  3. Run 'systemctl start shotclock-agent' to start the agent"
 echo "  4. Run 'systemctl start shotclock-kiosk' to start the kiosk"
-echo "  5. Connect to the AP at SSID=ShotClockAP (default) and browse to 192.168.4.1:3001"
+echo "  5. Connect to the AP at SSID=Shotclock-Setup (default) and browse to 192.168.4.1:8080"
 echo ""
 echo "To build the app on the Pi:"
 echo "  cd /opt/shotclock/releases/${CURRENT_VERSION}"

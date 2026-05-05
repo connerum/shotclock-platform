@@ -84,7 +84,12 @@ curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
 apt-get install -y nodejs
 
 # Install Chromium for kiosk mode
-apt-get install -y chromium-browser
+# Bookworm/Bullseye may provide chromium-browser; Trixie provides chromium.
+if apt-cache show chromium-browser >/dev/null 2>&1; then
+  apt-get install -y chromium-browser chromium-sandbox
+else
+  apt-get install -y chromium chromium-sandbox
+fi
 
 # Install NetworkManager for WiFi management
 apt-get install -y network-manager
@@ -92,6 +97,16 @@ apt-get install -y network-manager
 # Install hostapd and dnsmasq for captive portal
 apt-get install -y hostapd dnsmasq
 ```
+
+The repository installer already handles the Chromium package name difference. If `scripts/install-pi.sh` fails with `Package chromium-browser is not available` or `Unable to locate package libgconf-2-4`, pull the latest repo and rerun it:
+
+```bash
+cd ~/shotclock-platform
+git pull
+sudo ./scripts/install-pi.sh
+```
+
+That failure happens before `/opt/shotclock/shared` is created, so editing `/opt/shotclock/shared/.env` will also fail until the installer completes.
 
 ### 2. Configure NetworkManager
 
@@ -148,7 +163,10 @@ Environment=DEVICE_NAME=Shotclock Display 01
 Edit `/opt/shotclock/shared/.env`:
 ```bash
 SERVER_URL=http://your-server:3000
-DATABASE_URL=postgresql://user:pass@host:5432/shotclock
+AGENT_LOCAL_API_PORT=3001
+DEVICE_NAME=Shotclock Display 01
+SETUP_AP_SSID=Shotclock-Setup
+SETUP_AP_PASSWORD=shotclock123
 ```
 
 ### 3. Enable Services

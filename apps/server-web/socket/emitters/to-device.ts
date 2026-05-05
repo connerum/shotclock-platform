@@ -6,7 +6,7 @@ import type { TimerState, DisplayConfigPayload, DeviceMode } from '@shotclock/sh
 
 export function emitStateUpdate(io: TypedServer, deviceId: string, state: TimerState): boolean {
   try {
-    io.to(`device:${deviceId}`).emit('state:update', state);
+    io.of('/device').to(`device:${deviceId}`).emit('state:update', state);
     return true;
   } catch (error) {
     console.error(`Failed to emit state:update to device ${deviceId}:`, error);
@@ -16,7 +16,7 @@ export function emitStateUpdate(io: TypedServer, deviceId: string, state: TimerS
 
 export function emitConfigUpdate(io: TypedServer, deviceId: string, config: DisplayConfigPayload): boolean {
   try {
-    io.to(`device:${deviceId}`).emit('config:update', config);
+    io.of('/device').to(`device:${deviceId}`).emit('config:update', config);
     return true;
   } catch (error) {
     console.error(`Failed to emit config:update to device ${deviceId}:`, error);
@@ -26,7 +26,7 @@ export function emitConfigUpdate(io: TypedServer, deviceId: string, config: Disp
 
 export function emitModeSet(io: TypedServer, deviceId: string, mode: DeviceMode): boolean {
   try {
-    io.to(`device:${deviceId}`).emit('mode:set', mode);
+    io.of('/device').to(`device:${deviceId}`).emit('mode:set', mode);
     return true;
   } catch (error) {
     console.error(`Failed to emit mode:set to device ${deviceId}:`, error);
@@ -36,7 +36,7 @@ export function emitModeSet(io: TypedServer, deviceId: string, mode: DeviceMode)
 
 export function emitUpdateCheck(io: TypedServer, deviceId: string): boolean {
   try {
-    io.to(`device:${deviceId}`).emit('update:check');
+    io.of('/device').to(`device:${deviceId}`).emit('update:check');
     return true;
   } catch (error) {
     console.error(`Failed to emit update:check to device ${deviceId}:`, error);
@@ -46,7 +46,7 @@ export function emitUpdateCheck(io: TypedServer, deviceId: string): boolean {
 
 export function emitUpdateInstall(io: TypedServer, deviceId: string, version: string): boolean {
   try {
-    io.to(`device:${deviceId}`).emit('update:install', version);
+    io.of('/device').to(`device:${deviceId}`).emit('update:install', version);
     return true;
   } catch (error) {
     console.error(`Failed to emit update:install to device ${deviceId}:`, error);
@@ -56,7 +56,7 @@ export function emitUpdateInstall(io: TypedServer, deviceId: string, version: st
 
 export function emitReboot(io: TypedServer, deviceId: string): boolean {
   try {
-    io.to(`device:${deviceId}`).emit('reboot');
+    io.of('/device').to(`device:${deviceId}`).emit('reboot');
     return true;
   } catch (error) {
     console.error(`Failed to emit reboot to device ${deviceId}:`, error);
@@ -66,7 +66,7 @@ export function emitReboot(io: TypedServer, deviceId: string): boolean {
 
 export function emitPing(io: TypedServer, deviceId: string): boolean {
   try {
-    io.to(`device:${deviceId}`).emit('ping');
+    io.of('/device').to(`device:${deviceId}`).emit('ping');
     return true;
   } catch (error) {
     console.error(`Failed to emit ping to device ${deviceId}:`, error);

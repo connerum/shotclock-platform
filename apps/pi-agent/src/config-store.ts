@@ -22,15 +22,15 @@ const CONFIG_DIR = path.join(os.homedir(), '.shotclock');
 const CONFIG_FILE = path.join(CONFIG_DIR, 'config.json');
 
 const DEFAULT_CONFIG: AgentConfig = {
-  serverUrl: process.env.SERVER_URL || 'http://localhost:3030',
+  serverUrl: process.env.SERVER_URL || process.env.SOCKET_SERVER_URL || 'http://localhost:3000',
   mode: 'setup',
-  heartbeatInterval: 30000,
-  pairingCodeLength: 6,
-  setupApSsid: 'Shotclock-Setup',
-  setupApPassword: 'shotclock123',
-  updateCheckInterval: 3600000,
-  localApiPort: 3001,
-  deviceName: 'Shotclock Display',
+  heartbeatInterval: parseInt(process.env.AGENT_HEARTBEAT_INTERVAL || '30000', 10),
+  pairingCodeLength: parseInt(process.env.PAIRING_CODE_LENGTH || '6', 10),
+  setupApSsid: process.env.SETUP_AP_SSID || 'Shotclock-Setup',
+  setupApPassword: process.env.SETUP_AP_PASSWORD || 'shotclock123',
+  updateCheckInterval: parseInt(process.env.UPDATE_CHECK_INTERVAL || '3600000', 10),
+  localApiPort: parseInt(process.env.AGENT_LOCAL_API_PORT || '3001', 10),
+  deviceName: process.env.DEVICE_NAME || process.env.DEFAULT_DEVICE_NAME || 'Shotclock Display',
 };
 
 function ensureConfigDir(): void {

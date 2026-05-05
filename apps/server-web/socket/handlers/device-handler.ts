@@ -12,6 +12,17 @@ export function setupDeviceHandlers(socket: TypedSocket, io: TypedServer): void 
     console.log('Device hello:', data.deviceId, data.deviceName);
     
     try {
+      const existingDevice = await prisma.device.findUnique({
+        where: { deviceId: data.deviceId },
+      });
+
+      const isPaired = existingDevice?.status === 'paired';
+      const pairingCodeExp = data.pairingCodeExpiresAt
+        ? new Date(data.pairingCodeExpiresAt)
+        : data.pairingCode
+          ? new Date(Date.now() + 24 * 60 * 60 * 1000)
+          : undefined;
+
       // Update or create device in database
       await prisma.device.upsert({
         where: { deviceId: data.deviceId },
@@ -21,9 +32,15 @@ export function setupDeviceHandlers(socket: TypedSocket, io: TypedServer): void 
           controllerType: data.controllerType,
           capabilities: JSON.stringify(data.capabilities || []),
           displayProfile: JSON.stringify(data.displayProfile),
+          ...(data.pairingCode && !isPaired ? {
+            pairingCode: data.pairingCode,
+            pairingCodeExp,
+            status: 'unpaired',
+            mode: 'pairing',
+          } : {}),
           isOnline: true,
           lastSeen: new Date(),
-          status: 'online',
+          ...(isPaired ? { status: 'paired' } : {}),
         },
         create: {
           deviceId: data.deviceId,
@@ -32,15 +49,20 @@ export function setupDeviceHandlers(socket: TypedSocket, io: TypedServer): void 
           controllerType: data.controllerType,
           capabilities: JSON.stringify(data.capabilities || []),
           displayProfile: JSON.stringify(data.displayProfile),
+          pairingCode: data.pairingCode || null,
+          pairingCodeExp,
+          mode: data.pairingCode ? 'pairing' : 'setup',
           isOnline: true,
           lastSeen: new Date(),
-          status: 'online',
+          status: data.pairingCode ? 'unpaired' : 'online',
         },
       });
       
       // Join device room for targeted messaging
       socket.join(`device:${data.deviceId}`);
       socket.data.deviceId = data.deviceId;
+      socket.data.deviceName = data.deviceName;
+      socket.data.firmwareVersion = data.firmwareVersion;
       
       // Send initial config to device after hello
       (socket as any).emit('config:update', {

@@ -55,7 +55,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     // Emit config update to device via Socket.IO
     const io = getServerIO();
     if (io) {
-      io.to(`device:${deviceId}`).emit('config:update', {
+      io.of('/device').to(`device:${deviceId}`).emit('config:update', {
         displayProfile: body.displayProfile,
         brightness: body.brightness,
         orientation: body.orientation,

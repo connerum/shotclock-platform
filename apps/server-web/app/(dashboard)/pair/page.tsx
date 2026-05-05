@@ -7,7 +7,7 @@ export default function PairPage() {
   const router = useRouter();
   const [deviceName, setDeviceName] = useState('');
   const [pairingCode, setPairingCode] = useState('');
-  const [step, setStep] = useState<'generate' | 'enter' | 'confirm'>('generate');
+  const [step, setStep] = useState<'generate' | 'enter' | 'confirm'>('enter');
   const [generatedCode, setGeneratedCode] = useState<string | null>(null);
   const [validatedDevice, setValidatedDevice] = useState<any>(null);
   const [loading, setLoading] = useState(false);
@@ -84,15 +84,7 @@ export default function PairPage() {
     setError(null);
 
     try {
-      // Update device status to paired
-      const res = await fetch(`/api/devices/${validatedDevice.deviceId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          status: 'online',
-          organizationId: 'default-org',
-        }),
-      });
+      const res = await fetch(`/api/pair/${pairingCode}`, { method: 'POST' });
 
       if (!res.ok) throw new Error('Failed to pair device');
       
@@ -141,7 +133,7 @@ export default function PairPage() {
           <div className="bg-gray-900 rounded-lg p-6">
             <h2 className="text-xl font-semibold mb-4">Generate Pairing Code</h2>
             <p className="text-gray-400 mb-6">
-              Enter a name for your device, then share the generated code with the device to pair it.
+              Optional: pre-register a device. For a physical Pi display, use the code shown on the display instead.
             </p>
 
             <div className="space-y-4">
