@@ -96,6 +96,7 @@ PORT=3000
 SERVER_URL=https://courtcast.safety-linq.com
 NEXT_PUBLIC_SERVER_URL=https://courtcast.safety-linq.com
 SOCKET_SERVER_URL=https://courtcast.safety-linq.com
+DATABASE_URL=file:/opt/courtcast/data/prod.db
 ```
 
 Install and build:
@@ -103,7 +104,6 @@ Install and build:
 ```bash
 pnpm install
 pnpm prisma generate
-rm -f prisma/dev.db
 pnpm prisma migrate deploy
 pnpm build
 ```
