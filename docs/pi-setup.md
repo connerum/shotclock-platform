@@ -258,6 +258,8 @@ ip addr show wlan0
 
 The agent should log `Starting setup AP: Shotclock-Setup-...`, `hostapd` and `dnsmasq` should be active, and `wlan0` should have `192.168.4.1/24`. If `hostapd` fails, the agent service now fails instead of continuing as healthy.
 
+The setup page always includes a manual SSID/password form. On a single-radio Pi, nearby WiFi scans can be empty while `wlan0` is broadcasting the setup AP. Submit the network name manually if no networks appear. After credentials are submitted, the setup AP disconnects while the Pi joins the target WiFi. If connection fails, the setup AP is started again.
+
 If the AP is visible but `http://192.168.4.1:8080` does not load, verify the portal process is listening:
 
 ```bash

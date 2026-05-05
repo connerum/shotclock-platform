@@ -74,7 +74,7 @@ export async function startCaptivePortal(config: Partial<CaptivePortalConfig> = 
     });
   
     // WiFi connect endpoint
-    portalApp.post('/api/wifi/connect', async (req: Request, res: Response) => {
+    portalApp.post('/api/wifi/connect', (req: Request, res: Response) => {
       try {
         const { ssid, password } = req.body;
       
@@ -84,20 +84,16 @@ export async function startCaptivePortal(config: Partial<CaptivePortalConfig> = 
       }
       
       setupState = { ...setupState, step: 'network_selected', ssid };
-      
-      const success = await wifiManager.connect(ssid, password);
-      
-      if (success) {
-        setupState = { 
-          ...setupState, 
-          step: 'network_connected',
-          ssid,
-          password 
-        };
-        res.json({ success: true, ssid });
-      } else {
-        res.status(500).json({ success: false, error: 'Failed to connect' });
-      }
+
+      res.json({
+        success: true,
+        ssid,
+        message: 'Credentials received. The setup AP will disconnect while the display joins WiFi.',
+      });
+
+      setTimeout(() => {
+        void connectToWifiFromPortal(ssid, password);
+      }, 250);
     } catch (error) {
       res.status(500).json({ success: false, error: 'Connection error' });
     }
@@ -158,9 +154,12 @@ export async function startCaptivePortal(config: Partial<CaptivePortalConfig> = 
     .btn { background: #00ff00; color: #000; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; margin: 5px; }
     .btn:hover { background: #00cc00; }
     input { background: #333; color: #fff; border: 1px solid #444; padding: 10px; border-radius: 5px; width: 100%; margin: 5px 0; }
+    label { display: block; color: #aaa; margin-top: 12px; font-size: 12px; text-transform: uppercase; letter-spacing: .08em; }
     .network { background: #222; padding: 10px; margin: 5px 0; border-radius: 5px; cursor: pointer; }
     .network:hover { background: #333; }
     .info { background: #111; border: 1px solid #00ff00; padding: 15px; border-radius: 8px; margin: 10px 0; text-align: center; }
+    .hint { color: #aaa; font-size: 14px; line-height: 1.4; }
+    .error { color: #ff7777; }
   </style>
 </head>
 <body>
@@ -172,8 +171,26 @@ export async function startCaptivePortal(config: Partial<CaptivePortalConfig> = 
   <div id="status" class="status">
     <p><strong>Step:</strong> <span id="step">${setupState.step}</span></p>
   </div>
+  <div class="status">
+    <h2>Connect to WiFi</h2>
+    <p class="hint">Network scanning may be unavailable while this display is broadcasting setup WiFi. Select a network if one appears, or enter the network name manually.</p>
+    <form id="manual-form">
+      <label for="ssid">Network Name</label>
+      <input id="ssid" name="ssid" autocomplete="off" required>
+      <label for="password">Password</label>
+      <input id="password" name="password" type="password" autocomplete="current-password">
+      <button class="btn" type="submit">Connect</button>
+    </form>
+    <p id="message" class="hint"></p>
+  </div>
   <div id="networks"></div>
   <script>
+    const networksEl = document.getElementById('networks');
+    const messageEl = document.getElementById('message');
+    const ssidInput = document.getElementById('ssid');
+    const passwordInput = document.getElementById('password');
+    let loadingNetworks = false;
+
     async function refresh() {
       const res = await fetch('/api/setup/status');
       const data = await res.json();
@@ -189,26 +206,56 @@ export async function startCaptivePortal(config: Partial<CaptivePortalConfig> = 
     }
     
     async function loadNetworks() {
+      if (loadingNetworks) return;
+      loadingNetworks = true;
       try {
         const res = await fetch('/api/wifi/networks');
         const { networks } = await res.json();
-        document.getElementById('networks').innerHTML = networks.map(n => 
-          '<div class="network" onclick="connect(\\'' + n.ssid + '\\')">' + n.ssid + ' (' + n.signalStrength + '%)</div>'
-        ).join('');
+        networksEl.innerHTML = '';
+
+        if (!networks || networks.length === 0) {
+          networksEl.innerHTML = '<p class="hint">No networks found. Enter the network name manually.</p>';
+          return;
+        }
+
+        for (const network of networks) {
+          const item = document.createElement('div');
+          item.className = 'network';
+          item.textContent = network.ssid + ' (' + network.signalStrength + '%)';
+          item.addEventListener('click', () => {
+            ssidInput.value = network.ssid;
+            passwordInput.focus();
+          });
+          networksEl.appendChild(item);
+        }
       } catch (e) {
-        document.getElementById('networks').innerHTML = '<p>Loading networks...</p>';
+        networksEl.innerHTML = '<p class="hint">Unable to scan networks. Enter the network name manually.</p>';
+      } finally {
+        loadingNetworks = false;
       }
     }
     
-    async function connect(ssid) {
-      const password = prompt('Enter password for ' + ssid);
-      await fetch('/api/wifi/connect', {
+    async function connect(ssid, password) {
+      messageEl.textContent = 'Sending credentials...';
+      const res = await fetch('/api/wifi/connect', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ssid, password })
       });
-      refresh();
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.success) {
+        messageEl.textContent = data.error || 'Failed to send credentials.';
+        messageEl.className = 'hint error';
+        return;
+      }
+      messageEl.textContent = data.message || 'Connecting. This setup WiFi will disconnect.';
+      messageEl.className = 'hint';
     }
+
+    document.getElementById('manual-form').addEventListener('submit', (event) => {
+      event.preventDefault();
+      connect(ssidInput.value.trim(), passwordInput.value);
+    });
     
     refresh();
     setInterval(refresh, 3000);
@@ -231,6 +278,28 @@ export function stopCaptivePortal(): void {
     server.close();
     server = null;
   }
+}
+
+async function connectToWifiFromPortal(ssid: string, password?: string): Promise<void> {
+  console.log(`Setup portal received WiFi credentials for ${ssid}`);
+  await setupAP.stop();
+
+  const success = await wifiManager.connect(ssid, password);
+  if (success) {
+    setupState = {
+      ...setupState,
+      step: 'network_connected',
+      ssid,
+      password,
+    };
+    saveConfig({ mode: 'online' });
+    stopCaptivePortal();
+    return;
+  }
+
+  console.error(`Setup portal failed to connect to WiFi: ${ssid}`);
+  setupState = { ...setupState, step: 'ap_created', ssid: undefined, password: undefined };
+  await setupAP.start();
 }
 
 function listen(host: string, portalConfig: CaptivePortalConfig): Promise<boolean> {
