@@ -3,8 +3,8 @@
 import { io, Socket } from 'socket.io-client';
 import type { DeviceIdentity } from './identity.js';
 import type { AgentConfig } from './config-store.js';
-import type { ServerToDeviceEvents, HelloPayload, HeartbeatPayload } from '@shotclock/shared/types';
-import { markAsPaired } from './identity.js';
+import type { ServerToDeviceEvents, HelloPayload, HeartbeatPayload, PairingResponse } from '@shotclock/shared/types';
+import { loadIdentity, markAsPaired, isPaired } from './identity.js';
 import { loadState, saveState } from './state-store.js';
 import { saveConfig } from './config-store.js';
 import { getPairingCode, clearPairingCode } from './pairing-code.js';
@@ -88,21 +88,7 @@ export function setupSocketClient(
   });
 
   socket.on('pairing:complete', (payload) => {
-    if (!payload.success) {
-      console.error('Pairing failed:', payload.error);
-      return;
-    }
-
-    console.log('Pairing complete');
-    markAsPaired(payload.organizationId || 'unassigned', payload.venueId || 'unassigned');
-    saveConfig({
-      mode: 'online',
-      ...(payload.serverUrl && { serverUrl: payload.serverUrl }),
-      ...(payload.organizationId && { organizationId: payload.organizationId }),
-      ...(payload.venueId && { venueId: payload.venueId }),
-    });
-    clearPairingCode();
-    saveState({ mode: { type: 'shot-clock' } });
+    applyPairingComplete(payload);
   });
 
   // Handle update check
@@ -144,14 +130,15 @@ export function setupSocketClient(
 function sendHello(identity: DeviceIdentity): void {
   if (!socket) return;
   
+  const currentIdentity = loadIdentity() || identity;
   const state = loadState();
-  const pairingCode = identity.pairedAt ? null : getPairingCode();
+  const pairingCode = currentIdentity.pairedAt ? null : getPairingCode();
   
   const hello: HelloPayload = {
-    deviceId: identity.deviceId,
-    deviceName: identity.deviceName,
-    firmwareVersion: identity.firmwareVersion,
-    controllerType: identity.controllerType,
+    deviceId: currentIdentity.deviceId,
+    deviceName: currentIdentity.deviceName,
+    firmwareVersion: currentIdentity.firmwareVersion,
+    controllerType: currentIdentity.controllerType,
     capabilities: ['shot-clock', 'scoreboard', 'timer', 'media'],
     displayProfile: state.displayProfile,
     pairingCode: pairingCode?.code,
@@ -160,6 +147,85 @@ function sendHello(identity: DeviceIdentity): void {
   };
   
   socket.emit('device:hello', hello);
+}
+
+export function startPairingReconciliation(identity: DeviceIdentity, config: AgentConfig): () => void {
+  let stopped = false;
+  let inFlight = false;
+
+  const reconcile = async () => {
+    if (stopped || inFlight || isPaired()) return;
+
+    const currentState = loadState();
+    if (currentState.mode.type !== 'pairing') return;
+
+    inFlight = true;
+    try {
+      const serverUrl = config.serverUrl.replace(/\/$/, '');
+      const response = await fetch(`${serverUrl}/api/devices/${identity.deviceId}`, {
+        headers: { Accept: 'application/json' },
+      });
+
+      if (!response.ok) return;
+
+      const data = await response.json() as {
+        device?: {
+          deviceId: string;
+          status?: string;
+          mode?: string;
+          organizationId?: string | null;
+          venueId?: string | null;
+          pairingCode?: string | null;
+        };
+      };
+      const device = data.device;
+
+      if (
+        device?.deviceId === identity.deviceId &&
+        (device.status === 'paired' || (!device.pairingCode && device.mode !== 'setup'))
+      ) {
+        applyPairingComplete({
+          success: true,
+          deviceId: device.deviceId,
+          organizationId: device.organizationId || undefined,
+          venueId: device.venueId || undefined,
+          serverUrl,
+        });
+      }
+    } catch (error) {
+      console.warn('Pairing reconciliation failed:', error);
+    } finally {
+      inFlight = false;
+    }
+  };
+
+  const interval = setInterval(() => {
+    void reconcile();
+  }, 5000);
+  void reconcile();
+
+  return () => {
+    stopped = true;
+    clearInterval(interval);
+  };
+}
+
+function applyPairingComplete(payload: PairingResponse): void {
+  if (!payload.success) {
+    console.error('Pairing failed:', payload.error);
+    return;
+  }
+
+  console.log('Pairing complete');
+  markAsPaired(payload.organizationId || 'unassigned', payload.venueId || 'unassigned');
+  saveConfig({
+    mode: 'online',
+    ...(payload.serverUrl && { serverUrl: payload.serverUrl }),
+    ...(payload.organizationId && { organizationId: payload.organizationId }),
+    ...(payload.venueId && { venueId: payload.venueId }),
+  });
+  clearPairingCode();
+  saveState({ mode: { type: 'shot-clock' } });
 }
 
 export function sendHeartbeat(identity: DeviceIdentity): void {

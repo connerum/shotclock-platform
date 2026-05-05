@@ -16,7 +16,7 @@ export function setupDeviceHandlers(socket: TypedSocket, io: TypedServer): void 
         where: { deviceId: data.deviceId },
       });
 
-      const isPaired = existingDevice?.status === 'paired';
+      const isPaired = isDevicePaired(existingDevice);
       const pairingCodeExp = data.pairingCodeExpiresAt
         ? new Date(data.pairingCodeExpiresAt)
         : data.pairingCode
@@ -24,7 +24,7 @@ export function setupDeviceHandlers(socket: TypedSocket, io: TypedServer): void 
           : undefined;
 
       // Update or create device in database
-      await prisma.device.upsert({
+      const device = await prisma.device.upsert({
         where: { deviceId: data.deviceId },
         update: {
           name: data.deviceName,
@@ -68,6 +68,19 @@ export function setupDeviceHandlers(socket: TypedSocket, io: TypedServer): void 
       (socket as any).emit('config:update', {
         displayProfile: data.displayProfile,
       });
+
+      if (isDevicePaired(device)) {
+        const serverUrl = process.env.NEXT_PUBLIC_SERVER_URL || process.env.SERVER_URL || 'http://localhost:3000';
+        const payload = {
+          success: true,
+          deviceId: device.deviceId,
+          organizationId: device.organizationId || undefined,
+          venueId: device.venueId || undefined,
+          serverUrl,
+        };
+        (socket as any).emit('pairing:complete', payload);
+        (socket as any).emit('mode:set', { type: 'shot-clock' });
+      }
     } catch (error) {
       console.error('Error handling device hello:', error);
     }
@@ -78,14 +91,25 @@ export function setupDeviceHandlers(socket: TypedSocket, io: TypedServer): void 
     console.log('Device heartbeat:', data.deviceId, data.mode);
     
     try {
+      const existingDevice = await prisma.device.findUnique({
+        where: { deviceId: data.deviceId },
+      });
+      const isPaired = isDevicePaired(existingDevice);
+      const existingPairedMode = existingDevice?.mode && !['setup', 'pairing'].includes(existingDevice.mode)
+        ? existingDevice.mode
+        : 'shot-clock';
+      const nextMode = isPaired && ['setup', 'pairing'].includes(data.mode.type)
+        ? existingPairedMode
+        : data.mode.type;
+
       // Update last seen and mode
       await prisma.device.update({
         where: { deviceId: data.deviceId },
         data: {
           lastSeen: new Date(),
-          mode: data.mode.type,
+          mode: nextMode,
           isOnline: true,
-          status: 'online',
+          status: isPaired ? 'paired' : 'online',
         },
       }).catch(() => {}); // Ignore if device doesn't exist
       
@@ -180,4 +204,9 @@ export function setupDeviceHandlers(socket: TypedSocket, io: TypedServer): void 
       });
     }
   });
+}
+
+function isDevicePaired(device: { status: string; mode: string; pairingCode: string | null } | null | undefined): boolean {
+  if (!device) return false;
+  return device.status === 'paired' || (!device.pairingCode && device.mode !== 'setup');
 }

@@ -2,7 +2,7 @@
 
 import { loadConfig, saveConfig } from './config-store.js';
 import { loadIdentity, generateIdentity, isPaired } from './identity.js';
-import { setupSocketClient } from './socket-client.js';
+import { setupSocketClient, startPairingReconciliation } from './socket-client.js';
 import { startHeartbeat } from './heartbeat.js';
 import { startLocalApi } from './local-api.js';
 import { startCaptivePortal, stopCaptivePortal } from './captive-portal.js';
@@ -93,6 +93,7 @@ async function main() {
 
   // Start heartbeat
   const heartbeatStop = startHeartbeat();
+  const stopPairingReconciliation = startPairingReconciliation(identity, config);
 
   // Start local API server
   startLocalApi(identity, config, socketClient, updateManager, offlineMode);
@@ -105,6 +106,7 @@ async function main() {
   const cleanup = async () => {
     console.log('\nShutting down agent...');
     heartbeatStop();
+    stopPairingReconciliation();
     socketClient.disconnect();
     await setupAP.stop();
     stopCaptivePortal();
