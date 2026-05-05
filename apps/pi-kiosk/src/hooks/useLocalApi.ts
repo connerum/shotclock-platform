@@ -24,7 +24,7 @@ interface UseLocalApiResult {
 }
 
 const API_BASE = 'http://127.0.0.1:3001';
-const POLL_INTERVAL = 1000;
+const POLL_INTERVAL = 200;
 
 export function useLocalApi(): UseLocalApiResult {
   const [state, setState] = useState<LocalApiState | null>(null);

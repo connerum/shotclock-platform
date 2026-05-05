@@ -79,6 +79,9 @@ export default function DeviceDetailPage({ params }: { params: { deviceId: strin
   // Calibration state
   const calibrationStageRef = useRef<HTMLDivElement | null>(null);
   const calibrationInteractionRef = useRef<CalibrationInteraction | null>(null);
+  const calibrationPreviewTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const latestCalibrationPreviewRef = useRef<CalibrationBox | null>(null);
+  const lastCalibrationPreviewSentRef = useRef(0);
   const [calibration, setCalibration] = useState({
     x: 0,
     y: 0,
@@ -95,6 +98,14 @@ export default function DeviceDetailPage({ params }: { params: { deviceId: strin
   useEffect(() => {
     fetchDevice();
   }, [deviceId]);
+
+  useEffect(() => {
+    return () => {
+      if (calibrationPreviewTimeoutRef.current) {
+        clearTimeout(calibrationPreviewTimeoutRef.current);
+      }
+    };
+  }, []);
 
   const fetchDevice = async () => {
     try {
@@ -212,6 +223,71 @@ export default function DeviceDetailPage({ params }: { params: { deviceId: strin
     calibration.width !== savedCalibration.width ||
     calibration.height !== savedCalibration.height;
 
+  const buildCalibrationConfig = (box: CalibrationBox, preview = false) => {
+    const viewport = {
+      x: box.x,
+      y: box.y,
+      width: box.width,
+      height: box.height,
+      rotation: 0,
+      scaleX: 1,
+      scaleY: 1,
+    };
+    const displayProfile: DisplayProfile = {
+      id: device?.displayProfile?.id || 'default',
+      name: device?.displayProfile?.name || 'Default',
+      controllerType: device?.controllerType as any || 'generic',
+      viewport,
+      safeZone: device?.displayProfile?.safeZone || { top: 40, right: 40, bottom: 40, left: 40 },
+      fontSize: device?.displayProfile?.fontSize || { shotClock: 200, gameClock: 120, score: 150, period: 80, label: 40 },
+      colors: device?.displayProfile?.colors || { background: '#000000', foreground: '#ffffff', accent: '#00ff00', homeTeam: '#ff0000', awayTeam: '#0000ff', warning: '#ffff00', danger: '#ff0000' },
+    };
+    const calibrationData: CalibrationData = {
+      ...viewport,
+      timestamp: Date.now(),
+    };
+
+    return {
+      displayProfile,
+      calibrationData,
+      ...(preview && { preview: true }),
+    };
+  };
+
+  const flushCalibrationPreview = () => {
+    const box = latestCalibrationPreviewRef.current;
+    if (!box) return;
+
+    if (calibrationPreviewTimeoutRef.current) {
+      clearTimeout(calibrationPreviewTimeoutRef.current);
+      calibrationPreviewTimeoutRef.current = null;
+    }
+
+    latestCalibrationPreviewRef.current = null;
+    lastCalibrationPreviewSentRef.current = Date.now();
+    void sendCommand('update_config', buildCalibrationConfig(box, true));
+  };
+
+  const queueCalibrationPreview = (box: CalibrationBox) => {
+    latestCalibrationPreviewRef.current = box;
+
+    const elapsed = Date.now() - lastCalibrationPreviewSentRef.current;
+    if (elapsed >= 100) {
+      flushCalibrationPreview();
+      return;
+    }
+
+    if (!calibrationPreviewTimeoutRef.current) {
+      calibrationPreviewTimeoutRef.current = setTimeout(flushCalibrationPreview, 100 - elapsed);
+    }
+  };
+
+  const setCalibrationWithPreview = (box: CalibrationBox) => {
+    const nextBox = clampCalibrationBox(box);
+    setCalibration(nextBox);
+    queueCalibrationPreview(nextBox);
+  };
+
   const getCalibrationPoint = (event: ReactPointerEvent<HTMLDivElement>) => {
     const rect = calibrationStageRef.current?.getBoundingClientRect();
     if (!rect) return { x: 0, y: 0 };
@@ -226,14 +302,14 @@ export default function DeviceDetailPage({ params }: { params: { deviceId: strin
     const point = getCalibrationPoint(event);
     calibrationInteractionRef.current = { type: 'draw', startX: point.x, startY: point.y };
     event.currentTarget.setPointerCapture(event.pointerId);
-    setCalibration(clampCalibrationBox({
+    setCalibrationWithPreview({
       x: point.x,
       y: point.y,
       width: MIN_CALIBRATION_SIZE,
       height: MIN_CALIBRATION_SIZE,
       scaleX: 1,
       scaleY: 1,
-    }));
+    });
   };
 
   const startMoveCalibrationBox = (event: ReactPointerEvent<HTMLDivElement>) => {
@@ -270,23 +346,23 @@ export default function DeviceDetailPage({ params }: { params: { deviceId: strin
     if (interaction.type === 'draw') {
       const x = Math.min(interaction.startX, point.x);
       const y = Math.min(interaction.startY, point.y);
-      setCalibration(clampCalibrationBox({
+      setCalibrationWithPreview({
         x,
         y,
         width: Math.abs(point.x - interaction.startX),
         height: Math.abs(point.y - interaction.startY),
         scaleX: 1,
         scaleY: 1,
-      }));
+      });
       return;
     }
 
     if (interaction.type === 'move') {
-      setCalibration(clampCalibrationBox({
+      setCalibrationWithPreview({
         ...interaction.startBox,
         x: interaction.startBox.x + point.x - interaction.startX,
         y: interaction.startBox.y + point.y - interaction.startY,
-      }));
+      });
       return;
     }
 
@@ -309,11 +385,12 @@ export default function DeviceDetailPage({ params }: { params: { deviceId: strin
       nextBox.height = interaction.startBox.height + deltaY;
     }
 
-    setCalibration(clampCalibrationBox(nextBox));
+    setCalibrationWithPreview(nextBox);
   };
 
   const endCalibrationInteraction = (event: ReactPointerEvent<HTMLDivElement>) => {
     calibrationInteractionRef.current = null;
+    flushCalibrationPreview();
     if (event.currentTarget.hasPointerCapture(event.pointerId)) {
       event.currentTarget.releasePointerCapture(event.pointerId);
     }
@@ -322,28 +399,7 @@ export default function DeviceDetailPage({ params }: { params: { deviceId: strin
   const saveCalibration = async () => {
     setSaving(true);
     try {
-      const viewport = {
-        x: calibration.x,
-        y: calibration.y,
-        width: calibration.width,
-        height: calibration.height,
-        rotation: 0,
-        scaleX: 1,
-        scaleY: 1,
-      };
-      const displayProfile: DisplayProfile = {
-        id: device?.displayProfile?.id || 'default',
-        name: device?.displayProfile?.name || 'Default',
-        controllerType: device?.controllerType as any || 'generic',
-        viewport,
-        safeZone: device?.displayProfile?.safeZone || { top: 40, right: 40, bottom: 40, left: 40 },
-        fontSize: device?.displayProfile?.fontSize || { shotClock: 200, gameClock: 120, score: 150, period: 80, label: 40 },
-        colors: device?.displayProfile?.colors || { background: '#000000', foreground: '#ffffff', accent: '#00ff00', homeTeam: '#ff0000', awayTeam: '#0000ff', warning: '#ffff00', danger: '#ff0000' },
-      };
-      const calibrationData: CalibrationData = {
-        ...viewport,
-        timestamp: Date.now(),
-      };
+      const { displayProfile, calibrationData } = buildCalibrationConfig(calibration);
 
       const res = await fetch(`/api/devices/${deviceId}/config`, {
         method: 'PATCH',
@@ -364,18 +420,19 @@ export default function DeviceDetailPage({ params }: { params: { deviceId: strin
   };
 
   const resetCalibration = () => {
-    setCalibration(clampCalibrationBox({
+    setCalibrationWithPreview({
       x: 0,
       y: 0,
       width: CALIBRATION_CANVAS_WIDTH,
       height: CALIBRATION_CANVAS_HEIGHT,
       scaleX: 1,
       scaleY: 1,
-    }));
+    });
   };
 
   const showTestPattern = async () => {
     await setMode('calibration');
+    queueCalibrationPreview(calibration);
   };
 
   const checkForUpdates = async () => {
@@ -659,26 +716,26 @@ export default function DeviceDetailPage({ params }: { params: { deviceId: strin
               <div className="absolute left-0 top-1/2 w-full border-t border-green-500/50" />
               <div
                 onPointerDown={startMoveCalibrationBox}
-                className="absolute border-2 border-green-400 bg-green-500/10 cursor-move"
+                className="absolute border-4 border-green-400 bg-transparent cursor-move"
                 style={calibrationBoxStyle}
               >
                 <div className="absolute inset-0 flex items-center justify-center text-xs font-mono text-green-200 pointer-events-none">
                   {calibration.width} x {calibration.height}
                 </div>
                 {[
-                  ['nw', '-left-2 -top-2 cursor-nwse-resize'],
-                  ['n', 'left-1/2 -top-2 -translate-x-1/2 cursor-ns-resize'],
-                  ['ne', '-right-2 -top-2 cursor-nesw-resize'],
-                  ['e', '-right-2 top-1/2 -translate-y-1/2 cursor-ew-resize'],
-                  ['se', '-right-2 -bottom-2 cursor-nwse-resize'],
-                  ['s', 'left-1/2 -bottom-2 -translate-x-1/2 cursor-ns-resize'],
-                  ['sw', '-left-2 -bottom-2 cursor-nesw-resize'],
-                  ['w', '-left-2 top-1/2 -translate-y-1/2 cursor-ew-resize'],
+                  ['nw', '-left-3 -top-3 h-8 w-8 cursor-nwse-resize'],
+                  ['n', 'left-6 right-6 -top-3 h-6 cursor-ns-resize'],
+                  ['ne', '-right-3 -top-3 h-8 w-8 cursor-nesw-resize'],
+                  ['e', '-right-3 top-6 bottom-6 w-6 cursor-ew-resize'],
+                  ['se', '-right-3 -bottom-3 h-8 w-8 cursor-nwse-resize'],
+                  ['s', 'left-6 right-6 -bottom-3 h-6 cursor-ns-resize'],
+                  ['sw', '-left-3 -bottom-3 h-8 w-8 cursor-nesw-resize'],
+                  ['w', '-left-3 top-6 bottom-6 w-6 cursor-ew-resize'],
                 ].map(([handle, position]) => (
                   <div
                     key={handle}
                     onPointerDown={(event) => startResizeCalibrationBox(event, handle)}
-                    className={`absolute h-4 w-4 rounded-sm border border-black bg-green-400 ${position}`}
+                    className={`absolute bg-transparent ${position}`}
                   />
                 ))}
               </div>

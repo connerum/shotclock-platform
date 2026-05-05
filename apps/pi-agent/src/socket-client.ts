@@ -5,7 +5,7 @@ import type { DeviceIdentity } from './identity.js';
 import type { AgentConfig } from './config-store.js';
 import type { ServerToDeviceEvents, HelloPayload, HeartbeatPayload, PairingResponse } from '@shotclock/shared/types';
 import { loadIdentity, markAsPaired, isPaired } from './identity.js';
-import { loadState, saveState } from './state-store.js';
+import { loadState, saveState, setConfigPreview } from './state-store.js';
 import { saveConfig } from './config-store.js';
 import { getPairingCode, clearPairingCode } from './pairing-code.js';
 import type { UpdateManager } from './update-manager.js';
@@ -85,10 +85,16 @@ export function setupSocketClient(
   socket.on('config:update', (configUpdate) => {
     console.log('Received config update');
     try {
-      saveState({
+      const nextConfig = {
         displayProfile: configUpdate.displayProfile,
         ...(configUpdate.calibrationData && { calibrationData: configUpdate.calibrationData }),
-      });
+      };
+
+      if (configUpdate.preview) {
+        setConfigPreview(nextConfig);
+      } else {
+        saveState(nextConfig);
+      }
       sendConfigAck(true);
     } catch (error) {
       console.error('Failed to apply config update:', error);

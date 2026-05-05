@@ -8,7 +8,7 @@ import type { AgentConfig } from './config-store.js';
 import type { TypedSocket } from './socket-client.js';
 import type { UpdateManager } from './update-manager.js';
 import type { OfflineMode } from './offline-mode.js';
-import { loadState, saveState } from './state-store.js';
+import { loadEffectiveState, loadState, saveState } from './state-store.js';
 import { getPairingCode, regeneratePairingCode, getPairingCodeTimeRemaining, formatTimeRemaining } from './pairing-code.js';
 import { saveConfig as saveAgentConfig, loadConfig as loadAgentConfig } from './config-store.js';
 import { setupAP } from './setup-ap.js';
@@ -73,7 +73,7 @@ export function startLocalApi(
   // GET /local/config - Get config
   app.get('/local/config', (_req: Request, res: Response) => {
     const configData = loadAgentConfig();
-    const state = loadState();
+    const state = loadEffectiveState();
     
     res.json({
       config: configData,

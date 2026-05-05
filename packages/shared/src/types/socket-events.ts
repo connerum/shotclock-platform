@@ -202,6 +202,7 @@ export interface HeartbeatPayload {
 export interface DisplayConfigPayload {
   displayProfile: DisplayProfile;
   calibrationData?: CalibrationData;
+  preview?: boolean;
   brightness?: number;
   orientation?: 'landscape' | 'portrait';
 }

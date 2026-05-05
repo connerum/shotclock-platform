@@ -40,6 +40,8 @@ const DEFAULT_STATE: DeviceState = {
   lastUpdated: Date.now(),
 };
 
+let previewState: Partial<Pick<DeviceState, 'displayProfile' | 'calibrationData'>> | null = null;
+
 function ensureStateDir(): void {
   if (!fs.existsSync(STATE_DIR)) {
     fs.mkdirSync(STATE_DIR, { recursive: true });
@@ -62,9 +64,34 @@ export function loadState(): DeviceState {
   return { ...DEFAULT_STATE };
 }
 
+export function loadEffectiveState(): DeviceState {
+  return {
+    ...loadState(),
+    ...(previewState?.displayProfile && { displayProfile: previewState.displayProfile }),
+    ...(previewState?.calibrationData && { calibrationData: previewState.calibrationData }),
+  };
+}
+
+export function setConfigPreview(preview: Partial<Pick<DeviceState, 'displayProfile' | 'calibrationData'>>): DeviceState {
+  previewState = {
+    ...previewState,
+    ...preview,
+  };
+
+  return loadEffectiveState();
+}
+
+export function clearConfigPreview(): void {
+  previewState = null;
+}
+
 export function saveState(state: Partial<DeviceState>): DeviceState {
   try {
     ensureStateDir();
+
+    if (state.displayProfile || state.calibrationData) {
+      clearConfigPreview();
+    }
     
     const currentState = loadState();
     const newState: DeviceState = {
