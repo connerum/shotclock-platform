@@ -71,7 +71,10 @@ async function main() {
     
     if (apStarted) {
       // Start captive portal for WiFi setup
-      startCaptivePortal(setupApConfig);
+      const portalStarted = await startCaptivePortal(setupApConfig);
+      if (!portalStarted) {
+        throw new Error('Captive portal failed to start on port 8080');
+      }
 
       console.log('Setup AP started - waiting for WiFi configuration...');
     } else {

@@ -37,14 +37,14 @@ let activePortalConfig: CaptivePortalConfig = DEFAULT_CONFIG;
 /**
  * Start the captive portal server
  */
-export function startCaptivePortal(config: Partial<CaptivePortalConfig> = {}): void {
+export async function startCaptivePortal(config: Partial<CaptivePortalConfig> = {}): Promise<boolean> {
   const portalConfig = { ...DEFAULT_CONFIG, ...config };
   activePortalConfig = portalConfig;
   setupState = { ...setupState, step: 'ap_created' };
 
   if (server) {
     console.log(`Captive portal already running at http://${portalConfig.serverIp}:${portalConfig.serverPort}`);
-    return;
+    return true;
   }
   
   if (!routesRegistered) {
@@ -53,6 +53,14 @@ export function startCaptivePortal(config: Partial<CaptivePortalConfig> = {}): v
     // Setup state endpoint
     portalApp.get('/api/setup/status', (_req: Request, res: Response) => {
       res.json({ state: setupState, configured: setupState.step === 'complete' });
+    });
+
+    portalApp.get('/', (_req: Request, res: Response) => {
+      res.redirect('/setup');
+    });
+
+    portalApp.get(['/generate_204', '/gen_204', '/hotspot-detect.html', '/ncsi.txt', '/connecttest.txt'], (_req: Request, res: Response) => {
+      res.redirect('/setup');
     });
   
     // WiFi networks endpoint
@@ -212,7 +220,7 @@ export function startCaptivePortal(config: Partial<CaptivePortalConfig> = {}): v
     routesRegistered = true;
   }
   
-  listen(portalConfig.serverIp, portalConfig);
+  return listen('0.0.0.0', portalConfig);
 }
 
 /**
@@ -225,22 +233,33 @@ export function stopCaptivePortal(): void {
   }
 }
 
-function listen(host: string, portalConfig: CaptivePortalConfig): void {
-  server = portalApp.listen(portalConfig.serverPort, host, () => {
-    const displayHost = host === '0.0.0.0' ? portalConfig.serverIp : host;
-    console.log(`Captive portal running at http://${displayHost}:${portalConfig.serverPort}`);
-  });
+function listen(host: string, portalConfig: CaptivePortalConfig): Promise<boolean> {
+  return new Promise((resolve) => {
+    let settled = false;
 
-  server.once('error', (error: NodeJS.ErrnoException) => {
-    server?.close();
-    server = null;
+    server = portalApp.listen(portalConfig.serverPort, host, () => {
+      const displayHost = host === '0.0.0.0' ? portalConfig.serverIp : host;
+      console.log(`Captive portal running at http://${displayHost}:${portalConfig.serverPort}`);
+      settled = true;
+      resolve(true);
+    });
 
-    if (error.code === 'EADDRNOTAVAIL' && host === portalConfig.serverIp) {
-      console.warn(`Captive portal could not bind ${portalConfig.serverIp}; falling back to 0.0.0.0`);
-      listen('0.0.0.0', portalConfig);
-      return;
-    }
+    server.on('clientError', (error, socket) => {
+      console.warn('Captive portal client error:', error.message);
+      if (socket.writable) {
+        socket.end('HTTP/1.1 400 Bad Request\r\n\r\n');
+      }
+    });
 
-    console.error('Captive portal failed to start:', error);
+    server.once('error', (error: NodeJS.ErrnoException) => {
+      server?.close();
+      server = null;
+      console.error('Captive portal failed to start:', error);
+
+      if (!settled) {
+        settled = true;
+        resolve(false);
+      }
+    });
   });
 }

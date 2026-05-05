@@ -258,6 +258,16 @@ ip addr show wlan0
 
 The agent should log `Starting setup AP: Shotclock-Setup-...`, `hostapd` and `dnsmasq` should be active, and `wlan0` should have `192.168.4.1/24`. If `hostapd` fails, the agent service now fails instead of continuing as healthy.
 
+If the AP is visible but `http://192.168.4.1:8080` does not load, verify the portal process is listening:
+
+```bash
+journalctl -u shotclock-agent -n 120 --no-pager -l
+ss -ltnp | grep ':8080'
+curl -i http://192.168.4.1:8080/setup
+```
+
+The agent should log `Captive portal running at http://192.168.4.1:8080`. If port `8080` cannot bind, the agent service now fails instead of continuing as healthy.
+
 ### WiFi won't connect
 
 1. Verify SSID and password
