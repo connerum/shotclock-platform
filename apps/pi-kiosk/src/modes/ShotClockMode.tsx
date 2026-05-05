@@ -1,4 +1,4 @@
-// Shot Clock Mode - Main shot clock display
+// Shot Clock Mode - compact display for calibrated LED viewport.
 
 import { useEffect, useState } from 'react';
 import ShotClock from '../components/ShotClock';
@@ -28,7 +28,7 @@ export default function ShotClockMode({ state }: ShotClockModeProps) {
     const interval = setInterval(() => setNow(Date.now()), 250);
     return () => clearInterval(interval);
   }, [timerState?.isRunning, timerState?.lastUpdated]);
-  
+
   const elapsedSeconds = timerState?.isRunning
     ? Math.floor((now - (timerState.lastUpdated || now)) / 1000)
     : 0;
@@ -38,66 +38,51 @@ export default function ShotClockMode({ state }: ShotClockModeProps) {
   const awayScore = timerState?.awayScore ?? 0;
   const period = timerState?.period ?? 1;
   const isRunning = timerState?.isRunning ?? false;
-  
+
   const formatGameClock = (seconds: number): string => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
-    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
   const isWarning = shotClock <= 5 && shotClock > 0;
   const isExpired = shotClock === 0;
 
   return (
-    <div className="w-full h-full flex flex-col items-center justify-center bg-black text-white p-4">
-      {/* Period */}
-      <div className="text-3xl font-bold text-gray-500 mb-4">
-        PERIOD {period}
+    <div
+      className="grid h-full w-full grid-rows-[13%_54%_17%_16%] overflow-hidden bg-black px-2 py-1 text-white"
+      style={{ containerType: 'size' }}
+    >
+      <div className="flex items-center justify-between overflow-hidden font-mono text-[min(7cqh,5cqw)] font-bold leading-none text-gray-400">
+        <span>P{period}</span>
+        <span className={isRunning ? 'text-green-500' : 'text-yellow-500'}>
+          {isRunning ? 'RUN' : 'HOLD'}
+        </span>
       </div>
-      
-      {/* Main shot clock */}
-      <div className="flex-1 flex items-center justify-center w-full">
-        <ShotClock 
-          value={shotClock} 
+
+      <div className="min-h-0">
+        <ShotClock
+          value={shotClock}
           isWarning={isWarning}
           isExpired={isExpired}
           isRunning={isRunning}
         />
       </div>
-      
-      {/* Game clock */}
-      <div className="mb-8">
-        <div className="text-8xl font-mono font-bold">
-          {formatGameClock(gameClock)}
-        </div>
+
+      <div className="flex items-center justify-center overflow-hidden font-mono text-[min(14cqh,15cqw)] font-black leading-none tabular-nums text-white">
+        {formatGameClock(gameClock)}
       </div>
-      
-      {/* Scores */}
-      <div className="flex justify-center items-center gap-16 w-full">
-        <div className="text-center">
-          <p className="text-2xl text-gray-500 mb-2">HOME</p>
-          <p className="text-7xl font-bold text-red-500">{homeScore}</p>
+
+      <div className="grid min-h-0 grid-cols-[1fr_auto_1fr] items-center gap-1 overflow-hidden font-mono leading-none">
+        <div className="grid grid-cols-[auto_1fr] items-baseline gap-1 overflow-hidden">
+          <span className="text-[min(5cqh,4cqw)] font-bold text-red-400">H</span>
+          <span className="text-right text-[min(13cqh,12cqw)] font-black tabular-nums text-red-500">{homeScore}</span>
         </div>
-        <div className="text-4xl text-gray-600">vs</div>
-        <div className="text-center">
-          <p className="text-2xl text-gray-500 mb-2">AWAY</p>
-          <p className="text-7xl font-bold text-blue-500">{awayScore}</p>
+        <span className="text-[min(5cqh,4cqw)] font-bold text-gray-600">-</span>
+        <div className="grid grid-cols-[1fr_auto] items-baseline gap-1 overflow-hidden">
+          <span className="text-[min(13cqh,12cqw)] font-black tabular-nums text-blue-500">{awayScore}</span>
+          <span className="text-[min(5cqh,4cqw)] font-bold text-blue-400">A</span>
         </div>
-      </div>
-      
-      {/* Status indicator */}
-      <div className="mt-8">
-        {isRunning ? (
-          <div className="flex items-center text-green-500">
-            <span className="relative flex h-3 w-3 mr-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-3 w-3 bg-green-500"></span>
-            </span>
-            RUNNING
-          </div>
-        ) : (
-          <div className="text-yellow-500">PAUSED</div>
-        )}
       </div>
     </div>
   );

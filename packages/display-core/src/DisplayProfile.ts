@@ -13,28 +13,28 @@ export interface DisplayProfileOptions {
 }
 
 export const DEFAULT_VIEWPORT: Viewport = {
-  x: 0,
-  y: 0,
-  width: 1920,
-  height: 1080,
+  x: 960,
+  y: 640,
+  width: 256,
+  height: 194,
   rotation: 0,
   scaleX: 1,
   scaleY: 1,
 };
 
 export const DEFAULT_SAFE_ZONE: SafeZone = {
-  top: 40,
-  right: 40,
-  bottom: 40,
-  left: 40,
+  top: 8,
+  right: 8,
+  bottom: 8,
+  left: 8,
 };
 
 export const DEFAULT_FONT_SIZE: FontSizeConfig = {
-  shotClock: 200,
-  gameClock: 120,
-  score: 150,
-  period: 80,
-  label: 40,
+  shotClock: 92,
+  gameClock: 28,
+  score: 28,
+  period: 14,
+  label: 10,
 };
 
 export const DEFAULT_COLORS: ColorConfig = {

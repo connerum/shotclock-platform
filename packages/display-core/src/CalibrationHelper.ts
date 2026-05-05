@@ -43,10 +43,10 @@ export function applyCalibration(
  */
 export function resetCalibration(): CalibrationData {
   return {
-    x: 0,
-    y: 0,
-    width: 1920,
-    height: 1080,
+    x: 960,
+    y: 640,
+    width: 256,
+    height: 194,
     scaleX: 1,
     scaleY: 1,
     rotation: 0,

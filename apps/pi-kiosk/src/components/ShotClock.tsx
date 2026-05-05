@@ -33,22 +33,29 @@ export default function ShotClock({
   }, [isWarning, isExpired, isRunning]);
 
   return (
-    <div className={`relative ${glowClass}`}>
+    <div className={`relative flex h-full w-full items-center justify-center ${glowClass}`}>
       {/* Main display */}
-      <div className={`font-mono font-bold ${colorClass}`} style={{ fontSize: '20rem', lineHeight: 1 }}>
+      <div
+        className={`font-mono font-black tabular-nums ${colorClass}`}
+        style={{
+          fontSize: 'min(48cqw, 64cqh)',
+          lineHeight: 0.82,
+          letterSpacing: 0,
+        }}
+      >
         {displayValue}
       </div>
       
       {/* Decorative border */}
-      <div className={`absolute inset-0 border-4 ${isExpired ? 'border-red-500' : isWarning ? 'border-yellow-400' : 'border-gray-700'} rounded-lg`} />
+      <div className={`absolute inset-0 border-2 ${isExpired ? 'border-red-500' : isWarning ? 'border-yellow-400' : 'border-gray-700'}`} />
       
       {/* Running indicator */}
       {isRunning && (
-        <div className="absolute -top-4 left-1/2 transform -translate-x-1/2">
-          <div className="flex items-center gap-2 text-green-500 text-sm">
-            <span className="relative flex h-2 w-2">
+        <div className="absolute right-1 top-1">
+          <div className="flex items-center gap-1 font-mono text-[7px] text-green-500">
+            <span className="relative flex h-1.5 w-1.5">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+              <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-green-500"></span>
             </span>
             LIVE
           </div>

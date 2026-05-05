@@ -20,9 +20,9 @@ const DEFAULT_DISPLAY_PROFILE: DisplayProfile = {
   id: 'default-generic',
   name: 'Default Generic Display',
   controllerType: 'generic',
-  viewport: { x: 0, y: 0, width: 1920, height: 1080, rotation: 0, scaleX: 1, scaleY: 1 },
-  safeZone: { top: 40, right: 40, bottom: 40, left: 40 },
-  fontSize: { shotClock: 200, gameClock: 120, score: 150, period: 80, label: 40 },
+  viewport: { x: 960, y: 640, width: 256, height: 194, rotation: 0, scaleX: 1, scaleY: 1 },
+  safeZone: { top: 8, right: 8, bottom: 8, left: 8 },
+  fontSize: { shotClock: 92, gameClock: 28, score: 28, period: 14, label: 10 },
   colors: {
     background: '#000000',
     foreground: '#ffffff',
