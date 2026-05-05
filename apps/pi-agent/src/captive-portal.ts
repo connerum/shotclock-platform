@@ -4,7 +4,7 @@ import express, { Request, Response } from 'express';
 import { setupAP } from './setup-ap.js';
 import { wifiManager } from './wifi-manager.js';
 import { loadConfig, saveConfig } from './config-store.js';
-import { loadIdentity, markAsPaired } from './identity.js';
+import { isPaired, loadIdentity, markAsPaired } from './identity.js';
 import { saveState } from './state-store.js';
 import { registerPairingCodeWithServer } from './pairing-registration.js';
 
@@ -295,10 +295,11 @@ async function connectToWifiFromPortal(ssid: string, password?: string): Promise
       ssid,
       password,
     };
-    saveConfig({ mode: 'pairing' });
-    saveState({ mode: { type: 'pairing' } });
+    const paired = isPaired();
+    saveConfig({ mode: paired ? 'online' : 'pairing' });
+    saveState({ mode: { type: paired ? 'shot-clock' : 'pairing' } });
     const identity = loadIdentity();
-    if (identity) {
+    if (identity && !paired) {
       void registerPairingCodeWithServer(identity, loadConfig());
     }
     stopCaptivePortal();

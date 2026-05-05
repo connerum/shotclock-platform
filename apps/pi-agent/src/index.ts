@@ -41,11 +41,15 @@ async function main() {
   // Check if device is paired
   const paired = isPaired();
   
-  if (!paired && config.mode === 'setup') {
-    console.log('Device not paired and WiFi not configured - entering setup mode');
+  if (config.mode === 'setup') {
+    console.log(paired
+      ? 'Device is paired but WiFi setup is required - entering setup mode'
+      : 'Device not paired and WiFi not configured - entering setup mode');
 
-    const pairingCode = regeneratePairingCode();
-    console.log(`Pairing code: ${pairingCode.code} (expires in 24 hours)`);
+    if (!paired) {
+      const pairingCode = regeneratePairingCode();
+      console.log(`Pairing code: ${pairingCode.code} (expires in 24 hours)`);
+    }
     saveConfig({ mode: 'setup' });
     saveState({ mode: { type: 'setup' } });
 

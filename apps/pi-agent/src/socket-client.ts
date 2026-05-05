@@ -11,6 +11,7 @@ import { getPairingCode, clearPairingCode } from './pairing-code.js';
 import type { UpdateManager } from './update-manager.js';
 import { finishFactoryResetAndReboot, prepareFactoryReset, rebootSystem } from './factory-reset.js';
 import { registerPairingCodeWithServer } from './pairing-registration.js';
+import { clearNetworkRecovery, scheduleNetworkRecovery } from './network-recovery.js';
 
 export type TypedSocket = Socket<ServerToDeviceEvents, DeviceToDeviceEvents>;
 
@@ -49,6 +50,7 @@ export function setupSocketClient(
   socket.on('connect', () => {
     console.log('Connected to server');
     reconnectAttempts = 0;
+    clearNetworkRecovery();
     
     // Send hello
     sendHello(identity);
@@ -57,6 +59,7 @@ export function setupSocketClient(
   // Handle disconnection
   socket.on('disconnect', (reason: string) => {
     console.log('Disconnected from server:', reason);
+    scheduleNetworkRecovery(reason);
   });
 
   // Handle reconnect
@@ -69,6 +72,7 @@ export function setupSocketClient(
   socket.on('reconnect_error' as any, (error: Error) => {
     console.error('Reconnection error:', error);
     reconnectAttempts++;
+    scheduleNetworkRecovery(error.message);
   });
 
   // Handle state update from server

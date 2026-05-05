@@ -16,7 +16,7 @@ export const DEFAULT_VIEWPORT: Viewport = {
   x: 960,
   y: 640,
   width: 256,
-  height: 194,
+  height: 192,
   rotation: 0,
   scaleX: 1,
   scaleY: 1,
