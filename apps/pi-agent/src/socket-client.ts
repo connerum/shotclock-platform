@@ -10,6 +10,7 @@ import { saveConfig } from './config-store.js';
 import { getPairingCode, clearPairingCode } from './pairing-code.js';
 import type { UpdateManager } from './update-manager.js';
 import { finishFactoryResetAndReboot, prepareFactoryReset, rebootSystem } from './factory-reset.js';
+import { registerPairingCodeWithServer } from './pairing-registration.js';
 
 export type TypedSocket = Socket<ServerToDeviceEvents, DeviceToDeviceEvents>;
 
@@ -232,6 +233,8 @@ export function startPairingReconciliation(identity: DeviceIdentity, config: Age
 
     inFlight = true;
     try {
+      await registerPairingCodeWithServer(identity, config);
+
       const serverUrl = config.serverUrl.replace(/\/$/, '');
       const response = await fetch(`${serverUrl}/api/device-status/${identity.deviceId}/pairing`, {
         headers: { Accept: 'application/json' },

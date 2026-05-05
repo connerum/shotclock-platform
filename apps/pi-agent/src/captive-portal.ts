@@ -3,9 +3,10 @@
 import express, { Request, Response } from 'express';
 import { setupAP } from './setup-ap.js';
 import { wifiManager } from './wifi-manager.js';
-import { saveConfig } from './config-store.js';
-import { markAsPaired } from './identity.js';
+import { loadConfig, saveConfig } from './config-store.js';
+import { loadIdentity, markAsPaired } from './identity.js';
 import { saveState } from './state-store.js';
+import { registerPairingCodeWithServer } from './pairing-registration.js';
 
 interface SetupState {
   step: 'initial' | 'ap_created' | 'network_selected' | 'network_connected' | 'complete';
@@ -296,6 +297,10 @@ async function connectToWifiFromPortal(ssid: string, password?: string): Promise
     };
     saveConfig({ mode: 'pairing' });
     saveState({ mode: { type: 'pairing' } });
+    const identity = loadIdentity();
+    if (identity) {
+      void registerPairingCodeWithServer(identity, loadConfig());
+    }
     stopCaptivePortal();
     return;
   }
