@@ -182,6 +182,10 @@ function getMediaStorageErrorMessage(error: unknown, action: 'fetch' | 'upload')
     return 'Media database table is missing. Run Prisma generate and migrate deploy on the server, then rebuild and restart CourtCast.';
   }
 
+  if (message.includes('does not fit in an INT column') || message.includes('P2023')) {
+    return 'Media sort order data is invalid. Pull the latest code, run Prisma migrate deploy, rebuild, and restart CourtCast.';
+  }
+
   if (message.includes('EACCES') || message.includes('EPERM')) {
     return 'Server cannot write to the media upload directory. Check ownership and permissions for apps/server-web/public/media.';
   }
