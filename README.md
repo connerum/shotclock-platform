@@ -43,7 +43,7 @@ Shotclock is a monorepo containing the complete platform for managing sports sco
 Device Network Flow:
 
 ┌──────────────┐         ┌──────────────┐         ┌──────────────┐
-│   Browser    │◀───────▶│  Next.js     │◀───────▶│  PostgreSQL  │
+│   Browser    │◀───────▶│  Next.js     │◀───────▶│   SQLite     │
 │  Dashboard   │  HTTP/   │  Server      │  Prisma │  Database    │
 └──────────────┘  Socket  └──────────────┘         └──────────────┘
                             │     ▲
@@ -85,9 +85,11 @@ Timer state, scoreboard state, and wrestling match state logic.
 ### @shotclock/server-web
 Next.js 14 application with:
 - Dashboard UI for device management
+- Email/password authentication with per-user device ownership
 - Socket.IO server for real-time communication
 - REST API for device configuration
 - Prisma ORM for data persistence
+- Device-scoped media uploads for ads, logo, sponsor, team intro, and music
 
 ### @shotclock/pi-agent
 Node.js agent that runs on Raspberry Pi:
@@ -100,6 +102,7 @@ Node.js agent that runs on Raspberry Pi:
 ### @shotclock/pi-kiosk
 React kiosk application:
 - Mode-based rendering (setup, pairing, shot-clock, calibration, etc.)
+- Basketball, wrestling, volleyball, media, and emergency overlays
 - Local API polling for state updates
 - CSS transform-based viewport scaling
 - Fullscreen Chromium display
@@ -108,9 +111,9 @@ React kiosk application:
 
 ### Prerequisites
 
-- Node.js 20+
-- pnpm 8+
-- PostgreSQL 14+ (for production)
+- Node.js 20 LTS, Node.js 22 LTS, or Node.js 24 LTS
+- pnpm 10+
+- SQLite through Prisma
 
 ### Quick Start
 
@@ -196,6 +199,10 @@ shotclock-platform/
 | GET | /api/devices/:id/state | Get display state |
 | POST | /api/devices/:id/state | Update display state |
 | POST | /api/devices/:id/command | Send command |
+| GET | /api/devices/:id/media | List device presentation media |
+| POST | /api/devices/:id/media | Upload device presentation media |
+| PATCH | /api/devices/:id/media/:assetId | Enable/select device media |
+| DELETE | /api/devices/:id/media/:assetId | Delete device media |
 | POST | /api/pair | Initiate pairing |
 | GET | /api/pair/:code | Validate pairing code |
 | GET | /api/updates/manifest | Get update manifest |
@@ -228,6 +235,8 @@ shotclock-platform/
 - `state:update` - Update timer/score state
 - `config:update` - Update display config
 - `mode:set` - Set device mode
+- `presentation:show` - Show ads, logo, sponsor, intro, music, sound, or emergency overlay
+- `factory:reset` - Reset pairing/network/display state
 - `update:check` - Check for updates
 - `update:install` - Install update
 - `reboot` - Reboot device
@@ -263,6 +272,19 @@ cd shotclock-platform
 # Run installer
 chmod +x scripts/install-pi.sh
 sudo ./scripts/install-pi.sh
+
+# Configure the central server and kiosk desktop user
+sudo nano /opt/shotclock/shared/.env
+
+# Build the Pi packages
+pnpm install
+pnpm --filter @shotclock/shared build
+pnpm --filter @shotclock/pi-agent build
+pnpm --filter @shotclock/pi-kiosk build
+
+# Point services at this checkout
+sudo ln -sfn "$PWD" /opt/shotclock/current
+sudo systemctl daemon-reload
 ```
 
 ### Systemd Services

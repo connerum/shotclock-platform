@@ -13,13 +13,15 @@ Detailed setup instructions for deploying Shotclock on Raspberry Pi.
 
 ### 1. Flash the OS
 
-```bash
-# Download Raspberry Pi OS Lite
-wget https://downloads.raspberrypi.org/raspios_lite_armhf/images/raspios_lite_armhf-2024-03-15/2024-03-15-raspios-bullseye-armhf-lite.img.xz
+Use Raspberry Pi Imager and choose Raspberry Pi OS with Desktop for display units. Raspberry Pi OS Lite can run the agent, but the Chromium kiosk expects an active graphical desktop session on the HDMI output.
 
-# Flash to SD card (replace /dev/sdX with your card reader)
-xzcat 2024-03-15-raspios-bullseye-armhf-lite.img.xz | sudo dd of=/dev/sdX bs=4M status=progress
-```
+In Raspberry Pi Imager advanced options:
+
+- Enable SSH.
+- Set the hostname, for example `display-40091`.
+- Create the desktop/admin user, for example `admin`.
+- Set WiFi only if you want initial SSH access before using the built-in setup AP.
+- Set locale/timezone/country.
 
 ### 2. Initial Boot Setup
 
@@ -31,7 +33,7 @@ sudo mount /dev/sdX1 /mnt/sdcard
 # Enable SSH
 sudo touch /mnt/sdcard/ssh
 
-# Configure WiFi (optional)
+# Configure WiFi manually only if you did not set it in Raspberry Pi Imager.
 sudo cat > /mnt/sdcard/wpa_supplicant.conf << 'EOF'
 ctrl_interface=DIR=/var/run/wpa_supplicant GROUP=netdev
 update_config=1
@@ -52,10 +54,8 @@ sudo umount /mnt/sdcard
 
 ```bash
 # SSH into the Pi
-ssh pi@raspberrypi.local
+ssh admin@raspberrypi.local
 
-# Default password: raspberry
-# CHANGE THIS IMMEDIATELY!
 passwd
 ```
 
@@ -83,7 +83,7 @@ sudo apt update && sudo apt full-upgrade -y
 curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
 apt-get install -y nodejs
 
-# Install Chromium for kiosk mode
+# Install Chromium for kiosk mode.
 # Bookworm/Bullseye may provide chromium-browser; Trixie provides chromium.
 CHROMIUM_BROWSER_CANDIDATE="$(apt-cache policy chromium-browser | awk '/Candidate:/ {print $2}')"
 if [ -n "$CHROMIUM_BROWSER_CANDIDATE" ] && [ "$CHROMIUM_BROWSER_CANDIDATE" != "(none)" ]; then
@@ -113,7 +113,8 @@ That failure happens before `/opt/shotclock/shared` is created, so editing `/opt
 systemctl enable NetworkManager
 systemctl start NetworkManager
 
-# Allow passwordless NetworkManager access
+# Allow passwordless NetworkManager access. The installer and agent expect to
+# manage saved WiFi profiles through NetworkManager.
 sudo tee /etc/polkit-1/localauthority/50-local.d/nm.pkla << 'EOF'
 [nm-setup]
 Identity=unix-user:shotclock
@@ -128,6 +129,8 @@ EOF
 ```bash
 useradd -r -m -s /bin/bash shotclock
 usermod -aG video,audio,input shotclock
+mkdir -p /home/shotclock/.shotclock
+chown -R shotclock:shotclock /home/shotclock/.shotclock
 ```
 
 ### 4. Create Directory Structure
@@ -154,8 +157,10 @@ sudo systemctl daemon-reload
 Edit `/etc/systemd/system/shotclock-agent.service`:
 ```ini
 [Service]
-Environment=SERVER_URL=http://your-server:3000
-Environment=DEVICE_NAME=Shotclock Display 01
+User=root
+Group=root
+EnvironmentFile=/opt/shotclock/shared/.env
+Environment=HOME=/home/shotclock
 ```
 
 Edit `/opt/shotclock/shared/.env`:
@@ -172,27 +177,63 @@ KIOSK_USER=admin
 
 The setup AP is only broadcast while the device is unpaired. Its SSID is the configured prefix plus the first six characters of the unique device ID suffix, for example `Shotclock-Setup-1e4b35`.
 
+For production CourtCast:
+
+```bash
+SERVER_URL=https://courtcast.safety-linq.com
+AGENT_LOCAL_API_PORT=3001
+DEVICE_NAME=Shotclock Display 01
+SETUP_AP_SSID=Shotclock-Setup
+SETUP_AP_PASSWORD=shotclock123
+KIOSK_USER=admin
+```
+
 ### 3. Enable Services
 
 ```bash
 sudo systemctl enable shotclock-agent
 sudo systemctl enable shotclock-kiosk
 sudo systemctl start shotclock-agent
+sudo systemctl start shotclock-kiosk
+```
+
+## Repository Build And Service Symlink
+
+After cloning or pulling the repository on the Pi:
+
+```bash
+cd ~/shotclock-platform
+pnpm install --frozen-lockfile
+pnpm --filter @shotclock/shared build
+pnpm --filter @shotclock/pi-agent build
+pnpm --filter @shotclock/pi-kiosk build
+sudo ln -sfn "$PWD" /opt/shotclock/current
+sudo systemctl daemon-reload
+sudo systemctl restart shotclock-agent shotclock-kiosk
 ```
 
 ## Display Calibration
 
 ### Accessing Calibration
 
-1. From the dashboard, go to Devices → [device] → Calibration
+1. From the dashboard, go to Devices -> [device] -> Device Details/Settings
 2. Or use the local API: `curl http://localhost:3001/local/config`
 
 ### Calibration Process
 
 1. Enter calibration mode on the kiosk
-2. Use test patterns to verify display alignment
-3. Adjust offset and scale values
-4. Save calibration to apply
+2. Use Display Calibration to draw, move, and resize the calibration box
+3. Confirm the box updates on the Pi in real time
+4. Save calibration to persist locally on the Pi and on the server
+
+Current default LED calibration:
+
+```text
+X 960
+Y 640
+W 256
+H 192
+```
 
 ### Manual Calibration
 
@@ -203,8 +244,26 @@ curl http://localhost:3001/local/config
 # Set calibration
 curl -X POST http://localhost:3001/local/config \
   -H "Content-Type: application/json" \
-  -d '{"calibrationData": {"x": 10, "y": 5, "scaleX": 1.02, "scaleY": 0.98, "rotation": 0}}'
+  -d '{"calibrationData": {"x": 960, "y": 640, "width": 256, "height": 192, "scaleX": 1, "scaleY": 1, "rotation": 0}}'
 ```
+
+## Media Management
+
+Presentation media is configured on the server WebUI, not directly on the Pi:
+
+```text
+https://courtcast.safety-linq.com/devices/[deviceId]/settings
+```
+
+Upload media for:
+
+- Ads
+- Logo
+- Sponsor
+- Team Intro
+- Music
+
+The WebUI stores metadata in SQLite and stores files under `apps/server-web/public/media/devices/`. The Pi receives public media URLs through presentation commands and renders images/videos or plays audio in the kiosk overlay.
 
 ## Troubleshooting
 
@@ -285,5 +344,25 @@ journalctl -u shotclock-agent -n 100
 
 Common issues:
 - Wrong SERVER_URL
-- Database connection failure
 - Missing environment variables
+- `/opt/shotclock/current` symlink does not point to a built checkout
+- `apps/pi-agent/dist/index.js` does not exist because the agent was not built
+
+### Browser keyring prompt blocks kiosk
+
+The kiosk launcher passes Chromium:
+
+```bash
+--password-store=basic
+--use-mock-keychain
+```
+
+If a keyring prompt still appears, confirm the installed launcher is current and restart the kiosk:
+
+```bash
+cd ~/shotclock-platform
+git pull --ff-only
+sudo cp systemd/shotclock-kiosk.service /etc/systemd/system/shotclock-kiosk.service
+sudo systemctl daemon-reload
+sudo systemctl restart shotclock-kiosk
+```

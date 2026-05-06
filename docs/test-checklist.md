@@ -17,6 +17,7 @@ All items must pass before deployment is considered complete.
 - [ ] `pnpm --filter @shotclock/pi-kiosk build` succeeds
 - [ ] `pnpm build` (full monorepo) completes with zero errors
 - [ ] Database migrations run: `pnpm prisma migrate dev`
+- [ ] Production migration path runs: `pnpm prisma migrate deploy`
 - [ ] Server starts: `pnpm --filter @shotclock/server-web dev`
 - [ ] Server responds on port 3000
 
@@ -35,6 +36,8 @@ All items must pass before deployment is considered complete.
   - [ ] `GET /api/devices`
   - [ ] `GET /api/devices/[deviceId]`
   - [ ] `POST /api/devices/[deviceId]/command`
+  - [ ] `GET /api/devices/[deviceId]/media`
+  - [ ] `POST /api/devices/[deviceId]/media`
   - [ ] `GET /api/updates/manifest`
   - [ ] `POST /api/pair`
 
@@ -96,9 +99,13 @@ All items must pass before deployment is considered complete.
 - [ ] Timer can be started from dashboard
 - [ ] Timer can be stopped from dashboard
 - [ ] Timer can be reset from dashboard
-- [ ] Scores can be updated from dashboard
+- [ ] Basketball scores and period update the Pi display immediately
+- [ ] Wrestling scores and period update the Pi display immediately
+- [ ] Volleyball scores, sets, and set number update the Pi display immediately
 - [ ] Clock syncs to kiosk display within 1 second
-- [ ] Mode switching works (shot-clock, game-clock, calibration)
+- [ ] Sport selection works (basketball, wrestling, volleyball)
+- [ ] Mode switching works (setup, pairing, offline, sport modes, media, calibration, blank)
+- [ ] Presentation overlays work over each sport mode
 
 ---
 
@@ -126,7 +133,30 @@ All items must pass before deployment is considered complete.
 
 ---
 
-## 10. Remote Updates
+## 10. Presentation Media
+
+- [ ] Device settings page has Presentation Media section
+- [ ] Ads upload accepts image/video files
+- [ ] Ads can have multiple active files
+- [ ] Logo upload accepts image/video files
+- [ ] Sponsor upload accepts image/video files
+- [ ] Team Intro upload accepts video/audio files
+- [ ] Music upload accepts audio files
+- [ ] Preview links open uploaded files
+- [ ] Enabling/selecting files updates active state correctly
+- [ ] Deleting files removes the media record and file
+- [ ] Uploaded media is stored under `apps/server-web/public/media/devices/`
+- [ ] Metadata is stored in `DeviceMediaAsset`
+- [ ] Run Ads sends an active ad asset to the Pi when available
+- [ ] School Logo sends the active logo asset to the Pi when available
+- [ ] Sponsor sends the active sponsor asset to the Pi when available
+- [ ] Team Intro sends the active intro asset to the Pi when available
+- [ ] Music sends the active audio asset to the Pi when available
+- [ ] Clear Display hides active presentation overlay
+
+---
+
+## 11. Remote Updates
 
 - [ ] Update check endpoint works: `POST /local/update/check`
 - [ ] Update manifest is fetched from server
@@ -137,7 +167,7 @@ All items must pass before deployment is considered complete.
 
 ---
 
-## 11. Systemd Services
+## 12. Systemd Services
 
 - [ ] `shotclock-agent.service` installs correctly to `/etc/systemd/system/`
 - [ ] `shotclock-kiosk.service` installs correctly to `/etc/systemd/system/`
@@ -152,9 +182,9 @@ All items must pass before deployment is considered complete.
 
 ---
 
-## 12. Installation Script
+## 13. Installation Script
 
-- [ ] `install-pi.sh` runs without errors on a fresh Raspberry Pi OS Lite install
+- [ ] `install-pi.sh` runs without errors on a fresh Raspberry Pi OS with Desktop install
 - [ ] Node.js 22 is installed
 - [ ] pnpm is installed globally
 - [ ] Chromium and dependencies are installed (`chromium-browser` on older Raspberry Pi OS, `chromium` on Debian/Raspberry Pi OS Trixie)
@@ -169,7 +199,7 @@ All items must pass before deployment is considered complete.
 
 ---
 
-## 13. Configuration Templates
+## 14. Configuration Templates
 
 - [ ] `hostapd.conf.template` exists and has correct format
 - [ ] `dnsmasq.conf.template` exists and has correct format
@@ -180,7 +210,7 @@ All items must pass before deployment is considered complete.
 
 ---
 
-## 14. Captive Portal
+## 15. Captive Portal
 
 - [ ] AP mode starts when device is in setup mode
 - [ ] SSID with the configured setup prefix and device suffix is broadcast
@@ -195,10 +225,11 @@ All items must pass before deployment is considered complete.
 
 ---
 
-## 15. Documentation
+## 16. Documentation
 
 - [ ] `docs/setup.md` exists with accurate dev setup instructions
 - [ ] `docs/pi-setup.md` exists with accurate Pi deployment instructions
+- [ ] `docs/courtcast-deployment.md` exists with accurate server and Pi production deployment instructions
 - [ ] `docs/captive-portal.md` exists with accurate portal flow
 - [ ] `docs/remote-updates.md` exists with accurate update process
 - [ ] `docs/controller-abstraction.md` exists with accurate profiles
@@ -207,7 +238,7 @@ All items must pass before deployment is considered complete.
 
 ---
 
-## 16. GitHub Push
+## 17. GitHub Push
 
 - [ ] All changes committed with descriptive message
 - [ ] Commits pushed to `github.com/connerum/shotclock-platform`
@@ -217,20 +248,25 @@ All items must pass before deployment is considered complete.
 
 ---
 
-## 17. Final Build Verification
+## 18. Final Build Verification
 
 Run this command and verify all packages build:
 ```bash
-cd /home/shotclock/shotclock-platform && pnpm build
+cd ~/shotclock-platform
+pnpm --filter @shotclock/shared build
+pnpm --filter @shotclock/pi-agent build
+pnpm --filter @shotclock/pi-kiosk build
 ```
 
-Expected output order:
-1. ✓ @shotclock/shared builds
-2. ✓ @shotclock/display-core builds
-3. ✓ @shotclock/sports-core builds
-4. ✓ @shotclock/pi-agent builds
-5. ✓ @shotclock/pi-kiosk builds
-6. ✓ @shotclock/server-web builds
+For the server:
+
+```bash
+cd /opt/courtcast/shotclock-platform
+pnpm prisma generate
+pnpm prisma migrate deploy
+pnpm --filter @shotclock/shared build
+pnpm --filter @shotclock/server-web build
+```
 
 ---
 

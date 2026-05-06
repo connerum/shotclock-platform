@@ -4,9 +4,9 @@ Quick start guide for setting up the Shotclock Platform.
 
 ## Prerequisites
 
-- Node.js 20 LTS or 22 LTS (Node 23 is not supported)
-- pnpm 8+
-- PostgreSQL 14+ (for production)
+- Node.js 20 LTS, 22 LTS, or 24 LTS. Node 23 is not supported.
+- pnpm 10+
+- SQLite via Prisma. Production currently uses a SQLite file on the server.
 - Raspberry Pi OS or similar (for Pi deployment)
 
 ## Development Setup
@@ -57,11 +57,21 @@ This starts:
 - Pi Kiosk dev server: http://localhost:5173 or the next available Vite port
 - Built Pi Kiosk on device: served by the Pi Agent at http://localhost:3001/
 
+## Current Production Stack
+
+- Domain: `courtcast.safety-linq.com`
+- Server app directory: `/opt/courtcast/shotclock-platform`
+- Server database: SQLite at `/opt/courtcast/data/prod.db`
+- Uploaded presentation media: `apps/server-web/public/media/devices/`
+- Server service: `courtcast`
+- Pi app symlink: `/opt/shotclock/current`
+- Pi services: `shotclock-agent`, `shotclock-kiosk`
+
 ## Pi Deployment
 
 ### 1. Flash Raspberry Pi OS
 
-1. Download Raspberry Pi OS Lite from https://www.raspberrypi.com/software/
+1. Download Raspberry Pi OS with Desktop from https://www.raspberrypi.com/software/
 2. Flash to SD card using Raspberry Pi Imager
 3. Enable SSH and configure WiFi
 
@@ -69,7 +79,7 @@ This starts:
 
 ```bash
 # SSH into your Pi
-ssh pi@raspberrypi.local
+ssh admin@raspberrypi.local
 
 # Download the platform
 git clone https://github.com/connerum/shotclock-platform.git
@@ -96,19 +106,100 @@ sudo ./scripts/install-pi.sh
 4. Select your WiFi network and enter credentials
 5. Click "Complete Setup"
 
-### 4. Start Services
+### 4. Configure And Build Pi App
+
+Edit the shared Pi environment:
+
+```bash
+sudo nano /opt/shotclock/shared/.env
+```
+
+Minimum production values:
+
+```bash
+SERVER_URL=https://courtcast.safety-linq.com
+AGENT_LOCAL_API_PORT=3001
+DEVICE_NAME=Shotclock Display 01
+SETUP_AP_SSID=Shotclock-Setup
+SETUP_AP_PASSWORD=shotclock123
+KIOSK_USER=admin
+```
+
+Set `KIOSK_USER` to the desktop login user that owns the HDMI session. On the current field Pi this is `admin`.
+
+Build and point systemd at the checkout:
+
+```bash
+pnpm install
+pnpm --filter @shotclock/shared build
+pnpm --filter @shotclock/pi-agent build
+pnpm --filter @shotclock/pi-kiosk build
+sudo ln -sfn "$PWD" /opt/shotclock/current
+sudo systemctl daemon-reload
+```
+
+### 5. Start Services
 
 ```bash
 sudo systemctl start shotclock-agent
 sudo systemctl start shotclock-kiosk
 ```
 
+## Updating Production
+
+Server update:
+
+```bash
+cd /opt/courtcast/shotclock-platform
+git pull --ff-only
+pnpm install --frozen-lockfile
+pnpm prisma generate
+pnpm prisma migrate deploy
+mkdir -p apps/server-web/public/media/devices
+rm -rf apps/server-web/.next
+pnpm --filter @shotclock/shared build
+pnpm --filter @shotclock/server-web build
+sudo systemctl restart courtcast
+```
+
+Pi update:
+
+```bash
+cd ~/shotclock-platform
+git pull --ff-only
+pnpm install --frozen-lockfile
+pnpm --filter @shotclock/shared build
+pnpm --filter @shotclock/pi-agent build
+pnpm --filter @shotclock/pi-kiosk build
+sudo ln -sfn "$PWD" /opt/shotclock/current
+sudo systemctl restart shotclock-agent shotclock-kiosk
+```
+
 ## Pairing a Device
 
 1. Open the dashboard at http://your-server:3000
-2. Go to the "Pair" page
-3. Enter the pairing code shown on the Pi display
-4. The device will appear in the device list
+2. Log in. The production super account is `conner@two-a-days.com` / `PatchWork22!!`.
+3. Go to the "Pair" page
+4. Enter the pairing code shown on the Pi display
+5. The device will appear in the device list
+
+## Device Media
+
+Device media is managed from:
+
+```text
+/devices/[deviceId]/settings
+```
+
+The Presentation Media section manages files for:
+
+- Ads
+- Logo
+- Sponsor
+- Team Intro
+- Music
+
+The database stores metadata and slot assignments in `DeviceMediaAsset`. Files are stored on disk under `apps/server-web/public/media/devices/`. This keeps SQLite small and gives a straightforward future path to object storage if needed.
 
 ## Troubleshooting
 

@@ -102,10 +102,13 @@ DATABASE_URL=file:/opt/courtcast/data/prod.db
 Install and build:
 
 ```bash
-pnpm install
+mkdir -p /opt/courtcast/data
+mkdir -p apps/server-web/public/media/devices
+pnpm install --frozen-lockfile
 pnpm prisma generate
 pnpm prisma migrate deploy
-pnpm build
+pnpm --filter @shotclock/shared build
+pnpm --filter @shotclock/server-web build
 ```
 
 Optional demo seed:
@@ -164,6 +167,12 @@ Local server test:
 
 ```bash
 curl -i http://127.0.0.1:3000/api/devices
+```
+
+The route requires authentication, so `401 Authentication required` is a valid unauthenticated health signal. For the public app shell, use:
+
+```bash
+curl -I http://127.0.0.1:3000/login
 ```
 
 ## 6. Nginx Reverse Proxy
@@ -240,12 +249,21 @@ https://courtcast.safety-linq.com/devices
 https://courtcast.safety-linq.com/pair
 ```
 
+Initial super login:
+
+```text
+Email: conner@two-a-days.com
+Password: PatchWork22!!
+```
+
+Create normal user accounts from the registration page as needed. Normal users only see and control devices they pair or own; the super account can see all paired devices.
+
 ## 8. Pi Display Setup
 
 On each Raspberry Pi:
 
 ```bash
-ssh pi@raspberrypi.local
+ssh admin@raspberrypi.local
 sudo apt update && sudo apt full-upgrade -y
 git clone https://github.com/connerum/shotclock-platform.git
 cd shotclock-platform
@@ -300,9 +318,10 @@ Build on the Pi:
 
 ```bash
 cd ~/shotclock-platform
-pnpm install
-pnpm prisma generate
-pnpm build
+pnpm install --frozen-lockfile
+pnpm --filter @shotclock/shared build
+pnpm --filter @shotclock/pi-agent build
+pnpm --filter @shotclock/pi-kiosk build
 ```
 
 Point services at this checkout:
@@ -325,7 +344,54 @@ journalctl -u shotclock-agent -f
 journalctl -u shotclock-kiosk -f
 ```
 
-## 9. Pairing Flow
+## 9. Updating Existing Deployments
+
+Server update:
+
+```bash
+cd /opt/courtcast/shotclock-platform
+git pull --ff-only
+pnpm install --frozen-lockfile
+pnpm prisma generate
+pnpm prisma migrate deploy
+mkdir -p apps/server-web/public/media/devices
+rm -rf apps/server-web/.next
+pnpm --filter @shotclock/shared build
+pnpm --filter @shotclock/server-web build
+sudo systemctl restart courtcast
+sudo systemctl status courtcast --no-pager
+```
+
+Pi update:
+
+```bash
+cd ~/shotclock-platform
+git pull --ff-only
+pnpm install --frozen-lockfile
+pnpm --filter @shotclock/shared build
+pnpm --filter @shotclock/pi-agent build
+pnpm --filter @shotclock/pi-kiosk build
+sudo ln -sfn "$PWD" /opt/shotclock/current
+sudo systemctl restart shotclock-agent shotclock-kiosk
+sudo systemctl status shotclock-agent shotclock-kiosk --no-pager
+```
+
+If `git pull --ff-only` is blocked by local database changes, do not commit the production SQLite file. On the server the production DB should be outside the repository at `/opt/courtcast/data/prod.db`. For accidental repo-local DB changes:
+
+```bash
+git restore prisma/dev.db
+git pull --ff-only
+```
+
+If `git pull --ff-only` is blocked by local script edits on the Pi, inspect them first. If they are only emergency one-off deployment edits that are now in the repo, restore the file and pull:
+
+```bash
+git diff -- scripts/install-pi.sh scripts/launch-kiosk.sh
+git restore scripts/install-pi.sh scripts/launch-kiosk.sh
+git pull --ff-only
+```
+
+## 10. Pairing Flow
 
 On the Pi display, get the pairing code.
 
@@ -343,7 +409,47 @@ https://courtcast.safety-linq.com/devices
 
 The display should appear online.
 
-## 10. First LED Test Order
+## 11. Device Media
+
+Manage display media from:
+
+```text
+https://courtcast.safety-linq.com/devices/[deviceId]/settings
+```
+
+The Presentation Media section manages:
+
+- Ads: multiple active images/videos, rotated when the Run Ads button is used.
+- Logo: selected image/video for School Logo.
+- Sponsor: selected image/video for Sponsor.
+- Team Intro: selected video/audio for Team Intro.
+- Music: selected audio for Music.
+
+Storage model:
+
+- SQLite stores metadata and slot assignment in `DeviceMediaAsset`.
+- Files are stored on disk under `apps/server-web/public/media/devices/`.
+- Nginx allows uploads up to `100M` through `client_max_body_size 100M`.
+
+Back up both the SQLite database and the media directory:
+
+```bash
+tar -czf /root/courtcast-media-backup.tgz -C /opt/courtcast/shotclock-platform apps/server-web/public/media
+cp /opt/courtcast/data/prod.db /root/courtcast-prod.db.backup
+```
+
+## 12. Factory Reset
+
+Factory reset is available from the device settings page. It removes the device record from the WebUI, clears pairing/network/display state on the Pi, and reboots the Pi back into setup mode.
+
+After factory reset, repeat:
+
+1. Connect to `Shotclock-Setup-xxxxxx`.
+2. Open `http://192.168.4.1:8080`.
+3. Configure WiFi.
+4. Pair the new code from `https://courtcast.safety-linq.com/pair`.
+
+## 13. First LED Test Order
 
 Use a normal HDMI monitor first.
 
@@ -354,6 +460,8 @@ Confirm:
 - Dashboard sees device.
 - Mode changes work.
 - Shot clock counts down.
+- Basketball, wrestling, and volleyball score controls update the Pi immediately.
+- Game Presentation buttons show uploaded media where configured.
 - Calibration mode displays correctly.
 
 Then connect HDMI to the LED processor and repeat calibration. Use the LED processor's native resolution and refresh rate before tuning app calibration.
