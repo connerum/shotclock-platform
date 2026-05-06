@@ -124,22 +124,40 @@ export default function BasketballPage({ params }: { params: { deviceId: string 
       ? 'text-orange-300 drop-shadow-[0_0_32px_rgba(249,115,22,0.35)]'
       : 'text-white drop-shadow-[0_0_32px_rgba(255,255,255,0.12)]';
 
-  const updateShotClock = (value: number) => {
+  const commitTimerUpdates = (updates: Partial<TimerState>) => {
     const now = Date.now();
-    setShotClock(clampSeconds(value, 0, 99));
-    setTimerLastUpdated(now);
-    setTimerNow(now);
+    const currentState = projectTimerState(buildCurrentTimerState(), now);
+    const timerState: TimerState = {
+      ...currentState,
+      ...updates,
+      mode: currentState.isRunning ? 'run' : 'pause',
+      isRunning: currentState.isRunning,
+      isPaused: !currentState.isRunning,
+      lastUpdated: now,
+    };
+
+    applyTimerState(timerState);
+    void sendCommand('set_timer', { timerState, mode: { type: 'basketball' } });
+  };
+
+  const updateShotClock = (value: number) => {
+    commitTimerUpdates({ shotClock: clampSeconds(value, 0, 99) });
   };
 
   const updateGameClock = (value: number) => {
-    const now = Date.now();
-    setGameClock(clampSeconds(value, 0, 3600));
-    setTimerLastUpdated(now);
-    setTimerNow(now);
+    commitTimerUpdates({ gameClock: clampSeconds(value, 0, 3600) });
   };
 
   const updatePeriod = (value: number) => {
-    setPeriod(Math.max(1, Math.min(10, value)));
+    commitTimerUpdates({ period: Math.max(1, Math.min(10, value)) });
+  };
+
+  const updateHomeScore = (value: number) => {
+    commitTimerUpdates({ homeScore: Math.max(0, value) });
+  };
+
+  const updateAwayScore = (value: number) => {
+    commitTimerUpdates({ awayScore: Math.max(0, value) });
   };
 
   const startTimer = async () => {
@@ -180,6 +198,10 @@ export default function BasketballPage({ params }: { params: { deviceId: string 
   const applyTimerState = (timerState: TimerState) => {
     setShotClock(timerState.shotClock);
     setGameClock(timerState.gameClock);
+    setPeriod(timerState.period ?? 1);
+    setHomeScore(timerState.homeScore);
+    setAwayScore(timerState.awayScore);
+    setTimerRunning(timerState.isRunning);
     setTimerLastUpdated(timerState.lastUpdated);
     setTimerNow(timerState.lastUpdated);
   };
@@ -343,8 +365,8 @@ export default function BasketballPage({ params }: { params: { deviceId: string 
 
         <ControlCard title="Score" icon="PTS" accentClass="bg-green-500/15 text-green-300">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-1">
-            <ScoreControl label="Home" value={homeScore} onChange={setHomeScore} tone="text-red-300" />
-            <ScoreControl label="Away" value={awayScore} onChange={setAwayScore} tone="text-blue-300" />
+            <ScoreControl label="Home" value={homeScore} onChange={updateHomeScore} tone="text-red-300" />
+            <ScoreControl label="Away" value={awayScore} onChange={updateAwayScore} tone="text-blue-300" />
           </div>
         </ControlCard>
       </div>
