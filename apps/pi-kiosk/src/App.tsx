@@ -5,12 +5,14 @@ import SetupMode from './modes/SetupMode';
 import PairingMode from './modes/PairingMode';
 import OfflineMode from './modes/OfflineMode';
 import ShotClockMode from './modes/ShotClockMode';
+import VolleyballMode from './modes/VolleyballMode';
+import WrestlingMode from './modes/WrestlingMode';
 import MediaMode from './modes/MediaMode';
 import CalibrationMode from './modes/CalibrationMode';
 import BlankMode from './modes/BlankMode';
 import ViewportCanvas from './components/ViewportCanvas';
 
-type KioskMode = 'setup' | 'pairing' | 'offline' | 'shot-clock' | 'media' | 'calibration' | 'blank';
+type KioskMode = 'setup' | 'pairing' | 'offline' | 'basketball' | 'wrestling' | 'volleyball' | 'shot-clock' | 'media' | 'calibration' | 'blank';
 
 interface ShotClockState {
   mode?: { type: string };
@@ -19,6 +21,8 @@ interface ShotClockState {
     gameClock: number;
     homeScore: number;
     awayScore: number;
+    homeSets?: number;
+    awaySets?: number;
     period?: number;
     isRunning: boolean;
     isPaused?: boolean;
@@ -56,6 +60,12 @@ export default function App() {
         return <PairingMode />;
       case 'offline':
         return <OfflineMode />;
+      case 'basketball':
+        return <ShotClockMode state={state as ShotClockState | undefined} />;
+      case 'wrestling':
+        return <WrestlingMode state={state as ShotClockState | undefined} />;
+      case 'volleyball':
+        return <VolleyballMode state={state as ShotClockState | undefined} />;
       case 'shot-clock':
         return <ShotClockMode state={state as ShotClockState | undefined} />;
       case 'media':

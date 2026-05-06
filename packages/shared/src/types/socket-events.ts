@@ -5,6 +5,8 @@
 // Timer types
 export type TimerMode = 'stop' | 'run' | 'pause';
 
+export type SportType = 'basketball' | 'wrestling' | 'volleyball';
+
 export interface TimerState {
   mode: TimerMode;
   homeScore: number;
@@ -87,6 +89,9 @@ export type ModeType =
   | 'setup' 
   | 'pairing' 
   | 'offline' 
+  | 'basketball'
+  | 'wrestling'
+  | 'volleyball'
   | 'shot-clock' 
   | 'media' 
   | 'calibration' 

@@ -86,7 +86,8 @@ export function setupSocketClient(
     try {
       const currentState = loadState();
       const timerState = resolveIncomingTimerState(currentState.timerState, state);
-      saveState({ mode: { type: 'shot-clock' }, timerState });
+      const mode = isSportMode(currentState.mode.type) ? currentState.mode : { type: 'basketball' as const };
+      saveState({ mode, timerState });
       acknowledge(ack, { success: true });
       sendStateAck(true);
     } catch (error) {
@@ -222,7 +223,7 @@ function sendHello(identity: DeviceIdentity): void {
     deviceName: currentIdentity.deviceName,
     firmwareVersion: currentIdentity.firmwareVersion,
     controllerType: currentIdentity.controllerType,
-    capabilities: ['shot-clock', 'scoreboard', 'timer', 'media'],
+    capabilities: ['basketball', 'wrestling', 'volleyball', 'shot-clock', 'scoreboard', 'timer', 'media'],
     displayProfile: state.displayProfile,
     pairingCode: pairingCode?.code,
     pairingCodeExpiresAt: pairingCode?.expiresAt,
@@ -270,6 +271,10 @@ function resolveIncomingTimerState(
   }
 
   return rebaseTimerStateToLocalClock(incomingTimerState);
+}
+
+function isSportMode(mode: string): mode is 'basketball' | 'wrestling' | 'volleyball' {
+  return mode === 'basketball' || mode === 'wrestling' || mode === 'volleyball';
 }
 
 export function startPairingReconciliation(identity: DeviceIdentity, config: AgentConfig): () => void {

@@ -107,14 +107,20 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
           );
         }
 
+        const displayMode: DeviceMode = payload?.mode || { type: 'basketball' };
         const timerState = await resolveTimerCommandState(deviceId, rawTimerState);
+        const modeAck = await emitDeviceCommand(deviceNamespace, room, 'mode:set', displayMode);
+        if (!modeAck.success) {
+          return commandAckError(modeAck);
+        }
+
         const ack = await emitDeviceCommand(deviceNamespace, room, 'state:update', timerState);
         if (!ack.success) {
           return commandAckError(ack);
         }
 
         const displayState = {
-          mode: 'shot-clock',
+          mode: displayMode.type,
           timerState,
           mediaAssetId: null,
         };
