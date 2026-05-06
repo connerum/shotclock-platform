@@ -107,7 +107,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
           );
         }
 
-        const timerState = rebaseTimerStateToLocalClock(rawTimerState);
+        const timerState = await resolveTimerCommandState(deviceId, rawTimerState);
         const ack = await emitDeviceCommand(deviceNamespace, room, 'state:update', timerState);
         if (!ack.success) {
           return commandAckError(ack);
@@ -323,9 +323,66 @@ async function resetDeviceRecordAfterFactoryReset(deviceId: string): Promise<voi
   });
 }
 
+async function resolveTimerCommandState(deviceId: string, incomingState: TimerState): Promise<TimerState> {
+  if (incomingState.mode !== 'pause' && !incomingState.isPaused) {
+    return rebaseTimerStateToLocalClock(incomingState);
+  }
+
+  const previousState = await loadPersistedTimerState(deviceId);
+  if (!previousState?.isRunning) {
+    return rebaseTimerStateToLocalClock(incomingState);
+  }
+
+  const pausedState = pauseTimerState(previousState);
+  return rebaseTimerStateToLocalClock({
+    ...pausedState,
+    homeScore: incomingState.homeScore,
+    awayScore: incomingState.awayScore,
+    period: incomingState.period ?? pausedState.period,
+  });
+}
+
+async function loadPersistedTimerState(deviceId: string): Promise<TimerState | null> {
+  try {
+    const state = await prisma.displayState.findUnique({
+      where: { deviceId },
+      select: { timerState: true },
+    });
+
+    return state?.timerState ? JSON.parse(state.timerState) as TimerState : null;
+  } catch (error) {
+    console.warn(`Unable to load persisted timer state for ${deviceId}`, error);
+    return null;
+  }
+}
+
 function rebaseTimerStateToLocalClock(state: TimerState, now = Date.now()): TimerState {
   return {
     ...state,
     lastUpdated: now,
+  };
+}
+
+function pauseTimerState(state: TimerState, now = Date.now()): TimerState {
+  const projected = projectTimerState(state, now);
+
+  return {
+    ...projected,
+    mode: 'pause',
+    isRunning: false,
+    isPaused: true,
+    lastUpdated: now,
+  };
+}
+
+function projectTimerState(state: TimerState, now = Date.now()): TimerState {
+  if (!state.isRunning) return state;
+
+  const elapsedSeconds = Math.max(0, Math.floor((now - state.lastUpdated) / 1000));
+
+  return {
+    ...state,
+    shotClock: Math.max(0, state.shotClock - elapsedSeconds),
+    gameClock: Math.max(0, state.gameClock - elapsedSeconds),
   };
 }

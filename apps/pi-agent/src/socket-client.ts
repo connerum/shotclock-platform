@@ -4,7 +4,7 @@ import { io, Socket } from 'socket.io-client';
 import type { DeviceIdentity } from './identity.js';
 import type { AgentConfig } from './config-store.js';
 import type { ServerToDeviceEvents, HelloPayload, HeartbeatPayload, PairingResponse, DeviceCommandAck } from '@shotclock/shared/types';
-import { rebaseTimerStateToLocalClock } from '@shotclock/shared/timer';
+import { pauseTimerState, rebaseTimerStateToLocalClock } from '@shotclock/shared/timer';
 import { loadIdentity, markAsPaired, isPaired } from './identity.js';
 import { loadState, saveState, setConfigPreview } from './state-store.js';
 import { saveConfig } from './config-store.js';
@@ -84,7 +84,9 @@ export function setupSocketClient(
   socket.on('state:update', (state, ack) => {
     console.log('Received state update');
     try {
-      saveState({ mode: { type: 'shot-clock' }, timerState: rebaseTimerStateToLocalClock(state) });
+      const currentState = loadState();
+      const timerState = resolveIncomingTimerState(currentState.timerState, state);
+      saveState({ mode: { type: 'shot-clock' }, timerState });
       acknowledge(ack, { success: true });
       sendStateAck(true);
     } catch (error) {
@@ -251,6 +253,23 @@ export function reconnectSocketClient(): void {
   manager.reconnection?.(true);
   manager.reconnectionAttempts?.(Infinity);
   socket.connect();
+}
+
+function resolveIncomingTimerState(
+  currentTimerState: ReturnType<typeof loadState>['timerState'],
+  incomingTimerState: Parameters<typeof rebaseTimerStateToLocalClock>[0]
+) {
+  if ((incomingTimerState.mode === 'pause' || incomingTimerState.isPaused) && currentTimerState?.isRunning) {
+    const pausedState = pauseTimerState(currentTimerState);
+    return rebaseTimerStateToLocalClock({
+      ...pausedState,
+      homeScore: incomingTimerState.homeScore,
+      awayScore: incomingTimerState.awayScore,
+      period: incomingTimerState.period ?? pausedState.period,
+    });
+  }
+
+  return rebaseTimerStateToLocalClock(incomingTimerState);
 }
 
 export function startPairingReconciliation(identity: DeviceIdentity, config: AgentConfig): () => void {
