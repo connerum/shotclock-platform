@@ -7,6 +7,7 @@ import { loadConfig, saveConfig } from './config-store.js';
 import { isPaired, loadIdentity, markAsPaired } from './identity.js';
 import { saveState } from './state-store.js';
 import { registerPairingCodeWithServer } from './pairing-registration.js';
+import { reconnectSocketClient } from './socket-client.js';
 
 interface SetupState {
   step: 'initial' | 'ap_created' | 'network_selected' | 'network_connected' | 'complete';
@@ -302,6 +303,7 @@ async function connectToWifiFromPortal(ssid: string, password?: string): Promise
     if (identity && !paired) {
       void registerPairingCodeWithServer(identity, loadConfig());
     }
+    setTimeout(() => reconnectSocketClient(), 1000);
     stopCaptivePortal();
     return;
   }

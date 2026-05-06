@@ -25,7 +25,6 @@ interface DeviceToDeviceEvents {
 
 let socket: TypedSocket | null = null;
 let reconnectAttempts = 0;
-const MAX_RECONNECT_ATTEMPTS = 10;
 
 export function setupSocketClient(
   identity: DeviceIdentity,
@@ -40,7 +39,7 @@ export function setupSocketClient(
     path: '/socket.io',
     transports: ['websocket'],
     reconnection: true,
-    reconnectionAttempts: MAX_RECONNECT_ATTEMPTS,
+    reconnectionAttempts: Infinity,
     reconnectionDelay: 1000,
     reconnectionDelayMax: 5000,
     timeout: 10000,
@@ -228,6 +227,29 @@ function sendHello(identity: DeviceIdentity): void {
   };
   
   socket.emit('device:hello', hello);
+}
+
+export function reconnectSocketClient(): void {
+  if (!socket) return;
+
+  const identity = loadIdentity();
+  if (!identity) {
+    console.warn('Cannot reconnect socket: no identity found');
+    return;
+  }
+
+  if (socket.connected) {
+    console.log('Socket already connected; refreshing device hello');
+    sendHello(identity);
+    sendHeartbeat(identity);
+    return;
+  }
+
+  console.log('Forcing Socket.IO reconnect after network setup');
+  const manager = socket.io as any;
+  manager.reconnection?.(true);
+  manager.reconnectionAttempts?.(Infinity);
+  socket.connect();
 }
 
 export function startPairingReconciliation(identity: DeviceIdentity, config: AgentConfig): () => void {
