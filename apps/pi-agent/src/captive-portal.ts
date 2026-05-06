@@ -158,42 +158,290 @@ export async function startCaptivePortal(config: Partial<CaptivePortalConfig> = 
   <title>Shotclock Setup</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <style>
-    body { font-family: Arial, sans-serif; max-width: 500px; margin: 50px auto; padding: 20px; background: #000; color: #fff; }
-    h1 { color: #00ff00; }
-    .status { background: #222; padding: 15px; border-radius: 8px; margin: 10px 0; }
-    .btn { background: #00ff00; color: #000; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; margin: 5px; }
-    .btn:hover { background: #00cc00; }
-    input { background: #333; color: #fff; border: 1px solid #444; padding: 10px; border-radius: 5px; width: 100%; margin: 5px 0; }
-    label { display: block; color: #aaa; margin-top: 12px; font-size: 12px; text-transform: uppercase; letter-spacing: .08em; }
-    .network { background: #222; padding: 10px; margin: 5px 0; border-radius: 5px; cursor: pointer; }
-    .network:hover { background: #333; }
-    .info { background: #111; border: 1px solid #00ff00; padding: 15px; border-radius: 8px; margin: 10px 0; text-align: center; }
-    .hint { color: #aaa; font-size: 14px; line-height: 1.4; }
-    .error { color: #ff7777; }
+    :root {
+      color-scheme: light;
+      --bg: #f6f7f9;
+      --panel: #ffffff;
+      --panel-soft: #f0f4f8;
+      --text: #172033;
+      --muted: #667085;
+      --line: #d9e0ea;
+      --brand: #245581;
+      --brand-strong: #173f63;
+      --accent: #b34039;
+      --success: #16803d;
+      --shadow: 0 18px 48px rgba(23, 32, 51, 0.12);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      min-height: 100vh;
+      margin: 0;
+      padding: 24px;
+      background:
+        radial-gradient(circle at top left, rgba(36, 85, 129, 0.12), transparent 28rem),
+        linear-gradient(180deg, #ffffff 0%, var(--bg) 52%, #eef2f6 100%);
+      color: var(--text);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    main {
+      width: min(100%, 620px);
+      margin: 0 auto;
+    }
+
+    .shell {
+      overflow: hidden;
+      border: 1px solid rgba(217, 224, 234, 0.9);
+      border-radius: 24px;
+      background: rgba(255, 255, 255, 0.94);
+      box-shadow: var(--shadow);
+    }
+
+    .hero {
+      padding: 28px 28px 24px;
+      background: linear-gradient(135deg, #245581 0%, #1c496f 62%, #173f63 100%);
+      color: #ffffff;
+    }
+
+    .eyebrow {
+      margin: 0 0 8px;
+      color: rgba(255, 255, 255, 0.72);
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(30px, 8vw, 44px);
+      line-height: 1;
+      letter-spacing: 0;
+    }
+
+    h2 {
+      margin: 0 0 10px;
+      color: var(--text);
+      font-size: 21px;
+      line-height: 1.15;
+      letter-spacing: 0;
+    }
+
+    .hero-copy {
+      max-width: 38rem;
+      margin: 12px 0 0;
+      color: rgba(255, 255, 255, 0.82);
+      font-size: 15px;
+      line-height: 1.45;
+    }
+
+    .content {
+      display: grid;
+      gap: 16px;
+      padding: 18px;
+    }
+
+    .status,
+    .info,
+    #networks {
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      background: var(--panel);
+    }
+
+    .status,
+    .info {
+      padding: 18px;
+    }
+
+    .info {
+      display: grid;
+      gap: 12px;
+      background: var(--panel-soft);
+    }
+
+    .info-row {
+      display: grid;
+      gap: 4px;
+    }
+
+    .kicker,
+    label {
+      display: block;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .value {
+      overflow-wrap: anywhere;
+      color: var(--text);
+      font-size: 20px;
+      font-weight: 800;
+      line-height: 1.15;
+    }
+
+    .password {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    }
+
+    #status {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 14px 18px;
+    }
+
+    #status p {
+      margin: 0;
+    }
+
+    #step {
+      display: inline-flex;
+      align-items: center;
+      min-height: 30px;
+      padding: 6px 10px;
+      border-radius: 999px;
+      background: #e9f2fa;
+      color: var(--brand);
+      font-size: 13px;
+      font-weight: 800;
+    }
+
+    .hint {
+      margin: 0 0 14px;
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.5;
+    }
+
+    .error { color: var(--accent); }
+
+    form {
+      display: grid;
+      gap: 12px;
+    }
+
+    input {
+      width: 100%;
+      min-height: 48px;
+      margin-top: 6px;
+      padding: 12px 14px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: #ffffff;
+      color: var(--text);
+      font: inherit;
+      outline: none;
+      transition: border-color 140ms ease, box-shadow 140ms ease;
+    }
+
+    input:focus {
+      border-color: var(--brand);
+      box-shadow: 0 0 0 4px rgba(36, 85, 129, 0.14);
+    }
+
+    .btn {
+      min-height: 50px;
+      margin-top: 4px;
+      border: 0;
+      border-radius: 12px;
+      background: var(--brand);
+      color: #ffffff;
+      cursor: pointer;
+      font: inherit;
+      font-weight: 800;
+      box-shadow: 0 10px 22px rgba(36, 85, 129, 0.22);
+    }
+
+    .btn:hover { background: var(--brand-strong); }
+
+    #message {
+      min-height: 21px;
+      margin: 12px 0 0;
+    }
+
+    #networks {
+      overflow: hidden;
+      background: #ffffff;
+    }
+
+    #networks:empty { display: none; }
+    #networks .hint {
+      margin: 0;
+      padding: 16px;
+    }
+
+    .network {
+      padding: 14px 16px;
+      border-top: 1px solid var(--line);
+      color: var(--text);
+      cursor: pointer;
+      font-weight: 700;
+    }
+
+    .network:first-child { border-top: 0; }
+    .network:hover { background: #f5f8fb; }
+
+    @media (max-width: 520px) {
+      body { padding: 14px; }
+      .hero { padding: 24px 20px; }
+      .content { padding: 14px; }
+      #status {
+        display: grid;
+        align-items: start;
+      }
+    }
   </style>
 </head>
 <body>
-  <h1>Shotclock Setup</h1>
-  <div class="info">
-    <p><strong>Connect to: ${activePortalConfig.apSsid}</strong></p>
-    <p>Password: ${activePortalConfig.apPassword}</p>
-  </div>
-  <div id="status" class="status">
-    <p><strong>Step:</strong> <span id="step">${setupState.step}</span></p>
-  </div>
-  <div class="status">
-    <h2>Connect to WiFi</h2>
-    <p class="hint">Network scanning may be unavailable while this display is broadcasting setup WiFi. Select a network if one appears, or enter the network name manually.</p>
-    <form id="manual-form">
-      <label for="ssid">Network Name</label>
-      <input id="ssid" name="ssid" autocomplete="off" required>
-      <label for="password">Password</label>
-      <input id="password" name="password" type="password" autocomplete="current-password">
-      <button class="btn" type="submit">Connect</button>
-    </form>
-    <p id="message" class="hint"></p>
-  </div>
-  <div id="networks"></div>
+  <main>
+    <section class="shell">
+      <header class="hero">
+        <p class="eyebrow">CourtCast Display</p>
+        <h1>Network Setup</h1>
+        <p class="hero-copy">Connect this sportsboard to the venue WiFi. The setup network will turn off once the display joins your network.</p>
+      </header>
+
+      <div class="content">
+        <div class="info">
+          <div class="info-row">
+            <span class="kicker">Connected Setup Network</span>
+            <span class="value">${activePortalConfig.apSsid}</span>
+          </div>
+          <div class="info-row">
+            <span class="kicker">Setup Password</span>
+            <span class="value password">${activePortalConfig.apPassword}</span>
+          </div>
+        </div>
+
+        <div id="status" class="status">
+          <p><strong>Setup status</strong></p>
+          <span id="step">${setupState.step}</span>
+        </div>
+
+        <div class="status">
+          <h2>Join Venue WiFi</h2>
+          <p class="hint">Network scanning may be unavailable while this display is broadcasting setup WiFi. Select a network if one appears, or enter the network name manually.</p>
+          <form id="manual-form">
+            <label for="ssid">Network Name</label>
+            <input id="ssid" name="ssid" autocomplete="off" required>
+            <label for="password">Password</label>
+            <input id="password" name="password" type="password" autocomplete="current-password">
+            <button class="btn" type="submit">Connect Display</button>
+          </form>
+          <p id="message" class="hint"></p>
+        </div>
+
+        <div id="networks"></div>
+      </div>
+    </section>
+  </main>
   <script>
     const networksEl = document.getElementById('networks');
     const messageEl = document.getElementById('message');
@@ -211,7 +459,7 @@ export async function startCaptivePortal(config: Partial<CaptivePortalConfig> = 
       }
       
       if (data.state.step === 'complete') {
-        document.getElementById('status').innerHTML = '<p style="color:#00ff00">Setup Complete! Restarting...</p>';
+        document.getElementById('status').innerHTML = '<p style="color:#16803d;font-weight:800">Setup complete. Restarting...</p>';
       }
     }
     
