@@ -124,6 +124,8 @@ export interface PresentationOverlay {
   active: boolean;
   startedAt: number;
   durationMs?: number;
+  mediaUrl?: string;
+  mediaMimeType?: string;
 }
 
 export interface NetworkStatus {

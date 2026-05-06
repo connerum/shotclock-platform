@@ -62,6 +62,7 @@ model Device {
   ownerUser    User?         @relation(fields: [ownerUserId], references: [id], onDelete: SetNull)
   updates      DeviceUpdate[]
   state        DisplayState?
+  mediaAssets  DeviceMediaAsset[]
 
   @@index([ownerUserId])
 }
@@ -89,6 +90,25 @@ model MediaAsset {
   updatedAt      DateTime @updatedAt
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+}
+
+model DeviceMediaAsset {
+  id               String   @id @default(uuid())
+  deviceId         String
+  slot             String
+  filename         String
+  originalFilename String
+  url              String
+  mimeType         String
+  size             Int
+  isActive         Boolean  @default(true)
+  sortOrder        Int      @default(0)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  device Device @relation(fields: [deviceId], references: [deviceId], onDelete: Cascade)
+
+  @@index([deviceId, slot])
 }
 
 model FirmwareRelease {

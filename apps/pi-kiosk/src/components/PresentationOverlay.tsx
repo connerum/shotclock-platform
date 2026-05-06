@@ -32,6 +32,9 @@ export default function PresentationOverlay({ overlay }: PresentationOverlayProp
   if (!overlay?.active) return null;
 
   const isEmergency = overlay.type === 'emergency-weather' || overlay.type === 'emergency-medical';
+  const isImage = overlay.mediaMimeType?.startsWith('image/');
+  const isVideo = overlay.mediaMimeType?.startsWith('video/');
+  const isAudio = overlay.mediaMimeType?.startsWith('audio/');
   const accentClass = ACCENT_CLASSES[overlay.accent];
   const backgroundClass = BACKGROUND_CLASSES[overlay.accent];
 
@@ -46,6 +49,24 @@ export default function PresentationOverlay({ overlay }: PresentationOverlayProp
           <div className="animate-pulse text-[min(9cqh,6cqw)] font-black leading-none tracking-normal text-red-300">
             EMERGENCY
           </div>
+        )}
+        {overlay.mediaUrl && isImage && (
+          <img
+            src={overlay.mediaUrl}
+            alt=""
+            className="mx-auto max-h-[min(42cqh,44cqw)] max-w-full object-contain"
+          />
+        )}
+        {overlay.mediaUrl && isVideo && (
+          <video
+            src={overlay.mediaUrl}
+            autoPlay
+            playsInline
+            className="mx-auto max-h-[min(42cqh,44cqw)] max-w-full object-contain"
+          />
+        )}
+        {overlay.mediaUrl && isAudio && (
+          <audio src={overlay.mediaUrl} autoPlay loop={overlay.type === 'music'} />
         )}
         <div className="text-[min(22cqh,13cqw)] font-black uppercase leading-[0.9] tracking-normal">
           {overlay.title}

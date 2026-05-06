@@ -22,7 +22,63 @@ interface Device {
   calibrationData?: Partial<CalibrationData> | null;
 }
 
+type MediaSlot = 'ads' | 'logo' | 'sponsor' | 'team-intro' | 'music';
+
+interface DeviceMediaAsset {
+  id: string;
+  slot: MediaSlot;
+  originalFilename: string;
+  url: string;
+  mimeType: string;
+  size: number;
+  isActive: boolean;
+  createdAt: string;
+}
+
 const DEVICE_MODES = ['setup', 'pairing', 'offline', 'basketball', 'wrestling', 'volleyball', 'media', 'calibration', 'blank'];
+const MEDIA_SLOT_CONFIG: Array<{
+  slot: MediaSlot;
+  title: string;
+  description: string;
+  accept: string;
+  allowMultipleActive: boolean;
+}> = [
+  {
+    slot: 'ads',
+    title: 'Ads',
+    description: 'Images or videos shown by the Run Ads button.',
+    accept: 'image/*,video/*',
+    allowMultipleActive: true,
+  },
+  {
+    slot: 'logo',
+    title: 'Logo',
+    description: 'School logo shown by the School Logo button.',
+    accept: 'image/*,video/*',
+    allowMultipleActive: false,
+  },
+  {
+    slot: 'sponsor',
+    title: 'Sponsor',
+    description: 'Sponsor creative shown by the Sponsor button.',
+    accept: 'image/*,video/*',
+    allowMultipleActive: false,
+  },
+  {
+    slot: 'team-intro',
+    title: 'Team Intro',
+    description: 'Video or audio shown by the Team Intro button.',
+    accept: 'video/*,audio/*',
+    allowMultipleActive: false,
+  },
+  {
+    slot: 'music',
+    title: 'Music',
+    description: 'Audio played by the Music button.',
+    accept: 'audio/*',
+    allowMultipleActive: false,
+  },
+];
 const CALIBRATION_CANVAS_WIDTH = 1920;
 const CALIBRATION_CANVAS_HEIGHT = 1080;
 const MIN_CALIBRATION_SIZE = 24;
@@ -43,6 +99,14 @@ type CalibrationInteraction =
 
 function clamp(value: number, min: number, max: number) {
   return Math.max(min, Math.min(max, value));
+}
+
+function formatBytes(bytes: number) {
+  if (!Number.isFinite(bytes) || bytes <= 0) return '0 B';
+  const units = ['B', 'KB', 'MB', 'GB'];
+  const unitIndex = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
+  const value = bytes / 1024 ** unitIndex;
+  return `${value.toFixed(value >= 10 || unitIndex === 0 ? 0 : 1)} ${units[unitIndex]}`;
 }
 
 function clampCalibrationBox(box: CalibrationBox): CalibrationBox {
@@ -71,6 +135,10 @@ export default function DeviceDetailPage({ params }: { params: { deviceId: strin
   const [commandError, setCommandError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [factoryResetting, setFactoryResetting] = useState(false);
+  const [mediaAssets, setMediaAssets] = useState<DeviceMediaAsset[]>([]);
+  const [mediaLoading, setMediaLoading] = useState(true);
+  const [mediaError, setMediaError] = useState<string | null>(null);
+  const [uploadingSlot, setUploadingSlot] = useState<MediaSlot | null>(null);
   
   // Calibration state
   const calibrationStageRef = useRef<HTMLDivElement | null>(null);
@@ -93,6 +161,7 @@ export default function DeviceDetailPage({ params }: { params: { deviceId: strin
 
   useEffect(() => {
     fetchDevice();
+    fetchMediaAssets();
   }, [deviceId]);
 
   useEffect(() => {
@@ -128,6 +197,21 @@ export default function DeviceDetailPage({ params }: { params: { deviceId: strin
       console.error(err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchMediaAssets = async () => {
+    try {
+      setMediaLoading(true);
+      const res = await fetch(`/api/devices/${deviceId}/media`);
+      if (!res.ok) throw new Error('Failed to load media');
+      const data = await res.json();
+      setMediaAssets(data.mediaAssets || []);
+      setMediaError(null);
+    } catch (err) {
+      setMediaError(err instanceof Error ? err.message : 'Failed to load media');
+    } finally {
+      setMediaLoading(false);
     }
   };
 
@@ -424,6 +508,63 @@ export default function DeviceDetailPage({ params }: { params: { deviceId: strin
     setFactoryResetting(false);
   };
 
+  const uploadMediaAsset = async (slot: MediaSlot, file: File | null) => {
+    if (!file) return;
+
+    setUploadingSlot(slot);
+    setMediaError(null);
+    try {
+      const formData = new FormData();
+      formData.append('slot', slot);
+      formData.append('file', file);
+
+      const res = await fetch(`/api/devices/${deviceId}/media`, {
+        method: 'POST',
+        body: formData,
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error || `Upload failed with HTTP ${res.status}`);
+      await fetchMediaAssets();
+    } catch (err) {
+      setMediaError(err instanceof Error ? err.message : 'Upload failed');
+    } finally {
+      setUploadingSlot(null);
+    }
+  };
+
+  const setMediaAssetActive = async (asset: DeviceMediaAsset, isActive: boolean) => {
+    setMediaError(null);
+    try {
+      const res = await fetch(`/api/devices/${deviceId}/media/${asset.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ isActive }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error || `Update failed with HTTP ${res.status}`);
+      await fetchMediaAssets();
+    } catch (err) {
+      setMediaError(err instanceof Error ? err.message : 'Update failed');
+    }
+  };
+
+  const deleteMediaAsset = async (asset: DeviceMediaAsset) => {
+    const confirmed = window.confirm(`Delete ${asset.originalFilename}?`);
+    if (!confirmed) return;
+
+    setMediaError(null);
+    try {
+      const res = await fetch(`/api/devices/${deviceId}/media/${asset.id}`, {
+        method: 'DELETE',
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error || `Delete failed with HTTP ${res.status}`);
+      await fetchMediaAssets();
+    } catch (err) {
+      setMediaError(err instanceof Error ? err.message : 'Delete failed');
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -517,6 +658,122 @@ export default function DeviceDetailPage({ params }: { params: { deviceId: strin
               <span className="text-gray-400">Controller Type</span>
               <span>{device.controllerType || 'generic'}</span>
             </div>
+          </div>
+        </div>
+
+        {/* Media Management */}
+        <div className="rounded-lg bg-gray-900 p-6 lg:col-span-2">
+          <div className="mb-5 flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
+            <div>
+              <h2 className="text-xl font-semibold">Presentation Media</h2>
+              <p className="mt-1 text-sm text-gray-400">
+                Upload the media used by the Ads, Logo, Sponsor, Team Intro, and Music buttons.
+              </p>
+            </div>
+            <button
+              onClick={fetchMediaAssets}
+              disabled={mediaLoading}
+              className="rounded bg-gray-800 px-4 py-2 text-sm font-medium hover:bg-gray-700 disabled:opacity-50"
+            >
+              Refresh
+            </button>
+          </div>
+
+          <div className="mb-4 rounded border border-blue-900/60 bg-blue-950/30 p-3 text-sm text-blue-100/90">
+            Files are stored on disk under the server&apos;s public media folder. SQLite stores metadata, device ownership,
+            active status, and which button slot each file belongs to.
+          </div>
+
+          {mediaError && (
+            <div className="mb-4 rounded border border-red-700 bg-red-950/60 p-3 text-sm text-red-200">
+              {mediaError}
+            </div>
+          )}
+
+          <div className="grid grid-cols-1 gap-4 xl:grid-cols-5">
+            {MEDIA_SLOT_CONFIG.map((slotConfig) => {
+              const slotAssets = mediaAssets.filter((asset) => asset.slot === slotConfig.slot);
+              const activeCount = slotAssets.filter((asset) => asset.isActive).length;
+
+              return (
+                <div key={slotConfig.slot} className="rounded-lg border border-gray-800 bg-gray-950/70 p-4">
+                  <div className="mb-3">
+                    <h3 className="font-semibold">{slotConfig.title}</h3>
+                    <p className="mt-1 min-h-10 text-xs text-gray-400">{slotConfig.description}</p>
+                  </div>
+
+                  <label className="block cursor-pointer rounded border border-dashed border-gray-700 bg-gray-900 px-3 py-3 text-center text-sm font-medium text-gray-200 hover:border-gray-500 hover:bg-gray-800">
+                    {uploadingSlot === slotConfig.slot ? 'Uploading...' : 'Upload'}
+                    <input
+                      type="file"
+                      accept={slotConfig.accept}
+                      disabled={uploadingSlot !== null}
+                      className="hidden"
+                      onChange={(event) => {
+                        void uploadMediaAsset(slotConfig.slot, event.currentTarget.files?.[0] || null);
+                        event.currentTarget.value = '';
+                      }}
+                    />
+                  </label>
+
+                  <div className="mt-3 text-xs text-gray-500">
+                    {activeCount} active / {slotAssets.length} total
+                  </div>
+
+                  <div className="mt-3 space-y-2">
+                    {slotAssets.length === 0 && (
+                      <div className="rounded bg-gray-900 p-3 text-xs text-gray-500">No media uploaded</div>
+                    )}
+                    {slotAssets.map((asset) => (
+                      <div key={asset.id} className="rounded border border-gray-800 bg-black/30 p-3">
+                        <div className="truncate text-sm font-medium" title={asset.originalFilename}>
+                          {asset.originalFilename}
+                        </div>
+                        <div className="mt-1 text-xs text-gray-500">
+                          {asset.mimeType} / {formatBytes(asset.size)}
+                        </div>
+                        <div className="mt-2 flex flex-wrap gap-2">
+                          <a
+                            href={asset.url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="rounded bg-gray-800 px-2 py-1 text-xs hover:bg-gray-700"
+                          >
+                            Preview
+                          </a>
+                          {slotConfig.allowMultipleActive ? (
+                            <button
+                              onClick={() => setMediaAssetActive(asset, !asset.isActive)}
+                              className={`rounded px-2 py-1 text-xs ${
+                                asset.isActive ? 'bg-green-900 text-green-300' : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
+                              }`}
+                            >
+                              {asset.isActive ? 'Active' : 'Enable'}
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => setMediaAssetActive(asset, true)}
+                              disabled={asset.isActive}
+                              className={`rounded px-2 py-1 text-xs disabled:cursor-default ${
+                                asset.isActive ? 'bg-green-900 text-green-300' : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
+                              }`}
+                            >
+                              {asset.isActive ? 'Selected' : 'Use'}
+                            </button>
+                          )}
+                          <button
+                            onClick={() => deleteMediaAsset(asset)}
+                            className="rounded bg-red-950 px-2 py-1 text-xs text-red-200 hover:bg-red-900"
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
 

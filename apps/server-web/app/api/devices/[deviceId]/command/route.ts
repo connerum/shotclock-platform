@@ -348,6 +348,12 @@ function normalizePresentationOverlay(raw: unknown): PresentationOverlay | null 
     active: overlay.type === 'clear' ? false : overlay.active !== false,
     startedAt: Date.now(),
     ...(durationMs ? { durationMs } : {}),
+    ...(typeof overlay.mediaUrl === 'string' && overlay.mediaUrl.trim()
+      ? { mediaUrl: overlay.mediaUrl.trim().slice(0, 512) }
+      : {}),
+    ...(typeof overlay.mediaMimeType === 'string' && overlay.mediaMimeType.trim()
+      ? { mediaMimeType: overlay.mediaMimeType.trim().slice(0, 80) }
+      : {}),
   };
 }
 

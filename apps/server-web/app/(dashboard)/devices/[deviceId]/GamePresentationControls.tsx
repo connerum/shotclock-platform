@@ -1,7 +1,18 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { PresentationOverlay, PresentationOverlayAccent, PresentationOverlayType } from '@shotclock/shared/types';
+
+type MediaSlot = 'ads' | 'logo' | 'sponsor' | 'team-intro' | 'music';
+
+type DeviceMediaAsset = {
+  id: string;
+  slot: MediaSlot;
+  originalFilename: string;
+  url: string;
+  mimeType: string;
+  isActive: boolean;
+};
 
 type PresentationAction = {
   label: string;
@@ -132,8 +143,32 @@ export default function GamePresentationControls({ deviceId }: { deviceId: strin
   const [pendingType, setPendingType] = useState<PresentationOverlayType | null>(null);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [mediaAssets, setMediaAssets] = useState<DeviceMediaAsset[]>([]);
+
+  useEffect(() => {
+    const fetchMediaAssets = async () => {
+      try {
+        const response = await fetch(`/api/devices/${deviceId}/media`);
+        if (!response.ok) return;
+        const data = await response.json();
+        setMediaAssets(data.mediaAssets || []);
+      } catch {
+        setMediaAssets([]);
+      }
+    };
+
+    void fetchMediaAssets();
+  }, [deviceId]);
+
+  const activeMediaBySlot = useMemo(() => {
+    return mediaAssets.reduce<Record<MediaSlot, DeviceMediaAsset[]>>((acc, asset) => {
+      if (asset.isActive) acc[asset.slot].push(asset);
+      return acc;
+    }, { ads: [], logo: [], sponsor: [], 'team-intro': [], music: [] });
+  }, [mediaAssets]);
 
   const sendPresentation = async (action: PresentationAction) => {
+    const mediaAsset = getMediaAssetForAction(action.type, activeMediaBySlot);
     const overlay: PresentationOverlay = {
       type: action.type,
       title: action.title,
@@ -142,6 +177,10 @@ export default function GamePresentationControls({ deviceId }: { deviceId: strin
       active: true,
       startedAt: Date.now(),
       durationMs: action.durationMs,
+      ...(mediaAsset && {
+        mediaUrl: getPublicMediaUrl(mediaAsset.url),
+        mediaMimeType: mediaAsset.mimeType,
+      }),
     };
 
     await sendOverlayCommand(overlay, action.label);
@@ -240,4 +279,36 @@ export default function GamePresentationControls({ deviceId }: { deviceId: strin
       </div>
     </section>
   );
+}
+
+function getMediaAssetForAction(
+  type: PresentationOverlayType,
+  assetsBySlot: Record<MediaSlot, DeviceMediaAsset[]>
+) {
+  const slot = getSlotForPresentationType(type);
+  if (!slot) return null;
+
+  const assets = assetsBySlot[slot];
+  if (assets.length === 0) return null;
+
+  if (slot === 'ads') {
+    return assets[Math.floor(Date.now() / 1000) % assets.length];
+  }
+
+  return assets[0];
+}
+
+function getSlotForPresentationType(type: PresentationOverlayType): MediaSlot | null {
+  if (type === 'advertisement') return 'ads';
+  if (type === 'school-logo') return 'logo';
+  if (type === 'sponsor') return 'sponsor';
+  if (type === 'team-intro') return 'team-intro';
+  if (type === 'music') return 'music';
+  return null;
+}
+
+function getPublicMediaUrl(url: string) {
+  if (url.startsWith('http://') || url.startsWith('https://')) return url;
+  if (typeof window === 'undefined') return url;
+  return `${window.location.origin}${url}`;
 }
