@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import type { ReactNode } from 'react';
 import Link from 'next/link';
 import { TimerState } from '@shotclock/shared/types';
 import {
@@ -116,6 +117,12 @@ export default function BasketballPage({ params }: { params: { deviceId: string 
   const projectedTimerState = projectTimerState(buildCurrentTimerState(), timerNow);
   const displayedShotClock = projectedTimerState.shotClock;
   const displayedGameClock = projectedTimerState.gameClock;
+  const shotClockStatus = timerRunning ? 'Running' : 'Stopped';
+  const shotClockTone = displayedShotClock === 0
+    ? 'text-red-400 drop-shadow-[0_0_32px_rgba(239,68,68,0.45)]'
+    : displayedShotClock <= 5
+      ? 'text-orange-300 drop-shadow-[0_0_32px_rgba(249,115,22,0.35)]'
+      : 'text-white drop-shadow-[0_0_32px_rgba(255,255,255,0.12)]';
 
   const updateShotClock = (value: number) => {
     const now = Date.now();
@@ -129,6 +136,10 @@ export default function BasketballPage({ params }: { params: { deviceId: string 
     setGameClock(clampSeconds(value, 0, 3600));
     setTimerLastUpdated(now);
     setTimerNow(now);
+  };
+
+  const updatePeriod = (value: number) => {
+    setPeriod(Math.max(1, Math.min(10, value)));
   };
 
   const startTimer = async () => {
@@ -218,103 +229,124 @@ export default function BasketballPage({ params }: { params: { deviceId: string 
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <div className="bg-gray-900 rounded-lg p-6">
-          <h2 className="mb-4 text-xl font-semibold">Timer Controls</h2>
+      <section className="cc-card mb-6 p-8 text-center md:p-10">
+        <div className="text-xs font-bold uppercase tracking-[0.22em] text-gray-500">Shot Clock</div>
+        <div className={`mt-4 font-mono text-8xl font-black leading-none tabular-nums md:text-[8rem] ${shotClockTone}`}>
+          {displayedShotClock}
+        </div>
+        <div className="mt-6 flex items-center justify-center gap-3 text-sm font-semibold text-gray-300">
+          <span className={`h-3 w-3 rounded-full ${
+            timerRunning ? 'bg-green-400 shadow-[0_0_14px_rgba(34,197,94,0.7)]' : 'bg-gray-600'
+          }`} />
+          <span>{shotClockStatus}</span>
+          <span className="text-gray-600">/</span>
+          <span>Game {formatGameClock(displayedGameClock)}</span>
+          <span className="text-gray-600">/</span>
+          <span>Period {period}</span>
+        </div>
+      </section>
 
-          <div className="mb-4">
-            <label className="mb-2 block text-sm text-gray-400">Shot Clock (seconds)</label>
-            <div className="flex items-center space-x-3">
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
+        <ControlCard title="Timer Control" icon="PLAY" accentClass="bg-blue-500/15 text-blue-300">
+          <button
+            onClick={timerRunning ? pauseTimer : startTimer}
+            className={`cc-btn w-full px-5 py-4 text-base ${timerRunning ? 'cc-btn-orange' : 'cc-btn-primary'}`}
+          >
+            {timerRunning ? 'Pause Clock' : 'Start Clock'}
+          </button>
+          <button onClick={resetTimer} className="cc-btn cc-btn-red mt-3 w-full px-5 py-4 text-base">
+            Reset Game
+          </button>
+        </ControlCard>
+
+        <ControlCard title="Time Settings" icon="TIME" accentClass="bg-purple-500/15 text-purple-300">
+          <div className="grid grid-cols-2 gap-3">
+            <button
+              onClick={() => updateShotClock(24)}
+              disabled={timerRunning}
+              className="cc-btn cc-btn-blue px-4 py-3 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Reset 24s
+            </button>
+            <button
+              onClick={() => updateShotClock(14)}
+              disabled={timerRunning}
+              className="cc-btn cc-btn-blue px-4 py-3 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Reset 14s
+            </button>
+          </div>
+
+          <div className="mt-4 rounded-xl border border-white/10 bg-white/[0.04] p-4">
+            <label className="mb-2 block text-xs font-bold uppercase tracking-[0.16em] text-gray-500">
+              Custom Shot Clock
+            </label>
+            <div className="flex items-center gap-3">
               <button
                 onClick={() => updateShotClock(displayedShotClock - 1)}
                 disabled={timerRunning}
-                className="rounded bg-gray-800 px-3 py-1 hover:bg-gray-700 disabled:opacity-50"
+                className="rounded-lg bg-white/10 px-4 py-2 text-xl font-black hover:bg-white/15 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 -
-              </button>
-              <span className="w-16 text-center font-mono text-3xl">{displayedShotClock}</span>
-              <button
-                onClick={() => updateShotClock(displayedShotClock + 1)}
-                disabled={timerRunning}
-                className="rounded bg-gray-800 px-3 py-1 hover:bg-gray-700 disabled:opacity-50"
-              >
-                +
               </button>
               <input
                 type="number"
                 value={displayedShotClock}
                 onChange={(e) => updateShotClock(parseInt(e.target.value, 10) || 0)}
                 disabled={timerRunning}
-                className="w-20 rounded bg-gray-800 px-2 py-1 text-center font-mono disabled:opacity-50"
+                className="min-w-0 flex-1 rounded-lg px-3 py-2 text-center font-mono text-2xl font-black disabled:opacity-50"
               />
-            </div>
-          </div>
-
-          <div className="mb-4">
-            <label className="mb-2 block text-sm text-gray-400">Game Clock (seconds)</label>
-            <div className="flex items-center space-x-3">
               <button
-                onClick={() => updateGameClock(displayedGameClock - 30)}
+                onClick={() => updateShotClock(displayedShotClock + 1)}
                 disabled={timerRunning}
-                className="rounded bg-gray-800 px-3 py-1 hover:bg-gray-700 disabled:opacity-50"
-              >
-                -30
-              </button>
-              <span className="w-24 text-center font-mono text-3xl">
-                {Math.floor(displayedGameClock / 60)}:{String(displayedGameClock % 60).padStart(2, '0')}
-              </span>
-              <button
-                onClick={() => updateGameClock(displayedGameClock + 30)}
-                disabled={timerRunning}
-                className="rounded bg-gray-800 px-3 py-1 hover:bg-gray-700 disabled:opacity-50"
-              >
-                +30
-              </button>
-            </div>
-          </div>
-
-          <div className="mb-4">
-            <label className="mb-2 block text-sm text-gray-400">Period</label>
-            <div className="flex items-center space-x-3">
-              <button
-                onClick={() => setPeriod(Math.max(1, period - 1))}
-                className="rounded bg-gray-800 px-3 py-1 hover:bg-gray-700"
-              >
-                -
-              </button>
-              <span className="w-12 text-center text-2xl">{period}</span>
-              <button
-                onClick={() => setPeriod(Math.min(10, period + 1))}
-                className="rounded bg-gray-800 px-3 py-1 hover:bg-gray-700"
+                className="rounded-lg bg-white/10 px-4 py-2 text-xl font-black hover:bg-white/15 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 +
               </button>
             </div>
           </div>
 
-          <div className="flex space-x-2 pt-2">
-            {!timerRunning ? (
-              <button onClick={startTimer} className="flex-1 rounded bg-green-600 py-3 font-medium hover:bg-green-700">
-                Start
-              </button>
-            ) : (
-              <button onClick={pauseTimer} className="flex-1 rounded bg-yellow-600 py-3 font-medium hover:bg-yellow-700">
-                Pause
-              </button>
-            )}
-            <button onClick={resetTimer} className="flex-1 rounded bg-red-600 py-3 font-medium hover:bg-red-700">
-              Reset
+          <div className="mt-4 grid grid-cols-[auto_1fr_auto] items-center gap-3 rounded-xl border border-white/10 bg-white/[0.04] p-4">
+            <button
+              onClick={() => updateGameClock(displayedGameClock - 30)}
+              disabled={timerRunning}
+              className="rounded-lg bg-white/10 px-3 py-2 font-bold hover:bg-white/15 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              -30
+            </button>
+            <div className="text-center">
+              <div className="text-xs font-bold uppercase tracking-[0.16em] text-gray-500">Game Clock</div>
+              <div className="mt-1 font-mono text-2xl font-black">{formatGameClock(displayedGameClock)}</div>
+            </div>
+            <button
+              onClick={() => updateGameClock(displayedGameClock + 30)}
+              disabled={timerRunning}
+              className="rounded-lg bg-white/10 px-3 py-2 font-bold hover:bg-white/15 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              +30
             </button>
           </div>
-        </div>
 
-        <div className="bg-gray-900 rounded-lg p-6">
-          <h2 className="mb-4 text-xl font-semibold">Score</h2>
-          <div className="grid grid-cols-2 gap-8">
-            <ScoreControl label="Home" value={homeScore} onChange={setHomeScore} />
-            <ScoreControl label="Away" value={awayScore} onChange={setAwayScore} />
+          <div className="mt-4 flex items-center justify-between rounded-xl border border-white/10 bg-white/[0.04] p-4">
+            <span className="text-xs font-bold uppercase tracking-[0.16em] text-gray-500">Period</span>
+            <div className="flex items-center gap-3">
+              <button onClick={() => updatePeriod(period - 1)} className="rounded-lg bg-white/10 px-3 py-1 font-bold hover:bg-white/15">
+                -
+              </button>
+              <span className="w-10 text-center text-2xl font-black">{period}</span>
+              <button onClick={() => updatePeriod(period + 1)} className="rounded-lg bg-white/10 px-3 py-1 font-bold hover:bg-white/15">
+                +
+              </button>
+            </div>
           </div>
-        </div>
+        </ControlCard>
+
+        <ControlCard title="Score" icon="PTS" accentClass="bg-green-500/15 text-green-300">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-1">
+            <ScoreControl label="Home" value={homeScore} onChange={setHomeScore} tone="text-red-300" />
+            <ScoreControl label="Away" value={awayScore} onChange={setAwayScore} tone="text-blue-300" />
+          </div>
+        </ControlCard>
       </div>
 
       <GamePresentationControls deviceId={deviceId} />
@@ -322,25 +354,65 @@ export default function BasketballPage({ params }: { params: { deviceId: string 
   );
 }
 
-function ScoreControl({ label, value, onChange }: { label: string; value: number; onChange: (value: number) => void }) {
+function ControlCard({
+  title,
+  icon,
+  accentClass,
+  children,
+}: {
+  title: string;
+  icon: string;
+  accentClass: string;
+  children: ReactNode;
+}) {
   return (
-    <div className="text-center">
-      <p className="mb-3 text-gray-400">{label}</p>
-      <div className="flex items-center justify-center space-x-3">
+    <section className="cc-card cc-card-hover p-6">
+      <div className="mb-5 flex items-center gap-3">
+        <span className={`grid h-9 w-9 place-items-center rounded-lg text-xs font-black ${accentClass}`}>
+          {icon}
+        </span>
+        <h2 className="text-lg font-semibold">{title}</h2>
+      </div>
+      {children}
+    </section>
+  );
+}
+
+function ScoreControl({
+  label,
+  value,
+  onChange,
+  tone,
+}: {
+  label: string;
+  value: number;
+  onChange: (value: number) => void;
+  tone: string;
+}) {
+  return (
+    <div className="rounded-xl border border-white/10 bg-white/[0.04] p-4 text-center">
+      <p className="mb-3 text-xs font-bold uppercase tracking-[0.16em] text-gray-500">{label}</p>
+      <div className="flex items-center justify-center gap-3">
         <button
           onClick={() => onChange(Math.max(0, value - 1))}
-          className="rounded bg-gray-800 px-4 py-2 text-xl hover:bg-gray-700"
+          className="rounded-lg bg-white/10 px-4 py-2 text-xl font-black hover:bg-white/15"
         >
           -
         </button>
-        <span className="w-20 text-center font-mono text-5xl">{value}</span>
+        <span className={`w-20 text-center font-mono text-5xl font-black tabular-nums ${tone}`}>{value}</span>
         <button
           onClick={() => onChange(value + 1)}
-          className="rounded bg-gray-800 px-4 py-2 text-xl hover:bg-gray-700"
+          className="rounded-lg bg-white/10 px-4 py-2 text-xl font-black hover:bg-white/15"
         >
           +
         </button>
       </div>
     </div>
   );
+}
+
+function formatGameClock(seconds: number): string {
+  const mins = Math.floor(seconds / 60);
+  const secs = seconds % 60;
+  return `${mins}:${secs.toString().padStart(2, '0')}`;
 }
