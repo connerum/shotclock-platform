@@ -5,6 +5,14 @@ import type { PointerEvent as ReactPointerEvent } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { DeviceMode, TimerState, DisplayProfile, CalibrationData } from '@shotclock/shared/types';
+import {
+  clampSeconds,
+  createDefaultTimerState,
+  pauseTimerState,
+  projectTimerState,
+  startTimerState,
+  stopTimerState,
+} from '@shotclock/shared/timer';
 
 interface Device {
   id: string;
@@ -79,6 +87,8 @@ export default function DeviceDetailPage({ params }: { params: { deviceId: strin
   const [homeScore, setHomeScore] = useState(0);
   const [awayScore, setAwayScore] = useState(0);
   const [timerRunning, setTimerRunning] = useState(false);
+  const [timerLastUpdated, setTimerLastUpdated] = useState(Date.now());
+  const [timerNow, setTimerNow] = useState(Date.now());
   
   // Calibration state
   const calibrationStageRef = useRef<HTMLDivElement | null>(null);
@@ -104,6 +114,13 @@ export default function DeviceDetailPage({ params }: { params: { deviceId: strin
   }, [deviceId]);
 
   useEffect(() => {
+    if (!timerRunning) return;
+
+    const interval = setInterval(() => setTimerNow(Date.now()), 250);
+    return () => clearInterval(interval);
+  }, [timerRunning]);
+
+  useEffect(() => {
     return () => {
       if (calibrationPreviewTimeoutRef.current) {
         clearTimeout(calibrationPreviewTimeoutRef.current);
@@ -117,6 +134,18 @@ export default function DeviceDetailPage({ params }: { params: { deviceId: strin
       if (!res.ok) throw new Error('Device not found');
       const data = await res.json();
       setDevice(data.device);
+
+      const loadedTimerState = data.device.timerState
+        ? projectTimerState(data.device.timerState, Date.now())
+        : createDefaultTimerState();
+      setShotClock(loadedTimerState.shotClock);
+      setGameClock(loadedTimerState.gameClock);
+      setPeriod(loadedTimerState.period ?? 1);
+      setHomeScore(loadedTimerState.homeScore);
+      setAwayScore(loadedTimerState.awayScore);
+      setTimerRunning(loadedTimerState.isRunning);
+      setTimerLastUpdated(loadedTimerState.lastUpdated);
+      setTimerNow(Date.now());
       
       // Initialize calibration from device
       const viewport = data.device.displayProfile?.viewport;
@@ -163,6 +192,36 @@ export default function DeviceDetailPage({ params }: { params: { deviceId: strin
     }
   };
 
+  const buildCurrentTimerState = (): TimerState => ({
+    mode: timerRunning ? 'run' : 'pause',
+    homeScore,
+    awayScore,
+    period,
+    shotClock,
+    gameClock,
+    isRunning: timerRunning,
+    isPaused: !timerRunning,
+    lastUpdated: timerLastUpdated,
+  });
+
+  const projectedTimerState = projectTimerState(buildCurrentTimerState(), timerNow);
+  const displayedShotClock = projectedTimerState.shotClock;
+  const displayedGameClock = projectedTimerState.gameClock;
+
+  const updateShotClock = (value: number) => {
+    const now = Date.now();
+    setShotClock(clampSeconds(value, 0, 99));
+    setTimerLastUpdated(now);
+    setTimerNow(now);
+  };
+
+  const updateGameClock = (value: number) => {
+    const now = Date.now();
+    setGameClock(clampSeconds(value, 0, 3600));
+    setTimerLastUpdated(now);
+    setTimerNow(now);
+  };
+
   const setMode = async (mode: string) => {
     setSaving(true);
     const modePayload: DeviceMode = { type: mode as any };
@@ -174,56 +233,45 @@ export default function DeviceDetailPage({ params }: { params: { deviceId: strin
   };
 
   const startTimer = async () => {
-    const timerState: TimerState = {
-      mode: 'run',
-      homeScore,
-      awayScore,
-      period,
-      shotClock,
-      gameClock,
-      isRunning: true,
-      isPaused: false,
-      lastUpdated: Date.now(),
-    };
+    const timerState = startTimerState(buildCurrentTimerState());
     const success = await sendCommand('set_timer', { timerState });
-    if (success) setTimerRunning(true);
+    if (success) {
+      setShotClock(timerState.shotClock);
+      setGameClock(timerState.gameClock);
+      setTimerLastUpdated(timerState.lastUpdated);
+      setTimerNow(timerState.lastUpdated);
+      setTimerRunning(true);
+    }
   };
 
   const pauseTimer = async () => {
-    const timerState: TimerState = {
-      mode: 'pause',
-      homeScore,
-      awayScore,
-      period,
-      shotClock,
-      gameClock,
-      isRunning: false,
-      isPaused: true,
-      lastUpdated: Date.now(),
-    };
+    const timerState = pauseTimerState(buildCurrentTimerState());
     const success = await sendCommand('set_timer', { timerState });
-    if (success) setTimerRunning(false);
+    if (success) {
+      setShotClock(timerState.shotClock);
+      setGameClock(timerState.gameClock);
+      setTimerLastUpdated(timerState.lastUpdated);
+      setTimerNow(timerState.lastUpdated);
+      setTimerRunning(false);
+    }
   };
 
   const resetTimer = async () => {
-    const timerState: TimerState = {
-      mode: 'stop',
+    const timerState = stopTimerState({
+      ...buildCurrentTimerState(),
       homeScore: 0,
       awayScore: 0,
       period: 1,
-      shotClock: 24,
-      gameClock: 720,
-      isRunning: false,
-      isPaused: false,
-      lastUpdated: Date.now(),
-    };
+    });
     const success = await sendCommand('set_timer', { timerState });
     if (success) {
-      setShotClock(24);
-      setGameClock(720);
-      setPeriod(1);
-      setHomeScore(0);
-      setAwayScore(0);
+      setShotClock(timerState.shotClock);
+      setGameClock(timerState.gameClock);
+      setPeriod(timerState.period ?? 1);
+      setHomeScore(timerState.homeScore);
+      setAwayScore(timerState.awayScore);
+      setTimerLastUpdated(timerState.lastUpdated);
+      setTimerNow(timerState.lastUpdated);
       setTimerRunning(false);
     }
   };
@@ -591,22 +639,25 @@ export default function DeviceDetailPage({ params }: { params: { deviceId: strin
             <label className="block text-sm text-gray-400 mb-2">Shot Clock (seconds)</label>
             <div className="flex items-center space-x-3">
               <button 
-                onClick={() => setShotClock(Math.max(0, shotClock - 1))}
+                onClick={() => updateShotClock(displayedShotClock - 1)}
+                disabled={timerRunning}
                 className="bg-gray-800 px-3 py-1 rounded hover:bg-gray-700"
               >
                 -
               </button>
-              <span className="text-3xl font-mono w-16 text-center">{shotClock}</span>
+              <span className="text-3xl font-mono w-16 text-center">{displayedShotClock}</span>
               <button 
-                onClick={() => setShotClock(Math.min(99, shotClock + 1))}
+                onClick={() => updateShotClock(displayedShotClock + 1)}
+                disabled={timerRunning}
                 className="bg-gray-800 px-3 py-1 rounded hover:bg-gray-700"
               >
                 +
               </button>
               <input
                 type="number"
-                value={shotClock}
-                onChange={(e) => setShotClock(Math.max(0, Math.min(99, parseInt(e.target.value) || 0)))}
+                value={displayedShotClock}
+                onChange={(e) => updateShotClock(parseInt(e.target.value, 10) || 0)}
+                disabled={timerRunning}
                 className="w-20 bg-gray-800 rounded px-2 py-1 text-center font-mono"
               />
             </div>
@@ -617,16 +668,18 @@ export default function DeviceDetailPage({ params }: { params: { deviceId: strin
             <label className="block text-sm text-gray-400 mb-2">Game Clock (seconds)</label>
             <div className="flex items-center space-x-3">
               <button 
-                onClick={() => setGameClock(Math.max(0, gameClock - 30))}
+                onClick={() => updateGameClock(displayedGameClock - 30)}
+                disabled={timerRunning}
                 className="bg-gray-800 px-3 py-1 rounded hover:bg-gray-700"
               >
                 -30
               </button>
               <span className="text-3xl font-mono w-24 text-center">
-                {Math.floor(gameClock / 60)}:{String(gameClock % 60).padStart(2, '0')}
+                {Math.floor(displayedGameClock / 60)}:{String(displayedGameClock % 60).padStart(2, '0')}
               </span>
               <button 
-                onClick={() => setGameClock(Math.min(3600, gameClock + 30))}
+                onClick={() => updateGameClock(displayedGameClock + 30)}
+                disabled={timerRunning}
                 className="bg-gray-800 px-3 py-1 rounded hover:bg-gray-700"
               >
                 +30

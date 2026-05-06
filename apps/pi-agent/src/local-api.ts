@@ -14,6 +14,7 @@ import { saveConfig as saveAgentConfig, loadConfig as loadAgentConfig } from './
 import { setupAP } from './setup-ap.js';
 import { wifiManager } from './wifi-manager.js';
 import type { DeviceMode, TimerState } from '@shotclock/shared/types';
+import { rebaseTimerStateToLocalClock } from '@shotclock/shared/timer';
 import { getSetupApConfig } from './setup-mode.js';
 
 interface SetupState {
@@ -64,7 +65,7 @@ export function startLocalApi(
       const { mode, timerState } = req.body;
       const state = saveState({
         ...(mode && { mode: mode as DeviceMode }),
-        ...(timerState && { timerState: timerState as TimerState }),
+        ...(timerState && { timerState: rebaseTimerStateToLocalClock(timerState as TimerState) }),
       });
       res.json({ state });
     } catch (error) {

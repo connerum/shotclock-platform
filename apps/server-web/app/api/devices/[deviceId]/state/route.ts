@@ -11,6 +11,27 @@ interface RouteParams {
   params: { deviceId: string };
 }
 
+function createDefaultTimerState(now = Date.now()): TimerState {
+  return {
+    mode: 'stop',
+    homeScore: 0,
+    awayScore: 0,
+    period: 1,
+    shotClock: 24,
+    gameClock: 720,
+    isRunning: false,
+    isPaused: false,
+    lastUpdated: now,
+  };
+}
+
+function rebaseTimerStateToLocalClock(state: TimerState, now = Date.now()): TimerState {
+  return {
+    ...state,
+    lastUpdated: now,
+  };
+}
+
 export async function GET(_request: NextRequest, { params }: RouteParams) {
   try {
     const auth = await requireApiUser();
@@ -61,6 +82,9 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     const { deviceId } = params;
     const body = await request.json();
     const { mode, timerState, mediaAssetId } = body;
+    const timerStatePayload: TimerState | null = timerState
+      ? rebaseTimerStateToLocalClock(timerState)
+      : null;
 
     const device = await prisma.device.findUnique({
       where: { deviceId },
@@ -76,13 +100,13 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       where: { deviceId },
       update: {
         mode,
-        timerState: timerState ? JSON.stringify(timerState) : null,
+        timerState: timerStatePayload ? JSON.stringify(timerStatePayload) : null,
         mediaAssetId: mediaAssetId || null,
       },
       create: {
         deviceId,
         mode,
-        timerState: timerState ? JSON.stringify(timerState) : null,
+        timerState: timerStatePayload ? JSON.stringify(timerStatePayload) : null,
         mediaAssetId: mediaAssetId || null,
       },
     });
@@ -91,7 +115,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     await prisma.device.update({
       where: { deviceId },
       data: {
-        displayState: JSON.stringify({ mode, timerState, mediaAssetId }),
+        displayState: JSON.stringify({ mode, timerState: timerStatePayload, mediaAssetId }),
         mode,
       },
     });
@@ -99,17 +123,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     // Emit state update to device via Socket.IO
     const io = getServerIO();
     if (io) {
-      const timerStatePayload: TimerState = timerState || {
-        mode: 'stop',
-        homeScore: 0,
-        awayScore: 0,
-        shotClock: 24,
-        gameClock: 720,
-        isRunning: false,
-        isPaused: false,
-        lastUpdated: Date.now(),
-      };
-      io.of('/device').to(`device:${deviceId}`).emit('state:update', timerStatePayload);
+      io.of('/device').to(`device:${deviceId}`).emit('state:update', timerStatePayload || createDefaultTimerState());
     }
 
     return NextResponse.json({ 

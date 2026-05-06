@@ -6,6 +6,7 @@
   "types": "./dist/index.d.ts",
   "exports": {
     ".": "./dist/index.js",
+    "./timer": "./dist/timer/index.js",
     "./types": "./dist/types/index.js",
     "./socket": "./dist/socket/index.js"
   },

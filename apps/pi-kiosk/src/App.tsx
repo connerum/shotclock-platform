@@ -21,6 +21,8 @@ interface ShotClockState {
     awayScore: number;
     period?: number;
     isRunning: boolean;
+    isPaused?: boolean;
+    lastUpdated?: number;
   };
 }
 

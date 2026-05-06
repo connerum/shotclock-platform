@@ -4,6 +4,7 @@ import { io, Socket } from 'socket.io-client';
 import type { DeviceIdentity } from './identity.js';
 import type { AgentConfig } from './config-store.js';
 import type { ServerToDeviceEvents, HelloPayload, HeartbeatPayload, PairingResponse, DeviceCommandAck } from '@shotclock/shared/types';
+import { rebaseTimerStateToLocalClock } from '@shotclock/shared/timer';
 import { loadIdentity, markAsPaired, isPaired } from './identity.js';
 import { loadState, saveState, setConfigPreview } from './state-store.js';
 import { saveConfig } from './config-store.js';
@@ -83,7 +84,7 @@ export function setupSocketClient(
   socket.on('state:update', (state, ack) => {
     console.log('Received state update');
     try {
-      saveState({ mode: { type: 'shot-clock' }, timerState: state });
+      saveState({ mode: { type: 'shot-clock' }, timerState: rebaseTimerStateToLocalClock(state) });
       acknowledge(ack, { success: true });
       sendStateAck(true);
     } catch (error) {

@@ -1,6 +1,7 @@
 // Shot Clock Mode - compact display for calibrated LED viewport.
 
 import { useEffect, useState } from 'react';
+import { projectTimerState } from '@shotclock/shared/timer';
 import ShotClock from '../components/ShotClock';
 
 interface ShotClockModeProps {
@@ -13,6 +14,7 @@ interface ShotClockModeProps {
       awayScore: number;
       period?: number;
       isRunning: boolean;
+      isPaused?: boolean;
       lastUpdated?: number;
     };
   };
@@ -29,15 +31,24 @@ export default function ShotClockMode({ state }: ShotClockModeProps) {
     return () => clearInterval(interval);
   }, [timerState?.isRunning, timerState?.lastUpdated]);
 
-  const elapsedSeconds = timerState?.isRunning
-    ? Math.floor((now - (timerState.lastUpdated || now)) / 1000)
-    : 0;
-  const shotClock = Math.max(0, (timerState?.shotClock ?? 24) - elapsedSeconds);
-  const gameClock = Math.max(0, (timerState?.gameClock ?? 720) - elapsedSeconds);
-  const homeScore = timerState?.homeScore ?? 0;
-  const awayScore = timerState?.awayScore ?? 0;
-  const period = timerState?.period ?? 1;
-  const isRunning = timerState?.isRunning ?? false;
+  const projectedTimerState = timerState ? projectTimerState({
+    mode: timerState.isRunning ? 'run' : timerState.isPaused ? 'pause' : 'stop',
+    homeScore: timerState.homeScore,
+    awayScore: timerState.awayScore,
+    period: timerState.period,
+    shotClock: timerState.shotClock,
+    gameClock: timerState.gameClock,
+    isRunning: timerState.isRunning,
+    isPaused: Boolean(timerState.isPaused),
+    lastUpdated: timerState.lastUpdated ?? now,
+  }, now) : null;
+
+  const shotClock = projectedTimerState?.shotClock ?? 24;
+  const gameClock = projectedTimerState?.gameClock ?? 720;
+  const homeScore = projectedTimerState?.homeScore ?? 0;
+  const awayScore = projectedTimerState?.awayScore ?? 0;
+  const period = projectedTimerState?.period ?? 1;
+  const isRunning = projectedTimerState?.isRunning ?? false;
 
   const formatGameClock = (seconds: number): string => {
     const mins = Math.floor(seconds / 60);

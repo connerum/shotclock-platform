@@ -99,14 +99,15 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       }
 
       case 'set_timer': {
-        const timerState: TimerState = payload?.timerState;
-        if (!timerState) {
+        const rawTimerState: TimerState = payload?.timerState;
+        if (!rawTimerState) {
           return NextResponse.json(
             { error: 'Missing timerState for set_timer command' },
             { status: 400 }
           );
         }
 
+        const timerState = rebaseTimerStateToLocalClock(rawTimerState);
         const ack = await emitDeviceCommand(deviceNamespace, room, 'state:update', timerState);
         if (!ack.success) {
           return commandAckError(ack);
@@ -320,4 +321,11 @@ async function resetDeviceRecordAfterFactoryReset(deviceId: string): Promise<voi
   ]).catch((error) => {
     console.warn(`Unable to remove server device record for ${deviceId}`, error);
   });
+}
+
+function rebaseTimerStateToLocalClock(state: TimerState, now = Date.now()): TimerState {
+  return {
+    ...state,
+    lastUpdated: now,
+  };
 }
