@@ -44,18 +44,21 @@ export default function WrestlingMode({ state }: SportModeProps) {
   const isRunning = projectedState?.isRunning ?? false;
 
   return (
-    <div className="grid h-full w-full grid-rows-[16%_42%_42%] overflow-hidden bg-black px-2 py-1 font-mono text-white">
-      <div className="flex items-center justify-between overflow-hidden text-[min(7cqh,5cqw)] font-black leading-none text-gray-400">
-        <span>WRESTLING</span>
+    <div
+      className="grid h-full w-full grid-rows-[13%_38%_49%] overflow-hidden bg-black px-1.5 py-1 font-mono text-white"
+      style={{ containerType: 'size' }}
+    >
+      <div className="flex min-h-0 items-center justify-between gap-1 overflow-hidden text-[min(8cqh,4cqw)] font-black leading-none text-gray-400">
+        <span>WRESTLE</span>
         <span className={isRunning ? 'text-green-500' : 'text-yellow-500'}>{isRunning ? 'RUN' : 'HOLD'}</span>
         <span>P{period}</span>
       </div>
-      <div className="flex items-center justify-center overflow-hidden text-[min(28cqh,24cqw)] font-black leading-none tabular-nums">
+      <div className="flex min-h-0 items-center justify-center overflow-hidden text-[min(32cqh,22cqw)] font-black leading-none tabular-nums">
         {clock}
       </div>
-      <div className="grid min-h-0 grid-cols-2 gap-2 overflow-hidden leading-none">
+      <div className="grid min-h-0 grid-cols-2 gap-1 overflow-hidden leading-none">
         <ScorePane label="RED" value={redScore} className="text-red-500" />
-        <ScorePane label="GREEN" value={greenScore} className="text-green-500" />
+        <ScorePane label="GRN" value={greenScore} className="text-green-500" />
       </div>
     </div>
   );
@@ -63,9 +66,9 @@ export default function WrestlingMode({ state }: SportModeProps) {
 
 function ScorePane({ label, value, className }: { label: string; value: number; className: string }) {
   return (
-    <div className="grid min-h-0 grid-rows-[20%_80%] overflow-hidden border border-gray-800 px-1">
-      <div className={`flex items-center justify-center text-[min(6cqh,5cqw)] font-black ${className}`}>{label}</div>
-      <div className={`flex items-center justify-center text-[min(30cqh,24cqw)] font-black tabular-nums ${className}`}>{value}</div>
+    <div className="grid min-h-0 grid-rows-[18%_82%] overflow-hidden border border-gray-800 px-0.5">
+      <div className={`flex min-h-0 items-center justify-center text-[min(7cqh,4cqw)] font-black leading-none ${className}`}>{label}</div>
+      <div className={`flex min-h-0 items-center justify-center text-[min(36cqh,24cqw)] font-black leading-none tabular-nums ${className}`}>{value}</div>
     </div>
   );
 }
