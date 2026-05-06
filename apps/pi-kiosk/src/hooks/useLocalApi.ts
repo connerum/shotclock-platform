@@ -21,6 +21,9 @@ interface LocalApiConfig {
   setupAp?: {
     apSsid: string;
     apPassword: string;
+    portalHost?: string;
+    portalUrl?: string;
+    fallbackPortalUrl?: string;
   };
 }
 

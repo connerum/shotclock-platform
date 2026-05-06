@@ -102,9 +102,11 @@ sudo ./scripts/install-pi.sh
 
 1. The Pi will create a setup AP named like "Shotclock-Setup-1e4b35" while it is unpaired
 2. Connect to it with password "shotclock123"
-3. Open http://192.168.4.1:8080 in a browser
+3. Open http://sportsboard.local in a browser
 4. Select your WiFi network and enter credentials
 5. Click "Complete Setup"
+
+If `.local` does not resolve from your phone/tablet, use the fallback URL shown on the Pi: http://192.168.4.1:8080.
 
 ### 4. Configure And Build Pi App
 
@@ -122,6 +124,7 @@ AGENT_LOCAL_API_PORT=3001
 DEVICE_NAME=Shotclock Display 01
 SETUP_AP_SSID=Shotclock-Setup
 SETUP_AP_PASSWORD=shotclock123
+SETUP_PORTAL_HOST=sportsboard.local
 KIOSK_USER=admin
 ```
 

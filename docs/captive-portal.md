@@ -18,7 +18,7 @@ When a new Shotclock Pi boots for the first time (or is reset), it creates a loc
 │                                                                 │
 │   ┌──────────────┐         ┌──────────────────────────────────┐│
 │   │  hostapd     │         │  Captive Portal Server           ││
-│   │  (AP Mode)   │────────▶│  http://192.168.4.1:8080         ││
+│   │  (AP Mode)   │────────▶│  http://sportsboard.local        ││
 │   │              │         │                                  ││
 │   │  wlan0       │         │  - Setup status page            ││
 │   │  192.168.4.1 │         │  - WiFi network selection        ││
@@ -38,7 +38,7 @@ When a new Shotclock Pi boots for the first time (or is reset), it creates a loc
                     │  (Phone/Tablet/Computer)                 │
                     │                                          │
                     │  Connects to Shotclock-Setup-xxxxxx      │
-                    │  Opens http://192.168.4.1 automatically  │
+                    │  Opens http://sportsboard.local           │
                     │  (or captive portal detection)           │
                     └─────────────────────────────────────────┘
 ```
@@ -54,7 +54,8 @@ The access point is configured with these defaults:
 | Channel       | 6                   |
 | IP Address    | 192.168.4.1         |
 | DHCP Range    | 192.168.4.10-100    |
-| Portal URL    | http://192.168.4.1:8080 |
+| Portal URL    | http://sportsboard.local |
+| Fallback URL  | http://192.168.4.1:8080 |
 
 ## Portal Pages
 
@@ -153,8 +154,10 @@ Modern devices detect captive portals automatically:
 ### Manual Connection
 If auto-detection fails:
 1. Open browser
-2. Navigate to `http://192.168.4.1:8080`
+2. Navigate to `http://sportsboard.local`
 3. Follow setup steps
+
+Use `http://192.168.4.1:8080` if the client device does not resolve `.local` names.
 
 ## Security Considerations
 
@@ -178,7 +181,7 @@ If auto-detection fails:
 ### Portal doesn't load
 1. Verify you're connected to the setup AP named like `Shotclock-Setup-xxxxxx`
 2. Check if Pi is broadcasting the AP
-3. Try accessing http://192.168.4.1 directly
+3. Try accessing `http://192.168.4.1:8080` directly
 
 ### Can't see WiFi networks
 1. Wait 30 seconds after connecting to AP

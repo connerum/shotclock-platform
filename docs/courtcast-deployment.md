@@ -301,6 +301,7 @@ AGENT_LOCAL_API_PORT=3001
 DEVICE_NAME=Shotclock Display 01
 SETUP_AP_SSID=Shotclock-Setup
 SETUP_AP_PASSWORD=shotclock123
+SETUP_PORTAL_HOST=sportsboard.local
 KIOSK_USER=admin
 ```
 
@@ -453,9 +454,11 @@ Factory reset is available from the device settings page. It removes the device 
 After factory reset, repeat:
 
 1. Connect to `Shotclock-Setup-xxxxxx`.
-2. Open `http://192.168.4.1:8080`.
+2. Open `http://sportsboard.local`.
 3. Configure WiFi.
 4. Pair the new code from `https://courtcast.safety-linq.com/pair`.
+
+If the device you are using does not resolve `.local` names, use the fallback URL shown on the Pi: `http://192.168.4.1:8080`.
 
 ## 14. First LED Test Order
 

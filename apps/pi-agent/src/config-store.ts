@@ -11,6 +11,7 @@ export interface AgentConfig {
   pairingCodeLength: number;
   setupApSsid: string;
   setupApPassword: string;
+  setupPortalHost: string;
   updateCheckInterval: number;
   localApiPort: number;
   deviceName: string;
@@ -28,6 +29,7 @@ const DEFAULT_CONFIG: AgentConfig = {
   pairingCodeLength: parseInt(process.env.PAIRING_CODE_LENGTH || '6', 10),
   setupApSsid: process.env.SETUP_AP_SSID || 'Shotclock-Setup',
   setupApPassword: process.env.SETUP_AP_PASSWORD || 'shotclock123',
+  setupPortalHost: process.env.SETUP_PORTAL_HOST || 'sportsboard.local',
   updateCheckInterval: parseInt(process.env.UPDATE_CHECK_INTERVAL || '3600000', 10),
   localApiPort: parseInt(process.env.AGENT_LOCAL_API_PORT || '3001', 10),
   deviceName: process.env.DEVICE_NAME || process.env.DEFAULT_DEVICE_NAME || 'Shotclock Display',

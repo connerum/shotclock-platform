@@ -1,4 +1,4 @@
-// Captive Portal - Express server for setup on 192.168.4.1
+// Captive Portal - Express server for setup WiFi provisioning
 
 import express, { Request, Response } from 'express';
 import { setupAP } from './setup-ap.js';
@@ -18,6 +18,9 @@ interface SetupState {
 interface CaptivePortalConfig {
   apSsid: string;
   apPassword: string;
+  portalHost: string;
+  portalUrl: string;
+  fallbackPortalUrl: string;
   apChannel: number;
   serverIp: string;
   serverPort: number;
@@ -26,13 +29,16 @@ interface CaptivePortalConfig {
 const DEFAULT_CONFIG: CaptivePortalConfig = {
   apSsid: 'Shotclock-Setup',
   apPassword: 'shotclock123',
+  portalHost: 'sportsboard.local',
+  portalUrl: 'http://sportsboard.local',
+  fallbackPortalUrl: 'http://192.168.4.1:8080',
   apChannel: 6,
   serverIp: '192.168.4.1',
   serverPort: 8080,
 };
 
 const portalApp = express();
-let server: ReturnType<typeof portalApp.listen> | null = null;
+let servers: ReturnType<typeof portalApp.listen>[] = [];
 let setupState: SetupState = { step: 'initial' };
 let routesRegistered = false;
 let activePortalConfig: CaptivePortalConfig = DEFAULT_CONFIG;
@@ -45,8 +51,8 @@ export async function startCaptivePortal(config: Partial<CaptivePortalConfig> = 
   activePortalConfig = portalConfig;
   setupState = { ...setupState, step: 'ap_created' };
 
-  if (server) {
-    console.log(`Captive portal already running at http://${portalConfig.serverIp}:${portalConfig.serverPort}`);
+  if (servers.length > 0) {
+    console.log(`Captive portal already running at ${portalConfig.portalUrl}`);
     return true;
   }
   
@@ -271,17 +277,22 @@ export async function startCaptivePortal(config: Partial<CaptivePortalConfig> = 
     routesRegistered = true;
   }
   
-  return listen('0.0.0.0', portalConfig);
+  const fallbackStarted = await listen('0.0.0.0', portalConfig.serverPort, portalConfig);
+  const friendlyStarted = portalConfig.serverPort === 80
+    ? fallbackStarted
+    : await listen('0.0.0.0', 80, portalConfig);
+
+  return fallbackStarted || friendlyStarted;
 }
 
 /**
  * Stop the captive portal server
  */
 export function stopCaptivePortal(): void {
-  if (server) {
-    server.close();
-    server = null;
+  for (const activeServer of servers) {
+    activeServer.close();
   }
+  servers = [];
 }
 
 async function connectToWifiFromPortal(ssid: string, password?: string): Promise<void> {
@@ -314,28 +325,34 @@ async function connectToWifiFromPortal(ssid: string, password?: string): Promise
   await setupAP.start();
 }
 
-function listen(host: string, portalConfig: CaptivePortalConfig): Promise<boolean> {
+function listen(host: string, port: number, portalConfig: CaptivePortalConfig): Promise<boolean> {
   return new Promise((resolve) => {
     let settled = false;
+    let pendingServer: ReturnType<typeof portalApp.listen> | null = null;
 
-    server = portalApp.listen(portalConfig.serverPort, host, () => {
-      const displayHost = host === '0.0.0.0' ? portalConfig.serverIp : host;
-      console.log(`Captive portal running at http://${displayHost}:${portalConfig.serverPort}`);
+    pendingServer = portalApp.listen(port, host, () => {
+      if (pendingServer) {
+        servers.push(pendingServer);
+      }
+      const displayHost = port === 80
+        ? portalConfig.portalHost
+        : host === '0.0.0.0' ? portalConfig.serverIp : host;
+      const displayUrl = port === 80 ? `http://${displayHost}` : `http://${displayHost}:${port}`;
+      console.log(`Captive portal running at ${displayUrl}`);
       settled = true;
       resolve(true);
     });
 
-    server.on('clientError', (error, socket) => {
+    pendingServer.on('clientError', (error, socket) => {
       console.warn('Captive portal client error:', error.message);
       if (socket.writable) {
         socket.end('HTTP/1.1 400 Bad Request\r\n\r\n');
       }
     });
 
-    server.once('error', (error: NodeJS.ErrnoException) => {
-      server?.close();
-      server = null;
-      console.error('Captive portal failed to start:', error);
+    pendingServer.once('error', (error: NodeJS.ErrnoException) => {
+      pendingServer?.close();
+      console.error(`Captive portal failed to start on port ${port}:`, error);
 
       if (!settled) {
         settled = true;

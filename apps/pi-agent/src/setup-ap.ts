@@ -10,6 +10,7 @@ const execFileAsync = promisify(execFile);
 interface CaptivePortalConfig {
   apSsid: string;
   apPassword: string;
+  portalHost: string;
   apChannel: number;
   apInterface: string;
   wanInterface: string;
@@ -21,6 +22,7 @@ interface CaptivePortalConfig {
 const DEFAULT_AP_CONFIG: CaptivePortalConfig = {
   apSsid: 'Shotclock-Setup',
   apPassword: 'shotclock123',
+  portalHost: 'sportsboard.local',
   apChannel: 6,
   apInterface: 'wlan0',
   wanInterface: 'eth0',
@@ -32,6 +34,7 @@ const DEFAULT_AP_CONFIG: CaptivePortalConfig = {
 const HOSTAPD_CONF = `/etc/hostapd/hostapd.conf`;
 const HOSTAPD_DEFAULTS = `/etc/default/hostapd`;
 const DNSMASQ_CONF = `/etc/dnsmasq.d/shotclock-setup.conf`;
+const AVAHI_HOSTS = `/etc/avahi/hosts`;
 
 export class SetupAP {
   private config: CaptivePortalConfig;
@@ -55,6 +58,7 @@ export class SetupAP {
       
       // Configure dnsmasq
       await this.configureDnsmasq();
+      await this.configureMdnsAlias();
 
       // Bring the AP interface up and assign the address dnsmasq/portal bind to.
       await this.releaseApInterface();
@@ -150,17 +154,55 @@ rsn_pairwise=CCMP
   private async configureDnsmasq(): Promise<void> {
     const apInterface = this.getSafeInterfaceName(this.config.apInterface);
     const serverIp = this.getSafeIpv4Address(this.config.serverIp);
+    const portalHost = this.getSafeHostname(this.config.portalHost);
     const config = `
 interface=${apInterface}
+domain-needed
+bogus-priv
 dhcp-range=192.168.4.10,192.168.4.100,12h
 dhcp-option=3,${serverIp}
 dhcp-option=6,${serverIp}
+address=/${portalHost}/${serverIp}
 address=/#/${serverIp}
 listen-address=${serverIp}
 `.trim();
 
     await fs.promises.mkdir('/etc/dnsmasq.d', { recursive: true });
     await fs.promises.writeFile(DNSMASQ_CONF, config);
+  }
+
+  private async configureMdnsAlias(): Promise<void> {
+    const serverIp = this.getSafeIpv4Address(this.config.serverIp);
+    const portalHost = this.getSafeHostname(this.config.portalHost);
+
+    if (!portalHost.endsWith('.local')) {
+      return;
+    }
+
+    try {
+      await fs.promises.mkdir('/etc/avahi', { recursive: true });
+
+      const markerStart = '# BEGIN shotclock setup portal alias';
+      const markerEnd = '# END shotclock setup portal alias';
+      const block = `${markerStart}\n${serverIp} ${portalHost}\n${markerEnd}`;
+      let current = '';
+
+      try {
+        current = await fs.promises.readFile(AVAHI_HOSTS, 'utf-8');
+      } catch {
+        current = '';
+      }
+
+      const pattern = new RegExp(`${markerStart}[\\s\\S]*?${markerEnd}`);
+      const next = pattern.test(current)
+        ? current.replace(pattern, block)
+        : `${current.trimEnd()}\n${block}\n`;
+
+      await fs.promises.writeFile(AVAHI_HOSTS, next.trimStart());
+      await execFileAsync('systemctl', ['restart', 'avahi-daemon']).catch(() => {});
+    } catch (error) {
+      console.warn(`Unable to configure mDNS alias for ${portalHost}:`, error);
+    }
   }
 
   private async releaseApInterface(): Promise<void> {
@@ -230,6 +272,21 @@ listen-address=${serverIp}
       throw new Error(`Invalid IPv4 address: ${address}`);
     }
     return address;
+  }
+
+  private getSafeHostname(hostname: string): string {
+    const normalized = hostname.trim().toLowerCase().replace(/\.$/, '');
+    const labels = normalized.split('.');
+    const valid = normalized.length > 0
+      && normalized.length <= 253
+      && labels.length > 1
+      && labels.every((label) => /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/.test(label));
+
+    if (!valid) {
+      throw new Error(`Invalid setup portal hostname: ${hostname}`);
+    }
+
+    return normalized;
   }
 
   private getSafeCountryCode(country: string): string {

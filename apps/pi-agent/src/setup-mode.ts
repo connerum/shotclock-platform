@@ -7,9 +7,16 @@ import { saveState } from './state-store.js';
 
 export function getSetupApConfig(identity: DeviceIdentity, config: AgentConfig) {
   const setupApSuffix = identity.deviceId.replace(/^shotclock-/, '').substring(0, 6);
+  const portalHost = config.setupPortalHost || 'sportsboard.local';
+  const serverIp = '192.168.4.1';
+  const serverPort = 8080;
+
   return {
     apSsid: `${config.setupApSsid}-${setupApSuffix}`,
     apPassword: config.setupApPassword,
+    portalHost,
+    portalUrl: `http://${portalHost}`,
+    fallbackPortalUrl: `http://${serverIp}:${serverPort}`,
   };
 }
 
@@ -32,7 +39,7 @@ export async function enterWifiSetupMode(
 
   const portalStarted = await startCaptivePortal(setupApConfig);
   if (!portalStarted) {
-    throw new Error('Captive portal failed to start on port 8080');
+    throw new Error('Captive portal failed to start on ports 80 and 8080');
   }
 
   console.log('Setup AP started - waiting for WiFi configuration...');

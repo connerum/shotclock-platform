@@ -93,7 +93,7 @@ else
 fi
 
 # Install WiFi/AP and networking tools
-apt-get install -y network-manager hostapd dnsmasq iproute2 iptables rfkill iw wireless-regdb
+apt-get install -y network-manager hostapd dnsmasq avahi-daemon libnss-mdns iproute2 iptables rfkill iw wireless-regdb
 ```
 
 The repository installer already handles the Chromium package name difference. If `scripts/install-pi.sh` fails with `Package chromium-browser is not available` or `Unable to locate package libgconf-2-4`, pull the latest repo and rerun it:
@@ -170,6 +170,7 @@ AGENT_LOCAL_API_PORT=3001
 DEVICE_NAME=Shotclock Display 01
 SETUP_AP_SSID=Shotclock-Setup
 SETUP_AP_PASSWORD=shotclock123
+SETUP_PORTAL_HOST=sportsboard.local
 KIOSK_USER=admin
 ```
 
@@ -185,6 +186,7 @@ AGENT_LOCAL_API_PORT=3001
 DEVICE_NAME=Shotclock Display 01
 SETUP_AP_SSID=Shotclock-Setup
 SETUP_AP_PASSWORD=shotclock123
+SETUP_PORTAL_HOST=sportsboard.local
 KIOSK_USER=admin
 ```
 
@@ -327,15 +329,16 @@ The agent should log `Starting setup AP: Shotclock-Setup-...`, `hostapd` and `dn
 
 The setup page always includes a manual SSID/password form. On a single-radio Pi, nearby WiFi scans can be empty while `wlan0` is broadcasting the setup AP. Submit the network name manually if no networks appear. After credentials are submitted, the kiosk changes to offline while the setup AP disconnects and the Pi joins the target WiFi. If the connection succeeds, NetworkManager stores an autoconnect WiFi profile, `/home/shotclock/.shotclock/config.json` changes from `setup` to `pairing`, and future restarts skip setup AP mode. If connection fails, the setup AP is started again.
 
-If the AP is visible but `http://192.168.4.1:8080` does not load, verify the portal process is listening:
+If the AP is visible but `http://sportsboard.local` does not load, try the fallback URL `http://192.168.4.1:8080`, then verify the portal process is listening:
 
 ```bash
 journalctl -u shotclock-agent -n 120 --no-pager -l
-ss -ltnp | grep ':8080'
+ss -ltnp | grep -E ':80|:8080'
+curl -i http://sportsboard.local/setup
 curl -i http://192.168.4.1:8080/setup
 ```
 
-The agent should log `Captive portal running at http://192.168.4.1:8080`. If port `8080` cannot bind, the agent service now fails instead of continuing as healthy.
+The agent should log `Captive portal running at http://sportsboard.local` and `Captive portal running at http://192.168.4.1:8080`. The friendly hostname is backed by dnsmasq and Avahi when available; the IP fallback remains for clients that do not resolve `.local` names.
 
 ### WiFi won't connect
 

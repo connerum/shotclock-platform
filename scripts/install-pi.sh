@@ -88,8 +88,8 @@ done
 apt-get install -y "${AVAILABLE_CHROMIUM_DEPS[@]}"
 
 echo ""
-echo "[5/12] Installing NetworkManager, hostapd, dnsmasq..."
-apt-get install -y network-manager hostapd dnsmasq iproute2 iptables rfkill iw wireless-regdb
+echo "[5/12] Installing NetworkManager, hostapd, dnsmasq, and local hostname support..."
+apt-get install -y network-manager hostapd dnsmasq avahi-daemon libnss-mdns iproute2 iptables rfkill iw wireless-regdb
 
 echo ""
 echo "[6/12] Creating /opt/shotclock directory structure..."
@@ -177,7 +177,8 @@ echo "       dnsmasq.conf        - Usually fine as-is"
 echo "       wpa_supplicant.conf - For client WiFi (not AP mode)"
 echo "  3. Run 'systemctl start shotclock-agent' to start the agent"
 echo "  4. Run 'systemctl start shotclock-kiosk' to start the kiosk"
-echo "  5. Connect to the AP named like Shotclock-Setup-xxxxxx and browse to 192.168.4.1:8080"
+echo "  5. Connect to the AP named like Shotclock-Setup-xxxxxx and open sportsboard.local"
+echo "     Fallback: http://192.168.4.1:8080"
 echo ""
 echo "To build the app on the Pi:"
 echo "  cd /opt/shotclock/releases/${CURRENT_VERSION}"

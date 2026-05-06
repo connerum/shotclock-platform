@@ -191,7 +191,7 @@ All items must pass before deployment is considered complete.
 - [ ] Node.js 22 is installed
 - [ ] pnpm is installed globally
 - [ ] Chromium and dependencies are installed (`chromium-browser` on older Raspberry Pi OS, `chromium` on Debian/Raspberry Pi OS Trixie)
-- [ ] NetworkManager, hostapd, dnsmasq, iproute2, iptables, rfkill, iw, and wireless-regdb are installed
+- [ ] NetworkManager, hostapd, dnsmasq, avahi-daemon, libnss-mdns, iproute2, iptables, rfkill, iw, and wireless-regdb are installed
 - [ ] `/opt/shotclock` directory structure is created
 - [ ] `/home/shotclock/.shotclock` exists before services start
 - [ ] Config templates are copied to `/opt/shotclock/shared/config/`
@@ -221,7 +221,9 @@ All items must pass before deployment is considered complete.
 - [ ] `hostapd` and `dnsmasq` are active while setup AP is active
 - [ ] DHCP serves IP addresses in 192.168.4.0/24 range
 - [ ] DNS redirects all requests to 192.168.4.1
-- [ ] Portal page loads at `http://192.168.4.1:8080` when connecting to AP
+- [ ] `sportsboard.local` resolves to the Pi while connected to the setup AP
+- [ ] Portal page loads at `http://sportsboard.local` when connecting to AP
+- [ ] Portal fallback page loads at `http://192.168.4.1:8080`
 - [ ] WiFi network list populates
 - [ ] WiFi connection can be initiated
 - [ ] Setup completion transitions device out of setup mode

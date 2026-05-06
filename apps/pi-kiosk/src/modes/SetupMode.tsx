@@ -4,6 +4,9 @@ interface SetupModeProps {
   setupAp?: {
     apSsid: string;
     apPassword: string;
+    portalHost?: string;
+    portalUrl?: string;
+    fallbackPortalUrl?: string;
   };
 }
 
@@ -11,7 +14,9 @@ export default function SetupMode({ setupAp }: SetupModeProps) {
   const setupInfo = {
     apSsid: setupAp?.apSsid || 'Shotclock-Setup',
     apPassword: setupAp?.apPassword || 'shotclock123',
-    portalUrl: 'http://192.168.4.1:8080',
+    portalHost: setupAp?.portalHost || 'sportsboard.local',
+    portalUrl: setupAp?.portalUrl || 'http://sportsboard.local',
+    fallbackPortalUrl: setupAp?.fallbackPortalUrl || 'http://192.168.4.1:8080',
   };
 
   return (
@@ -39,8 +44,11 @@ export default function SetupMode({ setupAp }: SetupModeProps) {
 
       <div className="min-h-0 overflow-hidden">
         <div className="leading-none text-gray-500 text-[min(4.5cqw,6cqh)]">Open</div>
-        <div className="mt-1 truncate font-mono font-bold leading-none text-blue-400 text-[min(5.8cqw,8cqh)]">
-          {setupInfo.portalUrl}
+        <div className="mt-1 truncate font-mono font-bold leading-none text-blue-400 text-[min(7cqw,9cqh)]">
+          {setupInfo.portalHost}
+        </div>
+        <div className="mt-1 truncate font-mono leading-none text-gray-500 text-[min(3.4cqw,4.7cqh)]">
+          {setupInfo.fallbackPortalUrl.replace(/^https?:\/\//, '')}
         </div>
       </div>
 
