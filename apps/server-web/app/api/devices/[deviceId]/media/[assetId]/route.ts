@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { existsSync } from 'fs';
 import { unlink } from 'fs/promises';
 import { join } from 'path';
 import { prisma } from '@/lib/prisma';
@@ -84,7 +85,16 @@ async function getAccessibleMediaAsset(deviceId: string, assetId: string, auth: 
 }
 
 function getServerWebRoot() {
-  return process.cwd().endsWith(join('apps', 'server-web'))
-    ? process.cwd()
-    : join(process.cwd(), 'apps', 'server-web');
+  const cwd = process.cwd();
+  const nestedServerWebRoot = join(cwd, 'apps', 'server-web');
+
+  if (cwd.endsWith(join('apps', 'server-web')) || existsSync(join(cwd, 'public'))) {
+    return cwd;
+  }
+
+  if (existsSync(nestedServerWebRoot)) {
+    return nestedServerWebRoot;
+  }
+
+  return cwd;
 }

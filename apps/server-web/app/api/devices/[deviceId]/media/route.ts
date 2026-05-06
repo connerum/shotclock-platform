@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { randomUUID } from 'crypto';
-import { mkdir, writeFile } from 'fs/promises';
+import { existsSync } from 'fs';
+import { mkdir, unlink, writeFile } from 'fs/promises';
 import { join } from 'path';
 import { prisma } from '@/lib/prisma';
 import { canAccessDevice, requireApiUser } from '@/lib/auth';
@@ -39,11 +40,13 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
     return NextResponse.json({ mediaAssets });
   } catch (error) {
     console.error('Error fetching device media:', error);
-    return NextResponse.json({ error: 'Failed to fetch media' }, { status: 500 });
+    return NextResponse.json({ error: getMediaStorageErrorMessage(error, 'fetch') }, { status: 500 });
   }
 }
 
 export async function POST(request: NextRequest, { params }: RouteParams) {
+  let filepath: string | null = null;
+
   try {
     const auth = await requireApiUser();
     if (auth instanceof Response) return auth;
@@ -82,7 +85,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     const extension = getSafeExtension(originalFilename, file.type);
     const filename = `${Date.now()}-${randomUUID()}${extension}`;
     const mediaDir = join(getServerWebRoot(), 'public', 'media', 'devices', params.deviceId);
-    const filepath = join(mediaDir, filename);
+    filepath = join(mediaDir, filename);
 
     await mkdir(mediaDir, { recursive: true });
     await writeFile(filepath, Buffer.from(await file.arrayBuffer()));
@@ -111,7 +114,11 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     return NextResponse.json({ mediaAsset }, { status: 201 });
   } catch (error) {
     console.error('Error uploading device media:', error);
-    return NextResponse.json({ error: 'Failed to upload media' }, { status: 500 });
+    if (filepath) {
+      await unlink(filepath).catch(() => {});
+    }
+
+    return NextResponse.json({ error: getMediaStorageErrorMessage(error, 'upload') }, { status: 500 });
   }
 }
 
@@ -143,7 +150,40 @@ function getSafeExtension(filename: string, mimeType: string) {
 }
 
 function getServerWebRoot() {
-  return process.cwd().endsWith(join('apps', 'server-web'))
-    ? process.cwd()
-    : join(process.cwd(), 'apps', 'server-web');
+  const cwd = process.cwd();
+  const nestedServerWebRoot = join(cwd, 'apps', 'server-web');
+
+  if (cwd.endsWith(join('apps', 'server-web')) || existsSync(join(cwd, 'public'))) {
+    return cwd;
+  }
+
+  if (existsSync(nestedServerWebRoot)) {
+    return nestedServerWebRoot;
+  }
+
+  return cwd;
+}
+
+function getMediaStorageErrorMessage(error: unknown, action: 'fetch' | 'upload') {
+  const message = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
+
+  if (
+    message.includes('DeviceMediaAsset') ||
+    message.includes('deviceMediaAsset') ||
+    message.includes('does not exist in the current database') ||
+    message.includes('no such table') ||
+    message.includes('P2021')
+  ) {
+    return 'Media database table is missing. Run Prisma generate and migrate deploy on the server, then rebuild and restart CourtCast.';
+  }
+
+  if (message.includes('EACCES') || message.includes('EPERM')) {
+    return 'Server cannot write to the media upload directory. Check ownership and permissions for apps/server-web/public/media.';
+  }
+
+  if (message.includes('ENOENT')) {
+    return 'Media upload directory is missing. Create apps/server-web/public/media/devices and restart CourtCast.';
+  }
+
+  return action === 'fetch' ? 'Failed to fetch media' : 'Failed to upload media';
 }
