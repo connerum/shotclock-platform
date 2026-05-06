@@ -97,6 +97,8 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       });
     }
 
+    const sortOrder = await getNextSortOrder(params.deviceId, slot);
+
     const mediaAsset = await prisma.deviceMediaAsset.create({
       data: {
         deviceId: params.deviceId,
@@ -107,7 +109,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         mimeType: file.type || 'application/octet-stream',
         size: file.size,
         isActive: true,
-        sortOrder: Date.now(),
+        sortOrder,
       },
     });
 
@@ -164,16 +166,19 @@ function getServerWebRoot() {
   return cwd;
 }
 
+async function getNextSortOrder(deviceId: string, slot: MediaSlot) {
+  const aggregate = await prisma.deviceMediaAsset.aggregate({
+    where: { deviceId, slot },
+    _max: { sortOrder: true },
+  });
+
+  return (aggregate._max.sortOrder ?? -1) + 1;
+}
+
 function getMediaStorageErrorMessage(error: unknown, action: 'fetch' | 'upload') {
   const message = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
 
-  if (
-    message.includes('DeviceMediaAsset') ||
-    message.includes('deviceMediaAsset') ||
-    message.includes('does not exist in the current database') ||
-    message.includes('no such table') ||
-    message.includes('P2021')
-  ) {
+  if (message.includes('does not exist in the current database') || message.includes('no such table') || message.includes('P2021')) {
     return 'Media database table is missing. Run Prisma generate and migrate deploy on the server, then rebuild and restart CourtCast.';
   }
 
