@@ -5,12 +5,14 @@ import { loadIdentity, generateIdentity, isPaired } from './identity.js';
 import { setupSocketClient, startPairingReconciliation } from './socket-client.js';
 import { startHeartbeat } from './heartbeat.js';
 import { startLocalApi } from './local-api.js';
-import { startCaptivePortal, stopCaptivePortal } from './captive-portal.js';
+import { stopCaptivePortal } from './captive-portal.js';
 import { UpdateManager } from './update-manager.js';
 import { OfflineMode } from './offline-mode.js';
 import { setupAP } from './setup-ap.js';
 import { saveState } from './state-store.js';
 import { getPairingCode, regeneratePairingCode } from './pairing-code.js';
+import { wifiManager } from './wifi-manager.js';
+import { enterWifiSetupMode } from './setup-mode.js';
 
 const AGENT_VERSION = '0.1.0';
 
@@ -50,31 +52,7 @@ async function main() {
       const pairingCode = regeneratePairingCode();
       console.log(`Pairing code: ${pairingCode.code} (expires in 24 hours)`);
     }
-    saveConfig({ mode: 'setup' });
-    saveState({ mode: { type: 'setup' } });
-
-    const setupApSuffix = identity.deviceId.replace(/^shotclock-/, '').substring(0, 6);
-    const setupApConfig = {
-      apSsid: `${config.setupApSsid}-${setupApSuffix}`,
-      apPassword: config.setupApPassword,
-    };
-
-    setupAP.updateConfig(setupApConfig);
-
-    // Start setup AP
-    const apStarted = await setupAP.start();
-    
-    if (apStarted) {
-      // Start captive portal for WiFi setup
-      const portalStarted = await startCaptivePortal(setupApConfig);
-      if (!portalStarted) {
-        throw new Error('Captive portal failed to start on port 8080');
-      }
-
-      console.log('Setup AP started - waiting for WiFi configuration...');
-    } else {
-      throw new Error('Setup AP failed to start; check hostapd, dnsmasq, and wlan0 logs');
-    }
+    await enterWifiSetupMode(identity, config, 'configured setup mode');
   } else if (!paired) {
     console.log('Device has WiFi configured but is not paired - entering pairing mode');
 
@@ -83,12 +61,18 @@ async function main() {
     saveConfig({ mode: 'pairing' });
     saveState({ mode: { type: 'pairing' } });
   } else {
-    // Device is paired - connect to server
-    console.log('Device is paired - connecting to server...');
-    
-    // Update mode to online
-    saveConfig({ mode: 'online' });
-    saveState({ mode: { type: 'shot-clock' } });
+    const networkStatus = await wifiManager.getStatus();
+    if (!networkStatus.connected || !networkStatus.ip) {
+      console.log('Device is paired but WiFi is not connected - entering setup mode');
+      await enterWifiSetupMode(identity, config, 'paired device has no WiFi connection');
+    } else {
+      // Device is paired - connect to server
+      console.log('Device is paired - connecting to server...');
+
+      // Update mode to online
+      saveConfig({ mode: 'online' });
+      saveState({ mode: { type: 'shot-clock' } });
+    }
   }
 
   // Setup Socket.IO client after local setup state is established so hello

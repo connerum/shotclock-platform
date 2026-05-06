@@ -75,6 +75,11 @@ export function setupSocketClient(
     scheduleNetworkRecovery(error.message);
   });
 
+  socket.on('connect_error', (error: Error) => {
+    console.error('Connection error:', error);
+    scheduleNetworkRecovery(error.message);
+  });
+
   // Handle state update from server
   socket.on('state:update', (state, ack) => {
     console.log('Received state update');

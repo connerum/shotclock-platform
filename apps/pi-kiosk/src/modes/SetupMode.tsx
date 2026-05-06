@@ -1,9 +1,16 @@
 // Setup Mode - Shows setup AP SSID/password/portal URL
 
-export default function SetupMode() {
+interface SetupModeProps {
+  setupAp?: {
+    apSsid: string;
+    apPassword: string;
+  };
+}
+
+export default function SetupMode({ setupAp }: SetupModeProps) {
   const setupInfo = {
-    apSsid: 'Shotclock-Setup',
-    apPassword: 'shotclock123',
+    apSsid: setupAp?.apSsid || 'Shotclock-Setup',
+    apPassword: setupAp?.apPassword || 'shotclock123',
     portalUrl: 'http://192.168.4.1:8080',
   };
 

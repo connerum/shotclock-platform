@@ -11,6 +11,10 @@ interface LocalApiState {
 interface LocalApiConfig {
   displayProfile: DisplayProfile;
   calibrationData?: CalibrationData;
+  setupAp?: {
+    apSsid: string;
+    apPassword: string;
+  };
 }
 
 interface UseLocalApiResult {
@@ -47,7 +51,11 @@ export function useLocalApi(): UseLocalApiResult {
       const configRes = await fetch(`${API_BASE}/local/config`);
       if (configRes.ok) {
         const data = await configRes.json();
-        setConfig({ displayProfile: data.displayProfile, calibrationData: data.calibrationData });
+        setConfig({
+          displayProfile: data.displayProfile,
+          calibrationData: data.calibrationData,
+          setupAp: data.setupAp,
+        });
       }
 
       // Fetch pairing code

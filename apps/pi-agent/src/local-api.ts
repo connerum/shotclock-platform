@@ -14,6 +14,7 @@ import { saveConfig as saveAgentConfig, loadConfig as loadAgentConfig } from './
 import { setupAP } from './setup-ap.js';
 import { wifiManager } from './wifi-manager.js';
 import type { DeviceMode, TimerState } from '@shotclock/shared/types';
+import { getSetupApConfig } from './setup-mode.js';
 
 interface SetupState {
   step: 'initial' | 'ap_created' | 'network_selected' | 'network_connected' | 'complete';
@@ -43,6 +44,7 @@ export function startLocalApi(
       deviceName: identity.deviceName,
       firmwareVersion: identity.firmwareVersion,
       mode: state.mode,
+      setupAp: getSetupApConfig(identity, loadAgentConfig()),
       status: 'running',
       isOnline: _socket.connected,
       network: netStatus,
@@ -79,6 +81,7 @@ export function startLocalApi(
       config: configData,
       displayProfile: state.displayProfile,
       calibrationData: state.calibrationData,
+      setupAp: getSetupApConfig(identity, configData),
     });
   });
   

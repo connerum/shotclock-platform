@@ -49,7 +49,7 @@ export default function App() {
   const renderMode = () => {
     switch (currentMode) {
       case 'setup':
-        return <SetupMode />;
+        return <SetupMode setupAp={config?.setupAp} />;
       case 'pairing':
         return <PairingMode />;
       case 'offline':
