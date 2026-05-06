@@ -35,8 +35,31 @@ export default function PresentationOverlay({ overlay }: PresentationOverlayProp
   const isImage = overlay.mediaMimeType?.startsWith('image/');
   const isVideo = overlay.mediaMimeType?.startsWith('video/');
   const isAudio = overlay.mediaMimeType?.startsWith('audio/');
+  const hasVisualMedia = Boolean(overlay.mediaUrl && (isImage || isVideo));
   const accentClass = ACCENT_CLASSES[overlay.accent];
   const backgroundClass = BACKGROUND_CLASSES[overlay.accent];
+
+  if (hasVisualMedia) {
+    return (
+      <div className="absolute inset-0 z-20 flex h-full w-full items-center justify-center overflow-hidden bg-black">
+        {isImage && (
+          <img
+            src={overlay.mediaUrl}
+            alt=""
+            className="h-full w-full object-contain"
+          />
+        )}
+        {isVideo && (
+          <video
+            src={overlay.mediaUrl}
+            autoPlay
+            playsInline
+            className="h-full w-full object-contain"
+          />
+        )}
+      </div>
+    );
+  }
 
   return (
     <div
