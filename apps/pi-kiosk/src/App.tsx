@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import type { PresentationOverlay as PresentationOverlayState } from '@shotclock/shared/types';
 import { useLocalApi } from './hooks/useLocalApi';
 import { useDisplayProfile } from './hooks/useDisplayProfile';
 import SetupMode from './modes/SetupMode';
@@ -11,6 +12,7 @@ import MediaMode from './modes/MediaMode';
 import CalibrationMode from './modes/CalibrationMode';
 import BlankMode from './modes/BlankMode';
 import ViewportCanvas from './components/ViewportCanvas';
+import PresentationOverlay from './components/PresentationOverlay';
 
 type KioskMode = 'setup' | 'pairing' | 'offline' | 'basketball' | 'wrestling' | 'volleyball' | 'shot-clock' | 'media' | 'calibration' | 'blank';
 
@@ -28,6 +30,7 @@ interface ShotClockState {
     isPaused?: boolean;
     lastUpdated?: number;
   };
+  presentationOverlay?: PresentationOverlayState;
 }
 
 export default function App() {
@@ -81,7 +84,10 @@ export default function App() {
 
   return (
     <ViewportCanvas displayProfile={displayProfile}>
-      {renderMode()}
+      <div className="relative h-full w-full overflow-hidden">
+        {renderMode()}
+        <PresentationOverlay overlay={state?.presentationOverlay} />
+      </div>
     </ViewportCanvas>
   );
 }

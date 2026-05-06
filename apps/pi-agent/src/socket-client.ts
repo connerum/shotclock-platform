@@ -3,7 +3,14 @@
 import { io, Socket } from 'socket.io-client';
 import type { DeviceIdentity } from './identity.js';
 import type { AgentConfig } from './config-store.js';
-import type { ServerToDeviceEvents, HelloPayload, HeartbeatPayload, PairingResponse, DeviceCommandAck } from '@shotclock/shared/types';
+import type {
+  ServerToDeviceEvents,
+  HelloPayload,
+  HeartbeatPayload,
+  PairingResponse,
+  DeviceCommandAck,
+  PresentationOverlay,
+} from '@shotclock/shared/types';
 import { pauseTimerState, rebaseTimerStateToLocalClock } from '@shotclock/shared/timer';
 import { loadIdentity, markAsPaired, isPaired } from './identity.js';
 import { loadState, saveState, setConfigPreview } from './state-store.js';
@@ -26,6 +33,7 @@ interface DeviceToDeviceEvents {
 
 let socket: TypedSocket | null = null;
 let reconnectAttempts = 0;
+let presentationOverlayClearTimer: NodeJS.Timeout | null = null;
 
 export function setupSocketClient(
   identity: DeviceIdentity,
@@ -137,6 +145,20 @@ export function setupSocketClient(
     }
   });
 
+  socket.on('presentation:show', (overlay, ack) => {
+    console.log('Received presentation overlay:', overlay.type);
+    try {
+      applyPresentationOverlay(overlay);
+      acknowledge(ack, { success: true });
+      sendStateAck(true);
+    } catch (error) {
+      console.error('Failed to apply presentation overlay:', error);
+      const message = error instanceof Error ? error.message : String(error);
+      acknowledge(ack, { success: false, error: message });
+      sendStateAck(false, message);
+    }
+  });
+
   socket.on('pairing:complete', (payload, ack) => {
     applyPairingComplete(payload);
     acknowledge(ack, { success: true });
@@ -223,7 +245,7 @@ function sendHello(identity: DeviceIdentity): void {
     deviceName: currentIdentity.deviceName,
     firmwareVersion: currentIdentity.firmwareVersion,
     controllerType: currentIdentity.controllerType,
-    capabilities: ['basketball', 'wrestling', 'volleyball', 'shot-clock', 'scoreboard', 'timer', 'media'],
+    capabilities: ['basketball', 'wrestling', 'volleyball', 'shot-clock', 'scoreboard', 'timer', 'media', 'presentation'],
     displayProfile: state.displayProfile,
     pairingCode: pairingCode?.code,
     pairingCodeExpiresAt: pairingCode?.expiresAt,
@@ -275,6 +297,32 @@ function resolveIncomingTimerState(
 
 function isSportMode(mode: string): mode is 'basketball' | 'wrestling' | 'volleyball' {
   return mode === 'basketball' || mode === 'wrestling' || mode === 'volleyball';
+}
+
+function applyPresentationOverlay(overlay: PresentationOverlay): void {
+  if (presentationOverlayClearTimer) {
+    clearTimeout(presentationOverlayClearTimer);
+    presentationOverlayClearTimer = null;
+  }
+
+  const nextOverlay = overlay.type === 'clear'
+    ? { ...overlay, active: false }
+    : { ...overlay, active: overlay.active };
+
+  saveState({ presentationOverlay: nextOverlay });
+
+  if (nextOverlay.active && nextOverlay.durationMs && nextOverlay.durationMs > 0) {
+    presentationOverlayClearTimer = setTimeout(() => {
+      saveState({
+        presentationOverlay: {
+          ...nextOverlay,
+          active: false,
+          startedAt: Date.now(),
+        },
+      });
+      presentationOverlayClearTimer = null;
+    }, nextOverlay.durationMs);
+  }
 }
 
 export function startPairingReconciliation(identity: DeviceIdentity, config: AgentConfig): () => void {
@@ -370,6 +418,7 @@ export function sendHeartbeat(identity: DeviceIdentity): void {
       mode: state.mode,
       timerState: state.timerState,
       calibrationData: state.calibrationData,
+      presentationOverlay: state.presentationOverlay,
     },
     networkStatus: {
       ssid: undefined,

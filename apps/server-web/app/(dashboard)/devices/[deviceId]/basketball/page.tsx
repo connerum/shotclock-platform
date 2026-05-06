@@ -11,6 +11,7 @@ import {
   startTimerState,
   stopTimerState,
 } from '@shotclock/shared/timer';
+import GamePresentationControls from '../GamePresentationControls';
 
 interface Device {
   id: string;
@@ -315,6 +316,8 @@ export default function BasketballPage({ params }: { params: { deviceId: string 
           </div>
         </div>
       </div>
+
+      <GamePresentationControls deviceId={deviceId} />
     </div>
   );
 }

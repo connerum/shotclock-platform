@@ -102,6 +102,30 @@ export interface DeviceMode {
   subMode?: string;
 }
 
+export type PresentationOverlayType =
+  | 'advertisement'
+  | 'school-logo'
+  | 'sponsor'
+  | 'team-intro'
+  | 'champion'
+  | 'sound-horn'
+  | 'music'
+  | 'emergency-weather'
+  | 'emergency-medical'
+  | 'clear';
+
+export type PresentationOverlayAccent = 'blue' | 'green' | 'yellow' | 'orange' | 'purple' | 'red';
+
+export interface PresentationOverlay {
+  type: PresentationOverlayType;
+  title: string;
+  message?: string;
+  accent: PresentationOverlayAccent;
+  active: boolean;
+  startedAt: number;
+  durationMs?: number;
+}
+
 export interface NetworkStatus {
   ssid?: string;
   signalStrength: number;
@@ -114,6 +138,7 @@ export interface DisplayStatePayload {
   timerState?: TimerState;
   mediaAssetId?: string;
   calibrationData?: CalibrationData;
+  presentationOverlay?: PresentationOverlay;
 }
 
 // Update types
@@ -222,6 +247,7 @@ export interface ServerToDeviceEvents {
   'state:update': (state: TimerState, ack?: (response: DeviceCommandAck) => void) => void;
   'config:update': (config: DisplayConfigPayload, ack?: (response: DeviceCommandAck) => void) => void;
   'mode:set': (mode: DeviceMode, ack?: (response: DeviceCommandAck) => void) => void;
+  'presentation:show': (overlay: PresentationOverlay, ack?: (response: DeviceCommandAck) => void) => void;
   'pairing:complete': (payload: PairingResponse, ack?: (response: DeviceCommandAck) => void) => void;
   'update:check': (ack?: (response: DeviceCommandAck) => void) => void;
   'update:install': (version: string, ack?: (response: DeviceCommandAck) => void) => void;

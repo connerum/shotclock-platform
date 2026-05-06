@@ -1,10 +1,17 @@
 // POST /api/devices/[deviceId]/command → dispatch command to device via Socket.IO
-// Commands: set_mode, set_timer, update_config, factory_reset, reboot, check_update, install_update
+// Commands: set_mode, set_timer, presentation, update_config, factory_reset, reboot, check_update, install_update
 
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getServerIO } from '@/lib/socket';
-import { DeviceCommandAck, DeviceMode, TimerState } from '@shotclock/shared/types';
+import type {
+  DeviceCommandAck,
+  DeviceMode,
+  PresentationOverlay,
+  PresentationOverlayAccent,
+  PresentationOverlayType,
+  TimerState,
+} from '@shotclock/shared/types';
 import { canAccessDevice, requireApiUser } from '@/lib/auth';
 
 interface RouteParams {
@@ -126,6 +133,30 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         };
 
         await persistTimerCommand(deviceId, displayState);
+
+        return NextResponse.json({
+          success: true,
+          command: type,
+          acknowledged: true,
+          dispatchedAt: new Date().toISOString(),
+        });
+      }
+
+      case 'presentation': {
+        const overlay = normalizePresentationOverlay(payload?.overlay);
+        if (!overlay) {
+          return NextResponse.json(
+            { error: 'Missing or invalid presentation overlay' },
+            { status: 400 }
+          );
+        }
+
+        const ack = await emitDeviceCommand(deviceNamespace, room, 'presentation:show', overlay);
+        if (!ack.success) {
+          return commandAckError(ack);
+        }
+
+        await persistPresentationOverlay(deviceId, overlay);
 
         return NextResponse.json({
           success: true,
@@ -263,6 +294,88 @@ function commandAckError(ack: DeviceCommandAck) {
     { success: false, error: ack.error || 'Device did not acknowledge command' },
     { status: 504 }
   );
+}
+
+const PRESENTATION_TYPES = new Set<PresentationOverlayType>([
+  'advertisement',
+  'school-logo',
+  'sponsor',
+  'team-intro',
+  'champion',
+  'sound-horn',
+  'music',
+  'emergency-weather',
+  'emergency-medical',
+  'clear',
+]);
+
+const PRESENTATION_ACCENTS = new Set<PresentationOverlayAccent>([
+  'blue',
+  'green',
+  'yellow',
+  'orange',
+  'purple',
+  'red',
+]);
+
+function normalizePresentationOverlay(raw: unknown): PresentationOverlay | null {
+  if (!raw || typeof raw !== 'object') return null;
+
+  const overlay = raw as Partial<PresentationOverlay>;
+  if (!overlay.type || !PRESENTATION_TYPES.has(overlay.type)) return null;
+
+  const title = typeof overlay.title === 'string' && overlay.title.trim()
+    ? overlay.title.trim().slice(0, 32)
+    : overlay.type === 'clear'
+      ? 'CLEAR'
+      : null;
+  if (!title) return null;
+
+  const accent = overlay.accent && PRESENTATION_ACCENTS.has(overlay.accent)
+    ? overlay.accent
+    : 'blue';
+  const durationMs = typeof overlay.durationMs === 'number'
+    ? Math.max(0, Math.min(30000, Math.round(overlay.durationMs)))
+    : undefined;
+
+  return {
+    type: overlay.type,
+    title,
+    ...(typeof overlay.message === 'string' && overlay.message.trim()
+      ? { message: overlay.message.trim().slice(0, 48) }
+      : {}),
+    accent,
+    active: overlay.type === 'clear' ? false : overlay.active !== false,
+    startedAt: Date.now(),
+    ...(durationMs ? { durationMs } : {}),
+  };
+}
+
+async function persistPresentationOverlay(deviceId: string, overlay: PresentationOverlay): Promise<void> {
+  try {
+    const device = await prisma.device.findUnique({
+      where: { deviceId },
+      select: { displayState: true, mode: true },
+    });
+
+    const existingDisplayState = device?.displayState
+      ? JSON.parse(device.displayState)
+      : {};
+    const nextDisplayState = {
+      ...existingDisplayState,
+      mode: existingDisplayState.mode || device?.mode || 'shot-clock',
+      presentationOverlay: overlay,
+    };
+
+    await prisma.device.update({
+      where: { deviceId },
+      data: {
+        displayState: JSON.stringify(nextDisplayState),
+      },
+    });
+  } catch (error) {
+    console.warn(`Unable to persist presentation overlay for ${deviceId}; live command was still dispatched`, error);
+  }
 }
 
 async function persistTimerCommand(

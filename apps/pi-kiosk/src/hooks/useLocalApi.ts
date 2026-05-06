@@ -1,11 +1,18 @@
 // useLocalApi hook - Polls /local/state, /local/config
 
 import { useState, useEffect, useCallback } from 'react';
-import type { TimerState, DeviceMode, DisplayProfile, CalibrationData } from '@shotclock/shared/types';
+import type {
+  TimerState,
+  DeviceMode,
+  DisplayProfile,
+  CalibrationData,
+  PresentationOverlay,
+} from '@shotclock/shared/types';
 
 interface LocalApiState {
   mode?: DeviceMode;
   timerState?: TimerState;
+  presentationOverlay?: PresentationOverlay;
 }
 
 interface LocalApiConfig {

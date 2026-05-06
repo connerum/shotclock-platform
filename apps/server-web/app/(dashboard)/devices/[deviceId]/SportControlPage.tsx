@@ -10,6 +10,7 @@ import {
   startTimerState,
   stopTimerState,
 } from '@shotclock/shared/timer';
+import GamePresentationControls from './GamePresentationControls';
 
 type SportConfig = {
   sport: SportType;
@@ -234,6 +235,8 @@ export default function SportControlPage({ deviceId, config }: { deviceId: strin
           )}
         </div>
       </div>
+
+      <GamePresentationControls deviceId={deviceId} />
     </div>
   );
 }

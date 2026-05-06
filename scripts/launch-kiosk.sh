@@ -101,6 +101,7 @@ CHROMIUM_ARGS=(
   --disable-background-networking
   --disable-sync
   --disable-default-apps
+  --autoplay-policy=no-user-gesture-required
   --no-first-run
   --noerrdialogs
   --password-store=basic
