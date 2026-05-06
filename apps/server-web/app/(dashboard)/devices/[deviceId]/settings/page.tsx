@@ -620,8 +620,8 @@ export default function DeviceDetailPage({ params }: { params: { deviceId: strin
 
   return (
     <div>
-      <div className="mb-8">
-        <Link href={`/devices/${deviceId}`} className="text-gray-400 hover:text-white mb-4 inline-block">
+      <div className="mb-5">
+        <Link href={`/devices/${deviceId}`} className="mb-3 inline-block text-sm text-gray-400 hover:text-white">
           ← Back to Sports
         </Link>
         {commandError && (
@@ -629,13 +629,13 @@ export default function DeviceDetailPage({ params }: { params: { deviceId: strin
             {commandError}
           </div>
         )}
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div>
-            <h1 className="text-3xl font-bold">{device.name}</h1>
-            <p className="mt-1 text-lg font-semibold text-white/70">Device Details/Settings</p>
+            <h1 className="text-2xl font-bold md:text-3xl">{device.name}</h1>
+            <p className="mt-1 text-base font-semibold text-white/70">Device Details/Settings</p>
             <p className="text-gray-400 mt-1 font-mono text-sm">{device.deviceId}</p>
           </div>
-          <div className="flex items-center space-x-4">
+          <div className="flex flex-wrap items-center gap-3">
             <span className={`px-3 py-1 rounded-full text-sm font-medium ${
               device.isOnline ? 'bg-green-900 text-green-400' : 'bg-gray-700 text-gray-400'
             }`}>
@@ -648,17 +648,17 @@ export default function DeviceDetailPage({ params }: { params: { deviceId: strin
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         {/* Mode Controls */}
-        <div className="bg-gray-900 rounded-lg p-6">
-          <h2 className="text-xl font-semibold mb-4">Mode Controls</h2>
-          <div className="grid grid-cols-4 gap-2">
+        <div className="bg-gray-900 rounded-lg p-5">
+          <h2 className="mb-3 text-lg font-semibold">Mode Controls</h2>
+          <div className="grid grid-cols-3 gap-2 sm:grid-cols-5">
             {DEVICE_MODES.map((mode) => (
               <button
                 key={mode}
                 onClick={() => setMode(mode)}
                 disabled={saving}
-                className={`px-3 py-2 rounded text-sm font-medium transition-colors ${
+                className={`rounded px-2 py-2 text-sm font-medium transition-colors ${
                   device.mode === mode
                     ? 'bg-green-600 text-white'
                     : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
@@ -668,16 +668,16 @@ export default function DeviceDetailPage({ params }: { params: { deviceId: strin
               </button>
             ))}
           </div>
-          <div className="mt-4">
+          <div className="mt-3">
             <span className="text-gray-400 text-sm">Current Mode: </span>
             <span className="font-medium text-green-400">{device.mode || 'unknown'}</span>
           </div>
         </div>
 
         {/* Connection Info */}
-        <div className="bg-gray-900 rounded-lg p-6">
-          <h2 className="text-xl font-semibold mb-4">Connection Info</h2>
-          <div className="space-y-3 text-sm">
+        <div className="bg-gray-900 rounded-lg p-5">
+          <h2 className="mb-3 text-lg font-semibold">Connection Info</h2>
+          <div className="space-y-2 text-sm">
             <div className="flex justify-between">
               <span className="text-gray-400">IP Address</span>
               <span className="font-mono">192.168.1.100</span>
@@ -694,26 +694,19 @@ export default function DeviceDetailPage({ params }: { params: { deviceId: strin
         </div>
 
         {/* Media Management */}
-        <div className="rounded-lg bg-gray-900 p-6 lg:col-span-2">
-          <div className="mb-5 flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
+        <div className="rounded-lg bg-gray-900 p-5 lg:col-span-2">
+          <div className="mb-4 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
             <div>
-              <h2 className="text-xl font-semibold">Presentation Media</h2>
-              <p className="mt-1 text-sm text-gray-400">
-                Upload the media used by the Ads, Logo, Sponsor, Team Intro, and Music buttons.
-              </p>
+              <h2 className="text-lg font-semibold">Presentation Media</h2>
+              <p className="mt-1 text-sm text-gray-400">Ads, Logo, Sponsor, Team Intro, and Music assets.</p>
             </div>
             <button
               onClick={fetchMediaAssets}
               disabled={mediaLoading}
-              className="rounded bg-gray-800 px-4 py-2 text-sm font-medium hover:bg-gray-700 disabled:opacity-50"
+              className="w-full rounded bg-gray-800 px-4 py-2 text-sm font-medium hover:bg-gray-700 disabled:opacity-50 md:w-auto"
             >
               Refresh
             </button>
-          </div>
-
-          <div className="mb-4 rounded border border-blue-900/60 bg-blue-950/30 p-3 text-sm text-blue-100/90">
-            Files are stored on disk under the server&apos;s public media folder. SQLite stores metadata, device ownership,
-            active status, and which button slot each file belongs to.
           </div>
 
           {mediaError && (
@@ -722,19 +715,19 @@ export default function DeviceDetailPage({ params }: { params: { deviceId: strin
             </div>
           )}
 
-          <div className="grid grid-cols-1 gap-4 xl:grid-cols-5">
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2 2xl:grid-cols-5">
             {MEDIA_SLOT_CONFIG.map((slotConfig) => {
               const slotAssets = mediaAssets.filter((asset) => asset.slot === slotConfig.slot);
               const activeCount = slotAssets.filter((asset) => asset.isActive).length;
 
               return (
-                <div key={slotConfig.slot} className="rounded-lg border border-gray-800 bg-gray-950/70 p-4">
-                  <div className="mb-3">
+                <div key={slotConfig.slot} className="rounded-lg border border-gray-800 bg-gray-950/70 p-3">
+                  <div className="mb-2">
                     <h3 className="font-semibold">{slotConfig.title}</h3>
-                    <p className="mt-1 min-h-10 text-xs text-gray-400">{slotConfig.description}</p>
+                    <p className="mt-1 text-xs leading-snug text-gray-400">{slotConfig.description}</p>
                   </div>
 
-                  <label className="block cursor-pointer rounded border border-dashed border-gray-700 bg-gray-900 px-3 py-3 text-center text-sm font-medium text-gray-200 hover:border-gray-500 hover:bg-gray-800">
+                  <label className="block cursor-pointer rounded border border-dashed border-gray-700 bg-gray-900 px-3 py-2 text-center text-sm font-medium text-gray-200 hover:border-gray-500 hover:bg-gray-800">
                     {uploadingSlot === slotConfig.slot ? 'Uploading...' : 'Upload'}
                     <input
                       type="file"
@@ -748,16 +741,16 @@ export default function DeviceDetailPage({ params }: { params: { deviceId: strin
                     />
                   </label>
 
-                  <div className="mt-3 text-xs text-gray-500">
+                  <div className="mt-2 text-xs text-gray-500">
                     {activeCount} active / {slotAssets.length} total
                   </div>
 
-                  <div className="mt-3 space-y-2">
+                  <div className="mt-2 max-h-52 space-y-2 overflow-y-auto pr-1">
                     {slotAssets.length === 0 && (
                       <div className="rounded bg-gray-900 p-3 text-xs text-gray-500">No media uploaded</div>
                     )}
                     {slotAssets.map((asset) => (
-                      <div key={asset.id} className="rounded border border-gray-800 bg-black/30 p-3">
+                      <div key={asset.id} className="rounded border border-gray-800 bg-black/30 p-2">
                         <div className="truncate text-sm font-medium" title={asset.originalFilename}>
                           {asset.originalFilename}
                         </div>
@@ -810,9 +803,9 @@ export default function DeviceDetailPage({ params }: { params: { deviceId: strin
         </div>
 
         {/* Calibration Panel */}
-        <div className="bg-gray-900 rounded-lg p-6">
-          <h2 className="text-xl font-semibold mb-4">Display Calibration</h2>
-          <div className="space-y-4">
+        <div className="bg-gray-900 rounded-lg p-5">
+          <h2 className="mb-3 text-lg font-semibold">Display Calibration</h2>
+          <div className="space-y-3">
             <div
               ref={calibrationStageRef}
               onPointerDown={startDrawCalibrationBox}
@@ -867,19 +860,19 @@ export default function DeviceDetailPage({ params }: { params: { deviceId: strin
             </div>
 
             <div className="grid grid-cols-4 gap-2 text-center text-sm">
-              <div className="rounded bg-gray-800 p-3">
+              <div className="rounded bg-gray-800 p-2">
                 <div className="text-gray-400">X</div>
                 <div className="mt-1 font-mono text-lg">{calibration.x}</div>
               </div>
-              <div className="rounded bg-gray-800 p-3">
+              <div className="rounded bg-gray-800 p-2">
                 <div className="text-gray-400">Y</div>
                 <div className="mt-1 font-mono text-lg">{calibration.y}</div>
               </div>
-              <div className="rounded bg-gray-800 p-3">
+              <div className="rounded bg-gray-800 p-2">
                 <div className="text-gray-400">Width</div>
                 <div className="mt-1 font-mono text-lg">{calibration.width}</div>
               </div>
-              <div className="rounded bg-gray-800 p-3">
+              <div className="rounded bg-gray-800 p-2">
                 <div className="text-gray-400">Height</div>
                 <div className="mt-1 font-mono text-lg">{calibration.height}</div>
               </div>
@@ -920,10 +913,10 @@ export default function DeviceDetailPage({ params }: { params: { deviceId: strin
         </div>
 
         {/* Color Correction */}
-        <div className="bg-gray-900 rounded-lg p-6">
-          <h2 className="text-xl font-semibold mb-4">Color Correction</h2>
-          <div className="space-y-4">
-            <div className="rounded border border-gray-800 bg-gray-950 p-4">
+        <div className="bg-gray-900 rounded-lg p-5">
+          <h2 className="mb-3 text-lg font-semibold">Color Correction</h2>
+          <div className="space-y-3">
+            <div className="rounded border border-gray-800 bg-gray-950 p-3">
               <div className="flex items-start justify-between gap-4">
                 <div>
                   <div className="font-medium">RGB to BGR channel swap</div>
@@ -964,9 +957,9 @@ export default function DeviceDetailPage({ params }: { params: { deviceId: strin
         </div>
 
         {/* Update Controls */}
-        <div className="bg-gray-900 rounded-lg p-6">
-          <h2 className="text-xl font-semibold mb-4">Firmware Updates</h2>
-          <div className="space-y-4">
+        <div className="bg-gray-900 rounded-lg p-5">
+          <h2 className="mb-3 text-lg font-semibold">Firmware Updates</h2>
+          <div className="space-y-3">
             <div className="flex justify-between items-center">
               <span className="text-gray-400">Current Version</span>
               <span className="font-mono">{device.firmwareVersion || 'Unknown'}</span>

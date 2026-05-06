@@ -229,8 +229,8 @@ export default function BasketballPage({ params }: { params: { deviceId: string 
 
   return (
     <div>
-      <div className="mb-8">
-        <Link href={`/devices/${deviceId}`} className="mb-4 inline-block text-gray-400 hover:text-white">
+      <div className="mb-5">
+        <Link href={`/devices/${deviceId}`} className="mb-3 inline-block text-sm text-gray-400 hover:text-white">
           ← Back to Sports
         </Link>
         {commandError && (
@@ -238,9 +238,9 @@ export default function BasketballPage({ params }: { params: { deviceId: string 
             {commandError}
           </div>
         )}
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div>
-            <h1 className="text-3xl font-bold">Basketball Controls</h1>
+            <h1 className="text-2xl font-bold md:text-3xl">Basketball Controls</h1>
             <p className="mt-1 font-mono text-sm text-gray-400">{device.deviceId}</p>
           </div>
           <span className={`rounded-full px-3 py-1 text-sm font-medium ${
@@ -251,12 +251,12 @@ export default function BasketballPage({ params }: { params: { deviceId: string 
         </div>
       </div>
 
-      <section className="cc-card mb-6 p-8 text-center md:p-10">
+      <section className="cc-card mb-4 p-6 text-center md:p-7">
         <div className="text-xs font-bold uppercase tracking-[0.22em] text-gray-500">Shot Clock</div>
-        <div className={`mt-4 font-mono text-8xl font-black leading-none tabular-nums md:text-[8rem] ${shotClockTone}`}>
+        <div className={`mt-3 font-mono text-7xl font-black leading-none tabular-nums md:text-[7rem] ${shotClockTone}`}>
           {displayedShotClock}
         </div>
-        <div className="mt-6 flex items-center justify-center gap-3 text-sm font-semibold text-gray-300">
+        <div className="mt-4 flex flex-wrap items-center justify-center gap-3 text-sm font-semibold text-gray-300">
           <span className={`h-3 w-3 rounded-full ${
             timerRunning ? 'bg-green-400 shadow-[0_0_14px_rgba(34,197,94,0.7)]' : 'bg-gray-600'
           }`} />
@@ -268,7 +268,7 @@ export default function BasketballPage({ params }: { params: { deviceId: string 
         </div>
       </section>
 
-      <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <ControlCard title="Timer Control" icon="PLAY" accentClass="bg-blue-500/15 text-blue-300">
           <button
             onClick={timerRunning ? pauseTimer : startTimer}
@@ -388,8 +388,8 @@ function ControlCard({
   children: ReactNode;
 }) {
   return (
-    <section className="cc-card cc-card-hover p-6">
-      <div className="mb-5 flex items-center gap-3">
+    <section className="cc-card cc-card-hover p-5">
+      <div className="mb-4 flex items-center gap-3">
         <span className={`grid h-9 w-9 place-items-center rounded-lg text-xs font-black ${accentClass}`}>
           {icon}
         </span>

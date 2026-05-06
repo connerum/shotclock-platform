@@ -226,9 +226,9 @@ export default function GamePresentationControls({ deviceId }: { deviceId: strin
 
   return (
     <section className="mt-6">
-      <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+      <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <div>
-          <h2 className="text-2xl font-bold">Game Presentation</h2>
+          <h2 className="text-xl font-bold md:text-2xl">Game Presentation</h2>
           <p className="mt-1 text-sm text-gray-400">Display actions shared by every sport mode.</p>
         </div>
         <button
@@ -252,17 +252,17 @@ export default function GamePresentationControls({ deviceId }: { deviceId: strin
         </div>
       )}
 
-      <div className="grid grid-cols-1 gap-5 xl:grid-cols-4">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
         {PRESENTATION_GROUPS.map((group) => (
-          <div key={group.title} className="cc-card p-5">
+          <div key={group.title} className="cc-card p-4">
             <h3 className="text-lg font-semibold">{group.title}</h3>
-            <p className="mt-1 min-h-10 text-sm text-gray-400">{group.description}</p>
-            <div className="mt-5 grid gap-3">
+            <p className="mt-1 text-sm leading-snug text-gray-400">{group.description}</p>
+            <div className="mt-4 grid gap-2">
               {group.actions.map((action) => (
                 <button
                   key={action.type}
                   type="button"
-                  className={`cc-btn ${action.buttonClass} min-h-14 px-4 py-3 text-left disabled:cursor-wait disabled:opacity-60`}
+                  className={`cc-btn ${action.buttonClass} min-h-12 px-4 py-2.5 text-left disabled:cursor-wait disabled:opacity-60`}
                   disabled={pendingType !== null}
                   onClick={() => void sendPresentation(action)}
                   title={action.description}
