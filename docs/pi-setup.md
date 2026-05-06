@@ -265,6 +265,14 @@ Upload media for:
 
 The WebUI stores metadata in SQLite and stores files under `apps/server-web/public/media/devices/`. The Pi receives public media URLs through presentation commands and renders images/videos or plays audio in the kiosk overlay.
 
+## Color Correction
+
+RGB to BGR channel swap correction is enabled by default on the kiosk output. This compensates for LED processor paths where the receiver swaps red and blue channels. Disable or re-enable it from the device settings page after confirming colors on the physical LED panels:
+
+```text
+https://courtcast.safety-linq.com/devices/[deviceId]/settings
+```
+
 ## Troubleshooting
 
 ### Pi doesn't boot

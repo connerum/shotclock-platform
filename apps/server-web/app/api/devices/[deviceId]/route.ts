@@ -39,7 +39,7 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
 
     const parsedDevice = {
       ...device,
-      displayProfile: device.displayProfile ? JSON.parse(device.displayProfile) : null,
+      displayProfile: withDefaultColorCorrection(device.displayProfile ? JSON.parse(device.displayProfile) : null),
       displayState: device.displayState ? JSON.parse(device.displayState) : null,
       calibrationData: device.calibrationData ? JSON.parse(device.calibrationData) : null,
       capabilities: JSON.parse(device.capabilities || '[]'),
@@ -94,4 +94,15 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     console.error('Error updating device:', error);
     return NextResponse.json({ error: 'Failed to update device' }, { status: 500 });
   }
+}
+
+function withDefaultColorCorrection<T extends Record<string, any> | null>(displayProfile: T): T {
+  if (!displayProfile) return displayProfile;
+
+  return {
+    ...displayProfile,
+    colorCorrection: {
+      rgbToBgr: displayProfile.colorCorrection?.rgbToBgr ?? true,
+    },
+  } as T;
 }

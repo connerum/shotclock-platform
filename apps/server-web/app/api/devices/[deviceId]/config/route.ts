@@ -30,7 +30,7 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
     }
 
     const config = {
-      displayProfile: device.displayProfile ? JSON.parse(device.displayProfile) : null,
+      displayProfile: withDefaultColorCorrection(device.displayProfile ? JSON.parse(device.displayProfile) : null),
       calibrationData: device.calibrationData ? JSON.parse(device.calibrationData) : null,
     };
 
@@ -61,7 +61,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     const updateData: any = {};
     
     if (body.displayProfile !== undefined) {
-      updateData.displayProfile = JSON.stringify(body.displayProfile);
+      updateData.displayProfile = JSON.stringify(withDefaultColorCorrection(body.displayProfile));
     }
     if (body.calibrationData !== undefined) {
       updateData.calibrationData = JSON.stringify(body.calibrationData);
@@ -76,7 +76,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     const io = getServerIO();
     if (io) {
       io.of('/device').to(`device:${deviceId}`).emit('config:update', {
-        displayProfile: body.displayProfile,
+        displayProfile: withDefaultColorCorrection(body.displayProfile),
         calibrationData: body.calibrationData,
         brightness: body.brightness,
         orientation: body.orientation,
@@ -85,10 +85,21 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
 
     return NextResponse.json({ 
       success: true,
-      displayProfile: body.displayProfile,
+      displayProfile: withDefaultColorCorrection(body.displayProfile),
     });
   } catch (error) {
     console.error('Error updating config:', error);
     return NextResponse.json({ error: 'Failed to update config' }, { status: 500 });
   }
+}
+
+function withDefaultColorCorrection<T extends Record<string, any> | null | undefined>(displayProfile: T): T {
+  if (!displayProfile) return displayProfile;
+
+  return {
+    ...displayProfile,
+    colorCorrection: {
+      rgbToBgr: displayProfile.colorCorrection?.rgbToBgr ?? true,
+    },
+  } as T;
 }

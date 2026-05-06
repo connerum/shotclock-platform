@@ -438,7 +438,15 @@ tar -czf /root/courtcast-media-backup.tgz -C /opt/courtcast/shotclock-platform a
 cp /opt/courtcast/data/prod.db /root/courtcast-prod.db.backup
 ```
 
-## 12. Factory Reset
+## 12. Color Correction
+
+The kiosk output enables RGB to BGR channel swap correction by default for LED processor chains that swap red and blue channels. Toggle and save it per device from:
+
+```text
+https://courtcast.safety-linq.com/devices/[deviceId]/settings
+```
+
+## 13. Factory Reset
 
 Factory reset is available from the device settings page. It removes the device record from the WebUI, clears pairing/network/display state on the Pi, and reboots the Pi back into setup mode.
 
@@ -449,7 +457,7 @@ After factory reset, repeat:
 3. Configure WiFi.
 4. Pair the new code from `https://courtcast.safety-linq.com/pair`.
 
-## 13. First LED Test Order
+## 14. First LED Test Order
 
 Use a normal HDMI monitor first.
 

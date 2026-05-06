@@ -130,6 +130,9 @@ All items must pass before deployment is considered complete.
 - [ ] Calibration data can be saved: `POST /local/config` with calibration data
 - [ ] Saved calibration persists across agent restarts
 - [ ] Calibration can be reset
+- [ ] RGB to BGR color correction is enabled by default
+- [ ] Color correction can be disabled from device settings
+- [ ] Saved color correction state persists across Pi restarts
 
 ---
 

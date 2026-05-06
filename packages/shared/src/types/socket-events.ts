@@ -36,6 +36,7 @@ export interface DisplayProfile {
   safeZone: SafeZone;
   fontSize: FontSizeConfig;
   colors: ColorConfig;
+  colorCorrection?: ColorCorrectionConfig;
 }
 
 export interface Viewport {
@@ -71,6 +72,10 @@ export interface ColorConfig {
   awayTeam: string;
   warning: string;
   danger: string;
+}
+
+export interface ColorCorrectionConfig {
+  rgbToBgr: boolean;
 }
 
 export interface CalibrationData {
@@ -283,5 +288,6 @@ export const DEFAULT_DISPLAY_PROFILE: DisplayProfile = {
     awayTeam: '#0000ff',
     warning: '#ffff00',
     danger: '#ff0000'
-  }
+  },
+  colorCorrection: { rgbToBgr: true }
 };

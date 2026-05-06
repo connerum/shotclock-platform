@@ -201,6 +201,14 @@ The Presentation Media section manages files for:
 
 The database stores metadata and slot assignments in `DeviceMediaAsset`. Files are stored on disk under `apps/server-web/public/media/devices/`. This keeps SQLite small and gives a straightforward future path to object storage if needed.
 
+## Color Correction
+
+The Pi kiosk applies RGB to BGR color correction by default for LED processor chains that swap red and blue channels, such as Pi HDMI to NovaStar Taurus M3 to LED panels. Toggle and save this per device from:
+
+```text
+/devices/[deviceId]/settings
+```
+
 ## Troubleshooting
 
 ### Agent won't start

@@ -21,7 +21,7 @@ export function setupDeviceHandlers(socket: TypedSocket, io: TypedServer): void 
       const isPaired = isDevicePaired(existingDevice) && !shouldAcceptPairingCode;
       const storedDisplayProfile = parseJsonField(existingDevice?.displayProfile);
       const storedCalibrationData = parseJsonField(existingDevice?.calibrationData);
-      const displayProfile = storedDisplayProfile || data.displayProfile;
+      const displayProfile = withDefaultColorCorrection(storedDisplayProfile || data.displayProfile);
       const pairingCodeExp = data.pairingCodeExpiresAt
         ? new Date(data.pairingCodeExpiresAt)
         : data.pairingCode
@@ -54,7 +54,7 @@ export function setupDeviceHandlers(socket: TypedSocket, io: TypedServer): void 
           firmwareVersion: data.firmwareVersion,
           controllerType: data.controllerType,
           capabilities: JSON.stringify(data.capabilities || []),
-          displayProfile: JSON.stringify(data.displayProfile),
+          displayProfile: JSON.stringify(withDefaultColorCorrection(data.displayProfile)),
           pairingCode: data.pairingCode || null,
           pairingCodeExp,
           mode: data.pairingCode ? 'pairing' : 'setup',
@@ -231,4 +231,15 @@ function parseJsonField(value: string | null | undefined): any | null {
   } catch {
     return null;
   }
+}
+
+function withDefaultColorCorrection<T extends Record<string, any> | null>(displayProfile: T): T {
+  if (!displayProfile) return displayProfile;
+
+  return {
+    ...displayProfile,
+    colorCorrection: {
+      rgbToBgr: displayProfile.colorCorrection?.rgbToBgr ?? true,
+    },
+  };
 }

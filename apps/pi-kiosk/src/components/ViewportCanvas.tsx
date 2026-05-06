@@ -9,7 +9,7 @@ interface ViewportCanvasProps {
 }
 
 export default function ViewportCanvas({ displayProfile, children }: ViewportCanvasProps) {
-  const { cssVariables, transform } = displayProfile;
+  const { cssVariables, transform, colorCorrectionEnabled } = displayProfile;
 
   return (
     <div
@@ -19,6 +19,20 @@ export default function ViewportCanvas({ displayProfile, children }: ViewportCan
         ...cssVariables,
       }}
     >
+      <svg className="absolute h-0 w-0" aria-hidden="true" focusable="false">
+        <defs>
+          <filter id="rgb2bgr">
+            <feColorMatrix
+              type="matrix"
+              values="
+                0 0 1 0 0
+                0 1 0 0 0
+                1 0 0 0 0
+                0 0 0 1 0"
+            />
+          </filter>
+        </defs>
+      </svg>
       <div
         className="absolute left-0 top-0 overflow-hidden"
         style={{
@@ -26,6 +40,7 @@ export default function ViewportCanvas({ displayProfile, children }: ViewportCan
           height: 'calc(var(--viewport-height) * 1px)',
           transform,
           transformOrigin: 'top left',
+          filter: colorCorrectionEnabled ? 'url(#rgb2bgr)' : undefined,
         }}
       >
         {children}

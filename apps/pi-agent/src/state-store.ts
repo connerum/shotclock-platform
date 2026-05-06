@@ -39,6 +39,7 @@ const DEFAULT_DISPLAY_PROFILE: DisplayProfile = {
     warning: '#ffff00',
     danger: '#ff0000',
   },
+  colorCorrection: { rgbToBgr: true },
 };
 
 const DEFAULT_STATE: DeviceState = {

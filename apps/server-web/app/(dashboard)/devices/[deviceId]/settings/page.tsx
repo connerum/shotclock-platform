@@ -139,6 +139,9 @@ export default function DeviceDetailPage({ params }: { params: { deviceId: strin
   const [mediaLoading, setMediaLoading] = useState(true);
   const [mediaError, setMediaError] = useState<string | null>(null);
   const [uploadingSlot, setUploadingSlot] = useState<MediaSlot | null>(null);
+  const [rgbToBgrEnabled, setRgbToBgrEnabled] = useState(true);
+  const [savedRgbToBgrEnabled, setSavedRgbToBgrEnabled] = useState(true);
+  const [colorCorrectionSaving, setColorCorrectionSaving] = useState(false);
   
   // Calibration state
   const calibrationStageRef = useRef<HTMLDivElement | null>(null);
@@ -192,6 +195,9 @@ export default function DeviceDetailPage({ params }: { params: { deviceId: strin
       });
       setCalibration(nextCalibration);
       setSavedCalibration(nextCalibration);
+      const nextRgbToBgrEnabled = data.device.displayProfile?.colorCorrection?.rgbToBgr ?? true;
+      setRgbToBgrEnabled(nextRgbToBgrEnabled);
+      setSavedRgbToBgrEnabled(nextRgbToBgrEnabled);
     } catch (err) {
       setError('Failed to load device');
       console.error(err);
@@ -261,8 +267,9 @@ export default function DeviceDetailPage({ params }: { params: { deviceId: strin
     calibration.y !== savedCalibration.y ||
     calibration.width !== savedCalibration.width ||
     calibration.height !== savedCalibration.height;
+  const colorCorrectionChanged = rgbToBgrEnabled !== savedRgbToBgrEnabled;
 
-  const buildCalibrationConfig = (box: CalibrationBox, preview = false) => {
+  const buildCalibrationConfig = (box: CalibrationBox, preview = false, rgbToBgr = rgbToBgrEnabled) => {
     const viewport = {
       x: box.x,
       y: box.y,
@@ -280,6 +287,7 @@ export default function DeviceDetailPage({ params }: { params: { deviceId: strin
       safeZone: device?.displayProfile?.safeZone || { top: 40, right: 40, bottom: 40, left: 40 },
       fontSize: device?.displayProfile?.fontSize || { shotClock: 200, gameClock: 120, score: 150, period: 80, label: 40 },
       colors: device?.displayProfile?.colors || { background: '#000000', foreground: '#ffffff', accent: '#00ff00', homeTeam: '#ff0000', awayTeam: '#0000ff', warning: '#ffff00', danger: '#ff0000' },
+      colorCorrection: { rgbToBgr },
     };
     const calibrationData: CalibrationData = {
       ...viewport,
@@ -451,10 +459,34 @@ export default function DeviceDetailPage({ params }: { params: { deviceId: strin
       
       if (res.ok) {
         setSavedCalibration(calibration);
+        setSavedRgbToBgrEnabled(rgbToBgrEnabled);
         setDevice(prev => prev ? { ...prev, displayProfile, calibrationData } : null);
       }
     } finally {
       setSaving(false);
+    }
+  };
+
+  const saveColorCorrection = async () => {
+    setColorCorrectionSaving(true);
+    try {
+      const { displayProfile, calibrationData } = buildCalibrationConfig(calibration, false, rgbToBgrEnabled);
+
+      const res = await fetch(`/api/devices/${deviceId}/config`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          displayProfile,
+          calibrationData,
+        }),
+      });
+
+      if (res.ok) {
+        setSavedRgbToBgrEnabled(rgbToBgrEnabled);
+        setDevice(prev => prev ? { ...prev, displayProfile, calibrationData } : null);
+      }
+    } finally {
+      setColorCorrectionSaving(false);
     }
   };
 
@@ -883,6 +915,50 @@ export default function DeviceDetailPage({ params }: { params: { deviceId: strin
               className="w-full bg-green-600 hover:bg-green-700 py-2 rounded font-medium disabled:opacity-50"
             >
               {saving ? 'Saving...' : calibrationChanged ? 'Save Calibration' : 'Calibration Saved'}
+            </button>
+          </div>
+        </div>
+
+        {/* Color Correction */}
+        <div className="bg-gray-900 rounded-lg p-6">
+          <h2 className="text-xl font-semibold mb-4">Color Correction</h2>
+          <div className="space-y-4">
+            <div className="rounded border border-gray-800 bg-gray-950 p-4">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <div className="font-medium">RGB to BGR channel swap</div>
+                  <p className="mt-1 text-sm text-gray-400">
+                    Compensates for NovaStar Taurus receiver paths that swap red and blue channels from HDMI.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setRgbToBgrEnabled(value => !value)}
+                  className={`relative h-7 w-12 shrink-0 rounded-full transition-colors ${
+                    rgbToBgrEnabled ? 'bg-green-600' : 'bg-gray-700'
+                  }`}
+                  aria-pressed={rgbToBgrEnabled}
+                >
+                  <span
+                    className={`absolute top-1 h-5 w-5 rounded-full bg-white transition-transform ${
+                      rgbToBgrEnabled ? 'translate-x-6' : 'translate-x-1'
+                    }`}
+                  />
+                </button>
+              </div>
+              <div className="mt-3 text-sm">
+                <span className="text-gray-400">Current setting: </span>
+                <span className={rgbToBgrEnabled ? 'text-green-400' : 'text-gray-300'}>
+                  {rgbToBgrEnabled ? 'Enabled' : 'Disabled'}
+                </span>
+              </div>
+            </div>
+            <button
+              onClick={saveColorCorrection}
+              disabled={colorCorrectionSaving || saving}
+              className="w-full bg-green-600 hover:bg-green-700 py-2 rounded font-medium disabled:opacity-50"
+            >
+              {colorCorrectionSaving ? 'Saving...' : colorCorrectionChanged ? 'Save Color Correction' : 'Color Correction Saved'}
             </button>
           </div>
         </div>
