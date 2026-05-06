@@ -14,11 +14,12 @@ interface Device {
 }
 
 const SPORTS: Array<{
-  id: SportType;
+  id: SportType | 'settings';
   title: string;
   description: string;
   href: string;
   accent: string;
+  mode?: SportType;
 }> = [
   {
     id: 'basketball',
@@ -40,6 +41,13 @@ const SPORTS: Array<{
     description: 'Set, match, and team score controls.',
     href: 'volleyball',
     accent: 'from-green-500/30 to-cyan-500/20',
+  },
+  {
+    id: 'settings',
+    title: 'Device Details/Settings',
+    description: 'Mode, connection, calibration, firmware, and factory reset.',
+    href: 'settings',
+    accent: 'from-slate-500/30 to-zinc-500/20',
   },
 ];
 
@@ -69,20 +77,26 @@ export default function DeviceSportPage({ params }: { params: { deviceId: string
     void fetchDevice();
   }, [deviceId]);
 
-  const openSport = async (sport: SportType, href: string) => {
-    setSelectingSport(sport);
+  const openSport = async (sport: SportType | 'settings', href: string, mode?: SportType) => {
+    setSelectingSport(sport === 'settings' ? null : sport);
     setCommandError(null);
-    const mode: DeviceMode = { type: sport };
+
+    if (!mode) {
+      router.push(`/devices/${deviceId}/${href}`);
+      return;
+    }
+
+    const modePayload: DeviceMode = { type: mode };
 
     try {
       const response = await fetch(`/api/devices/${deviceId}/command`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type: 'set_mode', payload: { mode } }),
+        body: JSON.stringify({ type: 'set_mode', payload: { mode: modePayload } }),
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) {
-        throw new Error(data?.error || `Unable to switch display to ${sport}`);
+        throw new Error(data?.error || `Unable to switch display to ${mode}`);
       }
       router.push(`/devices/${deviceId}/${href}`);
     } catch (err) {
@@ -138,20 +152,20 @@ export default function DeviceSportPage({ params }: { params: { deviceId: string
         </div>
       )}
 
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
         {SPORTS.map((sport) => (
           <button
             key={sport.id}
             type="button"
             disabled={selectingSport !== null}
-            onClick={() => openSport(sport.id, sport.href)}
+            onClick={() => openSport(sport.id, sport.href, sport.id === 'settings' ? undefined : sport.id)}
             className="cc-card cc-card-hover min-h-48 p-6 text-left disabled:cursor-wait disabled:opacity-70"
           >
             <div className={`mb-5 h-20 rounded-lg bg-gradient-to-br ${sport.accent}`} />
             <h3 className="text-2xl font-bold">{sport.title}</h3>
             <p className="mt-2 text-sm leading-6 text-white/60">{sport.description}</p>
             <div className="mt-6 text-sm font-semibold text-green-400">
-              {selectingSport === sport.id ? 'Opening...' : 'Open controls'}
+              {selectingSport === sport.id ? 'Opening...' : sport.id === 'settings' ? 'Open settings' : 'Open controls'}
             </div>
           </button>
         ))}
