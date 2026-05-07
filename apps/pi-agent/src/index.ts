@@ -44,15 +44,23 @@ async function main() {
   const paired = isPaired();
   
   if (config.mode === 'setup') {
-    console.log(paired
-      ? 'Device is paired but WiFi setup is required - entering setup mode'
-      : 'Device not paired and WiFi not configured - entering setup mode');
+    const networkStatus = paired ? await wifiManager.getStatus() : null;
 
-    if (!paired) {
-      const pairingCode = regeneratePairingCode();
-      console.log(`Pairing code: ${pairingCode.code} (expires in 24 hours)`);
+    if (paired && networkStatus?.connected && networkStatus.ip) {
+      console.log('Device is paired and WiFi is connected; restoring online mode');
+      saveConfig({ mode: 'online' });
+      saveState({ mode: { type: 'shot-clock' } });
+    } else {
+      console.log(paired
+        ? 'Device is paired but WiFi setup is required - entering setup mode'
+        : 'Device not paired and WiFi not configured - entering setup mode');
+
+      if (!paired) {
+        const pairingCode = regeneratePairingCode();
+        console.log(`Pairing code: ${pairingCode.code} (expires in 24 hours)`);
+      }
+      await enterWifiSetupMode(identity, config, 'configured setup mode');
     }
-    await enterWifiSetupMode(identity, config, 'configured setup mode');
   } else if (!paired) {
     console.log('Device has WiFi configured but is not paired - entering pairing mode');
 

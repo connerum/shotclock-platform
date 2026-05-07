@@ -37,9 +37,21 @@ async function recoverToWifiSetup(): Promise<void> {
   if (config.mode !== 'online') return;
 
   recoveryInProgress = true;
-  console.warn('Server reconnect timed out; clearing saved WiFi and rebooting into setup AP');
+  console.warn('Server reconnect timed out; checking WiFi before entering setup recovery');
 
   try {
+    const networkStatus = await wifiManager.getStatus();
+
+    if (networkStatus.connected && networkStatus.ip) {
+      console.warn(
+        `Server is disconnected, but WiFi is still connected to ${networkStatus.ssid || 'unknown'} at ${networkStatus.ip}; keeping saved WiFi`
+      );
+      saveState({ mode: { type: 'offline' } });
+      recoveryInProgress = false;
+      return;
+    }
+
+    console.warn('WiFi is disconnected or missing an IP; clearing saved WiFi and rebooting into setup AP');
     saveConfig({ mode: 'setup' });
     saveState({ mode: { type: 'setup' } });
     await wifiManager.forgetSavedWifiNetworks();

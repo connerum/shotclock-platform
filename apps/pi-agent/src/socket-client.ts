@@ -46,7 +46,6 @@ export function setupSocketClient(
   
   socket = io(`${serverUrl.replace(/\/$/, '')}/device`, {
     path: '/socket.io',
-    transports: ['websocket'],
     reconnection: true,
     reconnectionAttempts: Infinity,
     reconnectionDelay: 1000,
