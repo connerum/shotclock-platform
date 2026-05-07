@@ -176,6 +176,7 @@ All items must pass before deployment is considered complete.
 - [ ] `shotclock-kiosk.service` installs correctly to `/etc/systemd/system/`
 - [ ] `shotclock-kiosk.service` runs as root and loads `/opt/shotclock/shared/.env`
 - [ ] `/opt/shotclock/shared/.env` sets `KIOSK_USER` to the active desktop user
+- [ ] `/opt/shotclock/shared/.env` sets `KIOSK_HIDE_CURSOR=true` for production displays
 - [ ] `systemctl enable shotclock-agent` succeeds
 - [ ] `systemctl enable shotclock-kiosk` succeeds
 - [ ] `systemctl start shotclock-agent` starts the agent
@@ -191,6 +192,7 @@ All items must pass before deployment is considered complete.
 - [ ] Node.js 22 is installed
 - [ ] pnpm is installed globally
 - [ ] Chromium and dependencies are installed (`chromium-browser` on older Raspberry Pi OS, `chromium` on Debian/Raspberry Pi OS Trixie)
+- [ ] `unclutter` is installed so the kiosk cursor hides before manual mouse movement
 - [ ] NetworkManager, hostapd, dnsmasq, avahi-daemon, libnss-mdns, iproute2, iptables, rfkill, iw, and wireless-regdb are installed
 - [ ] `/opt/shotclock` directory structure is created
 - [ ] `/home/shotclock/.shotclock` exists before services start

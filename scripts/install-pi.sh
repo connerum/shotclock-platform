@@ -72,6 +72,7 @@ CHROMIUM_DEPS=(
   libcairo2
   libpangocairo-1.0-0
   x11-xserver-utils
+  unclutter
 )
 
 # Debian/Raspberry Pi OS releases rename or remove a few compatibility packages.
@@ -139,6 +140,7 @@ ensure_env_default() {
 ensure_env_default "KIOSK_DISPLAY_OUTPUT" "auto"
 ensure_env_default "KIOSK_DISPLAY_MODE" "1024x768"
 ensure_env_default "KIOSK_DISPLAY_RATE" "60"
+ensure_env_default "KIOSK_HIDE_CURSOR" "true"
 
 echo ""
 echo "[8/12] Creating shotclock user..."

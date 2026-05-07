@@ -175,11 +175,14 @@ KIOSK_USER=admin
 KIOSK_DISPLAY_OUTPUT=auto
 KIOSK_DISPLAY_MODE=1024x768
 KIOSK_DISPLAY_RATE=60
+KIOSK_HIDE_CURSOR=true
 ```
 
 `KIOSK_USER` should be the Raspberry Pi desktop login user that owns the active HDMI session. On the current field Pi this is `admin`. The kiosk service starts as root, then launches Chromium as this user so it can attach to the visible desktop session.
 
 For NovaStar MSD300-1 controllers, keep the Pi kiosk output at `1024x768@60`. Field testing showed the MSD300-1 displayed moving blue-dot artifacts on running basketball displays at higher Pi output resolutions, while static images and the idle basketball display were clean. `1024x768@60` stopped the artifacts. RGB-to-BGR color correction should remain enabled for this controller path when needed for correct panel colors.
+
+`KIOSK_HIDE_CURSOR=true` starts `unclutter` before Chromium so the mouse pointer is hidden immediately, including before any manual mouse movement. To temporarily get the cursor back for desktop maintenance, set `KIOSK_HIDE_CURSOR=false` in `/opt/shotclock/shared/.env` and restart `shotclock-kiosk`.
 
 The setup AP is only broadcast while the device is unpaired. Its SSID is the configured prefix plus the first six characters of the unique device ID suffix, for example `Shotclock-Setup-1e4b35`.
 
@@ -193,6 +196,7 @@ SETUP_AP_SSID=Shotclock-Setup
 SETUP_AP_PASSWORD=shotclock123
 SETUP_PORTAL_HOST=sportsboard.local
 KIOSK_USER=admin
+KIOSK_HIDE_CURSOR=true
 ```
 
 ### 3. Enable Services
@@ -298,6 +302,31 @@ sudo systemctl restart shotclock-kiosk
 ```
 
 The launcher applies this with `xrandr` before Chromium starts. Leave `KIOSK_DISPLAY_OUTPUT=auto` unless the Pi has multiple connected outputs; then set it to the exact `xrandr` output name.
+
+## Kiosk Cursor
+
+Production kiosks should hide the cursor:
+
+```bash
+grep -q '^KIOSK_HIDE_CURSOR=' /opt/shotclock/shared/.env \
+  && sudo sed -i 's/^KIOSK_HIDE_CURSOR=.*/KIOSK_HIDE_CURSOR=true/' /opt/shotclock/shared/.env \
+  || echo 'KIOSK_HIDE_CURSOR=true' | sudo tee -a /opt/shotclock/shared/.env
+sudo apt-get update
+sudo apt-get install -y unclutter
+sudo systemctl restart shotclock-kiosk
+```
+
+To get the cursor back for maintenance:
+
+```bash
+grep -q '^KIOSK_HIDE_CURSOR=' /opt/shotclock/shared/.env \
+  && sudo sed -i 's/^KIOSK_HIDE_CURSOR=.*/KIOSK_HIDE_CURSOR=false/' /opt/shotclock/shared/.env \
+  || echo 'KIOSK_HIDE_CURSOR=false' | sudo tee -a /opt/shotclock/shared/.env
+sudo pkill -x unclutter || true
+sudo systemctl restart shotclock-kiosk
+```
+
+Set it back to `true` and restart `shotclock-kiosk` before returning the Pi to production.
 
 ## Troubleshooting
 

@@ -10,6 +10,7 @@ KIOSK_START_TIMEOUT="${KIOSK_START_TIMEOUT:-120}"
 KIOSK_DISPLAY_MODE="${KIOSK_DISPLAY_MODE:-1024x768}"
 KIOSK_DISPLAY_RATE="${KIOSK_DISPLAY_RATE:-60}"
 KIOSK_DISPLAY_OUTPUT="${KIOSK_DISPLAY_OUTPUT:-auto}"
+KIOSK_HIDE_CURSOR="${KIOSK_HIDE_CURSOR:-true}"
 
 echo "Launching Shotclock Kiosk..."
 
@@ -56,8 +57,44 @@ USER_DATA_DIR="/tmp/shotclock-kiosk-profile-${KIOSK_RUN_USER}"
 mkdir -p "$USER_DATA_DIR"
 chown "$KIOSK_RUN_USER:$KIOSK_RUN_USER" "$USER_DATA_DIR"
 
+cursor_hidden_enabled() {
+  case "${KIOSK_HIDE_CURSOR,,}" in
+    0|false|no|off)
+      return 1
+      ;;
+    *)
+      return 0
+      ;;
+  esac
+}
+
+append_query_param() {
+  local url="$1"
+  local param="$2"
+
+  if [[ "$url" == *\?* ]]; then
+    echo "${url}&${param}"
+  else
+    echo "${url}?${param}"
+  fi
+}
+
 if command -v xset >/dev/null 2>&1; then
   runuser -u "$KIOSK_RUN_USER" -- env DISPLAY="$DISPLAY" XAUTHORITY="$XAUTHORITY" xset s off -dpms s noblank >/dev/null 2>&1 || true
+fi
+
+if cursor_hidden_enabled; then
+  if command -v unclutter >/dev/null 2>&1; then
+    pkill -u "$KIOSK_RUN_USER" -x unclutter >/dev/null 2>&1 || true
+    runuser -u "$KIOSK_RUN_USER" -- env DISPLAY="$DISPLAY" XAUTHORITY="$XAUTHORITY" \
+      unclutter -idle 0.1 -root >/dev/null 2>&1 &
+  else
+    echo "Warning: KIOSK_HIDE_CURSOR=true, but unclutter is not installed"
+  fi
+else
+  pkill -u "$KIOSK_RUN_USER" -x unclutter >/dev/null 2>&1 || true
+  KIOSK_URL="$(append_query_param "$KIOSK_URL" "showCursor=1")"
+  echo "Kiosk cursor hiding disabled"
 fi
 
 apply_display_mode() {

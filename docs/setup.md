@@ -129,11 +129,14 @@ KIOSK_USER=admin
 KIOSK_DISPLAY_OUTPUT=auto
 KIOSK_DISPLAY_MODE=1024x768
 KIOSK_DISPLAY_RATE=60
+KIOSK_HIDE_CURSOR=true
 ```
 
 Set `KIOSK_USER` to the desktop login user that owns the HDMI session. On the current field Pi this is `admin`.
 
 For NovaStar MSD300-1 deployments, keep `KIOSK_DISPLAY_MODE=1024x768` and `KIOSK_DISPLAY_RATE=60`. Field testing found that higher Pi output resolutions could show moving blue-dot artifacts on running basketball displays even though static images and the idle basketball display were clean. RGB-to-BGR color correction remains appropriate on this controller path when it is needed for correct colors.
+
+Keep `KIOSK_HIDE_CURSOR=true` in production. The installer installs `unclutter`, and the kiosk launcher uses it to hide the cursor immediately. To temporarily show the cursor on the Pi desktop, set `KIOSK_HIDE_CURSOR=false` in `/opt/shotclock/shared/.env`, run `sudo pkill -x unclutter || true`, and restart `shotclock-kiosk`.
 
 Build and point systemd at the checkout:
 
