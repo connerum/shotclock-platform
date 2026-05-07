@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
 import Link from 'next/link';
-import { TimerState } from '@shotclock/shared/types';
+import { DeviceMode, TimerState } from '@shotclock/shared/types';
 import {
   clampSeconds,
   createDefaultTimerState,
@@ -54,6 +54,11 @@ export default function BasketballPage({ params }: { params: { deviceId: string 
     const interval = setInterval(() => setTimerNow(Date.now()), 250);
     return () => clearInterval(interval);
   }, [timerRunning]);
+
+  useEffect(() => {
+    if (!device) return;
+    void sendCommand('set_mode', { mode: buildBasketballMode(previewMode) });
+  }, [device?.deviceId]);
 
   const fetchDevice = async () => {
     try {
@@ -138,7 +143,7 @@ export default function BasketballPage({ params }: { params: { deviceId: string 
     };
 
     applyTimerState(timerState);
-    void sendCommand('set_timer', { timerState, mode: { type: 'basketball' } });
+    void sendCommand('set_timer', { timerState, mode: buildBasketballMode() });
   };
 
   const updateShotClock = (value: number) => {
@@ -163,7 +168,7 @@ export default function BasketballPage({ params }: { params: { deviceId: string 
 
   const startTimer = async () => {
     const timerState = startTimerState(buildCurrentTimerState());
-    const success = await sendCommand('set_timer', { timerState, mode: { type: 'basketball' } });
+    const success = await sendCommand('set_timer', { timerState, mode: buildBasketballMode() });
     if (success) {
       applyTimerState(timerState);
       setTimerRunning(true);
@@ -172,7 +177,7 @@ export default function BasketballPage({ params }: { params: { deviceId: string 
 
   const pauseTimer = async () => {
     const timerState = pauseTimerState(buildCurrentTimerState());
-    const success = await sendCommand('set_timer', { timerState, mode: { type: 'basketball' } });
+    const success = await sendCommand('set_timer', { timerState, mode: buildBasketballMode() });
     if (success) {
       applyTimerState(timerState);
       setTimerRunning(false);
@@ -186,7 +191,7 @@ export default function BasketballPage({ params }: { params: { deviceId: string 
       awayScore: 0,
       period: 1,
     });
-    const success = await sendCommand('set_timer', { timerState, mode: { type: 'basketball' } });
+    const success = await sendCommand('set_timer', { timerState, mode: buildBasketballMode() });
     if (success) {
       applyTimerState(timerState);
       setPeriod(timerState.period ?? 1);
@@ -205,6 +210,16 @@ export default function BasketballPage({ params }: { params: { deviceId: string 
     setTimerRunning(timerState.isRunning);
     setTimerLastUpdated(timerState.lastUpdated);
     setTimerNow(timerState.lastUpdated);
+  };
+
+  const buildBasketballMode = (mode = previewMode): DeviceMode => ({
+    type: 'basketball',
+    subMode: mode === 'regular' ? 'shot-clock-only' : 'advanced',
+  });
+
+  const switchPreviewMode = (mode: 'regular' | 'advanced') => {
+    setPreviewMode(mode);
+    void sendCommand('set_mode', { mode: buildBasketballMode(mode) });
   };
 
   if (loading) {
@@ -265,7 +280,7 @@ export default function BasketballPage({ params }: { params: { deviceId: string 
               <button
                 key={mode}
                 type="button"
-                onClick={() => setPreviewMode(mode)}
+                onClick={() => switchPreviewMode(mode)}
                 className={`rounded-md px-4 py-2 text-sm font-semibold capitalize transition-colors ${
                   previewMode === mode
                     ? 'bg-green-600 text-white'

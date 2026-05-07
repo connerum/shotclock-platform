@@ -17,7 +17,7 @@ import PresentationOverlay from './components/PresentationOverlay';
 type KioskMode = 'setup' | 'pairing' | 'offline' | 'basketball' | 'wrestling' | 'volleyball' | 'shot-clock' | 'media' | 'calibration' | 'blank';
 
 interface ShotClockState {
-  mode?: { type: string };
+  mode?: { type: string; subMode?: string };
   timerState?: {
     shotClock: number;
     gameClock: number;

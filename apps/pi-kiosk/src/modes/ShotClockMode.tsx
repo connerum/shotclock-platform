@@ -6,7 +6,7 @@ import ShotClock from '../components/ShotClock';
 
 interface ShotClockModeProps {
   state?: {
-    mode?: { type: string };
+    mode?: { type: string; subMode?: string };
     timerState?: {
       shotClock: number;
       gameClock: number;
@@ -58,6 +58,25 @@ export default function ShotClockMode({ state }: ShotClockModeProps) {
 
   const isWarning = shotClock <= 5 && shotClock > 0;
   const isExpired = shotClock === 0;
+  const isShotClockOnly = state?.mode?.subMode === 'shot-clock-only';
+
+  if (isShotClockOnly) {
+    return (
+      <div
+        className="flex h-full w-full items-center justify-center overflow-hidden bg-black p-1 text-white"
+        style={{ containerType: 'size' }}
+      >
+        <div className="relative h-full w-full overflow-hidden border-2 border-gray-700 bg-black">
+          <ShotClock
+            value={shotClock}
+            isWarning={isWarning}
+            isExpired={isExpired}
+            isRunning={isRunning}
+          />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div
