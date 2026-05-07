@@ -17,3 +17,11 @@ body,
   box-sizing: border-box;
   cursor: none !important;
 }
+
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 2147483647;
+  cursor: none !important;
+}
