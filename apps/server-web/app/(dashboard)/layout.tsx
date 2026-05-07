@@ -1,7 +1,7 @@
 // Dashboard layout with navigation
 
 import Link from 'next/link';
-import { requireUser } from '@/lib/auth';
+import { isSuperUser, requireUser } from '@/lib/auth';
 
 export default async function DashboardLayout({
   children,
@@ -33,12 +33,14 @@ export default async function DashboardLayout({
                 >
                   Pair
                 </Link>
-                <Link
-                  href="/releases"
-                  className="cc-nav-link px-3 py-2"
-                >
-                  Releases
-                </Link>
+                {isSuperUser(user) && (
+                  <Link
+                    href="/releases"
+                    className="cc-nav-link px-3 py-2"
+                  >
+                    Releases
+                  </Link>
+                )}
               </div>
             </div>
             <div className="flex items-center gap-3">
