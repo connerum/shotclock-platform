@@ -26,28 +26,28 @@ const SPORTS: Array<{
     title: 'Basketball',
     description: 'Shot clock, game clock, period, and score controls.',
     href: 'basketball',
-    imageSrc: '/images/sports/basketball.svg',
+    imageSrc: '/images/sports/basketball.png',
   },
   {
     id: 'wrestling',
     title: 'Wrestling',
     description: 'Match clock, period, and wrestler score controls.',
     href: 'wrestling',
-    imageSrc: '/images/sports/wrestling.svg',
+    imageSrc: '/images/sports/wrestling.png',
   },
   {
     id: 'volleyball',
     title: 'Volleyball',
     description: 'Set, match, and team score controls.',
     href: 'volleyball',
-    imageSrc: '/images/sports/volleyball.svg',
+    imageSrc: '/images/sports/volleyball.png',
   },
   {
     id: 'settings',
     title: 'Device Details/Settings',
     description: 'Mode, connection, calibration, firmware, and factory reset.',
     href: 'settings',
-    imageSrc: '/images/sports/settings.svg',
+    imageSrc: '/images/sports/settings.png',
   },
 ];
 

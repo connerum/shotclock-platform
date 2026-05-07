@@ -25,6 +25,7 @@ const BACKGROUND_CLASSES: Record<PresentationOverlayState['accent'], string> = {
 
 export default function PresentationOverlay({ overlay }: PresentationOverlayProps) {
   const [playlistIndex, setPlaylistIndex] = useState(0);
+  const [mediaLoadFailed, setMediaLoadFailed] = useState(false);
 
   useEffect(() => {
     if (overlay?.type !== 'sound-horn' || !overlay.active) return;
@@ -34,6 +35,10 @@ export default function PresentationOverlay({ overlay }: PresentationOverlayProp
   useEffect(() => {
     setPlaylistIndex(0);
   }, [overlay?.startedAt, overlay?.type]);
+
+  useEffect(() => {
+    setMediaLoadFailed(false);
+  }, [overlay?.startedAt, overlay?.type, playlistIndex]);
 
   useEffect(() => {
     if (!overlay?.active || !overlay.mediaPlaylist || overlay.mediaPlaylist.length <= 1) return;
@@ -68,7 +73,7 @@ export default function PresentationOverlay({ overlay }: PresentationOverlayProp
   const isImage = activeMedia?.mediaMimeType.startsWith('image/');
   const isVideo = activeMedia?.mediaMimeType.startsWith('video/');
   const isAudio = activeMedia?.mediaMimeType.startsWith('audio/');
-  const hasVisualMedia = Boolean(activeMedia?.mediaUrl && (isImage || isVideo));
+  const hasVisualMedia = Boolean(activeMedia?.mediaUrl && (isImage || isVideo) && !mediaLoadFailed);
   const accentClass = ACCENT_CLASSES[overlay.accent];
   const backgroundClass = BACKGROUND_CLASSES[overlay.accent];
 
@@ -80,6 +85,7 @@ export default function PresentationOverlay({ overlay }: PresentationOverlayProp
             src={activeMedia?.mediaUrl}
             alt=""
             className="h-full w-full object-contain"
+            onError={() => setMediaLoadFailed(true)}
           />
         )}
         {isVideo && (
@@ -89,6 +95,7 @@ export default function PresentationOverlay({ overlay }: PresentationOverlayProp
             autoPlay
             playsInline
             className="h-full w-full object-contain"
+            onError={() => setMediaLoadFailed(true)}
           />
         )}
       </div>
