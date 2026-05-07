@@ -7,6 +7,7 @@ interface UseDisplayProfileResult {
   profile: DisplayProfile | null;
   cssVariables: Record<string, string>;
   transform: string;
+  contentRotation: number;
   colorCorrectionEnabled: boolean;
 }
 
@@ -43,7 +44,8 @@ export function useDisplayProfile(profile?: DisplayProfile | null): UseDisplayPr
       return {
         profile: null,
         cssVariables: defaultCssVariables,
-        transform: 'translate(0px, 0px) scale(1, 1) rotate(0deg)',
+        transform: 'translate(0px, 0px) scale(1, 1)',
+        contentRotation: 0,
         colorCorrectionEnabled: true,
       };
     }
@@ -74,12 +76,13 @@ export function useDisplayProfile(profile?: DisplayProfile | null): UseDisplayPr
       '--color-danger': profile.colors.danger,
     };
 
-    const transform = `translate(${profile.viewport.x}px, ${profile.viewport.y}px) scale(${profile.viewport.scaleX}, ${profile.viewport.scaleY}) rotate(${profile.viewport.rotation}deg)`;
+    const transform = `translate(${profile.viewport.x}px, ${profile.viewport.y}px) scale(${profile.viewport.scaleX}, ${profile.viewport.scaleY})`;
 
     return {
       profile,
       cssVariables,
       transform,
+      contentRotation: profile.viewport.rotation || 0,
       colorCorrectionEnabled: profile.colorCorrection?.rgbToBgr ?? true,
     };
   }, [profile]);

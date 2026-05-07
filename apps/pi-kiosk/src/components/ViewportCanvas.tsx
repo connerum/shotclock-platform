@@ -9,7 +9,7 @@ interface ViewportCanvasProps {
 }
 
 export default function ViewportCanvas({ displayProfile, children }: ViewportCanvasProps) {
-  const { cssVariables, transform, colorCorrectionEnabled } = displayProfile;
+  const { cssVariables, transform, contentRotation, colorCorrectionEnabled } = displayProfile;
 
   return (
     <div
@@ -39,11 +39,19 @@ export default function ViewportCanvas({ displayProfile, children }: ViewportCan
           width: 'calc(var(--viewport-width) * 1px)',
           height: 'calc(var(--viewport-height) * 1px)',
           transform,
-          transformOrigin: 'center center',
+          transformOrigin: 'top left',
           filter: colorCorrectionEnabled ? 'url(#rgb2bgr)' : undefined,
         }}
       >
-        {children}
+        <div
+          className="h-full w-full"
+          style={{
+            transform: contentRotation ? `rotate(${contentRotation}deg)` : undefined,
+            transformOrigin: 'center center',
+          }}
+        >
+          {children}
+        </div>
       </div>
     </div>
   );
