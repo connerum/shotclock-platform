@@ -303,9 +303,14 @@ SETUP_AP_SSID=Shotclock-Setup
 SETUP_AP_PASSWORD=shotclock123
 SETUP_PORTAL_HOST=sportsboard.local
 KIOSK_USER=admin
+KIOSK_DISPLAY_OUTPUT=auto
+KIOSK_DISPLAY_MODE=1024x768
+KIOSK_DISPLAY_RATE=60
 ```
 
 Set `KIOSK_USER` to the Pi desktop login user that owns the HDMI session. On `display-40091`, that user is `admin`.
+
+For NovaStar MSD300-1 controllers, keep the Pi kiosk output at `1024x768@60`. Field testing showed moving blue-dot artifacts on running basketball displays at higher Pi output resolutions, while static images and the idle basketball display stayed clean. `1024x768@60` stopped the artifacts. Keep RGB-to-BGR color correction enabled when this controller path needs it for correct LED colors.
 
 If `/opt/shotclock/shared/.env` still does not exist, the install script did not finish. Create the directory manually only as a recovery step:
 
@@ -475,4 +480,4 @@ Confirm:
 - Game Presentation buttons show uploaded media where configured.
 - Calibration mode displays correctly.
 
-Then connect HDMI to the LED processor and repeat calibration. Use the LED processor's native resolution and refresh rate before tuning app calibration.
+Then connect HDMI to the LED processor and repeat calibration. For NovaStar MSD300-1, use the deployed `1024x768@60` Pi output before tuning app calibration. For other LED processors, use the processor's stable native resolution and refresh rate before calibration.

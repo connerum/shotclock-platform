@@ -7,6 +7,9 @@ export DISPLAY="${DISPLAY:-:0}"
 AGENT_LOCAL_API_PORT="${AGENT_LOCAL_API_PORT:-3001}"
 KIOSK_URL="${KIOSK_URL:-http://127.0.0.1:${AGENT_LOCAL_API_PORT}/}"
 KIOSK_START_TIMEOUT="${KIOSK_START_TIMEOUT:-120}"
+KIOSK_DISPLAY_MODE="${KIOSK_DISPLAY_MODE:-1024x768}"
+KIOSK_DISPLAY_RATE="${KIOSK_DISPLAY_RATE:-60}"
+KIOSK_DISPLAY_OUTPUT="${KIOSK_DISPLAY_OUTPUT:-auto}"
 
 echo "Launching Shotclock Kiosk..."
 
@@ -56,6 +59,35 @@ chown "$KIOSK_RUN_USER:$KIOSK_RUN_USER" "$USER_DATA_DIR"
 if command -v xset >/dev/null 2>&1; then
   runuser -u "$KIOSK_RUN_USER" -- env DISPLAY="$DISPLAY" XAUTHORITY="$XAUTHORITY" xset s off -dpms s noblank >/dev/null 2>&1 || true
 fi
+
+apply_display_mode() {
+  if [ -z "${KIOSK_DISPLAY_MODE:-}" ] || [ "$KIOSK_DISPLAY_MODE" = "auto" ]; then
+    echo "Kiosk display mode left unchanged"
+    return
+  fi
+
+  if ! command -v xrandr >/dev/null 2>&1; then
+    echo "xrandr not available; cannot set kiosk display mode"
+    return
+  fi
+
+  local output="$KIOSK_DISPLAY_OUTPUT"
+  if [ -z "$output" ] || [ "$output" = "auto" ]; then
+    output="$(runuser -u "$KIOSK_RUN_USER" -- env DISPLAY="$DISPLAY" XAUTHORITY="$XAUTHORITY" xrandr --query 2>/dev/null | awk '/ connected/ { print $1; exit }' || true)"
+  fi
+
+  if [ -z "$output" ]; then
+    echo "No connected display output found; cannot set kiosk display mode"
+    return
+  fi
+
+  echo "Setting kiosk display output ${output} to ${KIOSK_DISPLAY_MODE}@${KIOSK_DISPLAY_RATE}Hz"
+  runuser -u "$KIOSK_RUN_USER" -- env DISPLAY="$DISPLAY" XAUTHORITY="$XAUTHORITY" \
+    xrandr --output "$output" --mode "$KIOSK_DISPLAY_MODE" --rate "$KIOSK_DISPLAY_RATE" >/dev/null 2>&1 \
+    || echo "Warning: failed to set ${output} to ${KIOSK_DISPLAY_MODE}@${KIOSK_DISPLAY_RATE}Hz"
+}
+
+apply_display_mode
 
 wait_for_kiosk_url() {
   local deadline=$((SECONDS + KIOSK_START_TIMEOUT))

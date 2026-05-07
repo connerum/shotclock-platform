@@ -172,9 +172,14 @@ SETUP_AP_SSID=Shotclock-Setup
 SETUP_AP_PASSWORD=shotclock123
 SETUP_PORTAL_HOST=sportsboard.local
 KIOSK_USER=admin
+KIOSK_DISPLAY_OUTPUT=auto
+KIOSK_DISPLAY_MODE=1024x768
+KIOSK_DISPLAY_RATE=60
 ```
 
 `KIOSK_USER` should be the Raspberry Pi desktop login user that owns the active HDMI session. On the current field Pi this is `admin`. The kiosk service starts as root, then launches Chromium as this user so it can attach to the visible desktop session.
+
+For NovaStar MSD300-1 controllers, keep the Pi kiosk output at `1024x768@60`. Field testing showed the MSD300-1 displayed moving blue-dot artifacts on running basketball displays at higher Pi output resolutions, while static images and the idle basketball display were clean. `1024x768@60` stopped the artifacts. RGB-to-BGR color correction should remain enabled for this controller path when needed for correct panel colors.
 
 The setup AP is only broadcast while the device is unpaired. Its SSID is the configured prefix plus the first six characters of the unique device ID suffix, for example `Shotclock-Setup-1e4b35`.
 
@@ -274,6 +279,25 @@ RGB to BGR channel swap correction is enabled by default on the kiosk output. Th
 ```text
 https://courtcast.safety-linq.com/devices/[deviceId]/settings
 ```
+
+## NovaStar MSD300-1 Display Mode
+
+For MSD300-1 deployments, set the Pi output to `1024x768@60`:
+
+```bash
+grep -q '^KIOSK_DISPLAY_OUTPUT=' /opt/shotclock/shared/.env \
+  && sudo sed -i 's/^KIOSK_DISPLAY_OUTPUT=.*/KIOSK_DISPLAY_OUTPUT=auto/' /opt/shotclock/shared/.env \
+  || echo 'KIOSK_DISPLAY_OUTPUT=auto' | sudo tee -a /opt/shotclock/shared/.env
+grep -q '^KIOSK_DISPLAY_MODE=' /opt/shotclock/shared/.env \
+  && sudo sed -i 's/^KIOSK_DISPLAY_MODE=.*/KIOSK_DISPLAY_MODE=1024x768/' /opt/shotclock/shared/.env \
+  || echo 'KIOSK_DISPLAY_MODE=1024x768' | sudo tee -a /opt/shotclock/shared/.env
+grep -q '^KIOSK_DISPLAY_RATE=' /opt/shotclock/shared/.env \
+  && sudo sed -i 's/^KIOSK_DISPLAY_RATE=.*/KIOSK_DISPLAY_RATE=60/' /opt/shotclock/shared/.env \
+  || echo 'KIOSK_DISPLAY_RATE=60' | sudo tee -a /opt/shotclock/shared/.env
+sudo systemctl restart shotclock-kiosk
+```
+
+The launcher applies this with `xrandr` before Chromium starts. Leave `KIOSK_DISPLAY_OUTPUT=auto` unless the Pi has multiple connected outputs; then set it to the exact `xrandr` output name.
 
 ## Troubleshooting
 

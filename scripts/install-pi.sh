@@ -118,6 +118,28 @@ else
   echo "Warning: config templates directory not found at ${SCRIPT_DIR}/config"
 fi
 
+ensure_env_default() {
+  local key="$1"
+  local value="$2"
+  local env_file="/opt/shotclock/shared/.env"
+
+  touch "$env_file"
+  if grep -q "^${key}=" "$env_file"; then
+    echo "${key} already configured in ${env_file}"
+  else
+    echo "${key}=${value}" >> "$env_file"
+    echo "Set ${key}=${value} in ${env_file}"
+  fi
+}
+
+# NovaStar MSD300-1 deployment default. Field testing showed moving/running
+# basketball displays produced blue-dot artifacts at higher Pi resolutions.
+# 1024x768@60 keeps the MSD300-1 input stable while RGB/BGR correction remains
+# enabled for correct panel colors.
+ensure_env_default "KIOSK_DISPLAY_OUTPUT" "auto"
+ensure_env_default "KIOSK_DISPLAY_MODE" "1024x768"
+ensure_env_default "KIOSK_DISPLAY_RATE" "60"
+
 echo ""
 echo "[8/12] Creating shotclock user..."
 if ! id -u shotclock > /dev/null 2>&1; then

@@ -126,9 +126,14 @@ SETUP_AP_SSID=Shotclock-Setup
 SETUP_AP_PASSWORD=shotclock123
 SETUP_PORTAL_HOST=sportsboard.local
 KIOSK_USER=admin
+KIOSK_DISPLAY_OUTPUT=auto
+KIOSK_DISPLAY_MODE=1024x768
+KIOSK_DISPLAY_RATE=60
 ```
 
 Set `KIOSK_USER` to the desktop login user that owns the HDMI session. On the current field Pi this is `admin`.
+
+For NovaStar MSD300-1 deployments, keep `KIOSK_DISPLAY_MODE=1024x768` and `KIOSK_DISPLAY_RATE=60`. Field testing found that higher Pi output resolutions could show moving blue-dot artifacts on running basketball displays even though static images and the idle basketball display were clean. RGB-to-BGR color correction remains appropriate on this controller path when it is needed for correct colors.
 
 Build and point systemd at the checkout:
 
