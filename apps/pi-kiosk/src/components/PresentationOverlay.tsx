@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { PresentationOverlay as PresentationOverlayState } from '@shotclock/shared/types';
 
 interface PresentationOverlayProps {
@@ -24,18 +24,51 @@ const BACKGROUND_CLASSES: Record<PresentationOverlayState['accent'], string> = {
 };
 
 export default function PresentationOverlay({ overlay }: PresentationOverlayProps) {
+  const [playlistIndex, setPlaylistIndex] = useState(0);
+
   useEffect(() => {
     if (overlay?.type !== 'sound-horn' || !overlay.active) return;
     playHorn();
   }, [overlay?.active, overlay?.startedAt, overlay?.type]);
 
+  useEffect(() => {
+    setPlaylistIndex(0);
+  }, [overlay?.startedAt, overlay?.type]);
+
+  useEffect(() => {
+    if (!overlay?.active || !overlay.mediaPlaylist || overlay.mediaPlaylist.length <= 1) return;
+
+    const intervalMs = Math.max(1000, overlay.rotationIntervalMs ?? 8000);
+    const interval = setInterval(() => {
+      setPlaylistIndex((index) => (index + 1) % overlay.mediaPlaylist!.length);
+    }, intervalMs);
+
+    return () => clearInterval(interval);
+  }, [overlay?.active, overlay?.rotationIntervalMs, overlay?.startedAt]);
+
+  const activeMedia = useMemo(() => {
+    const playlist = overlay?.mediaPlaylist || [];
+    if (playlist.length > 0) {
+      return playlist[playlistIndex % playlist.length];
+    }
+
+    if (overlay?.mediaUrl && overlay.mediaMimeType) {
+      return {
+        mediaUrl: overlay.mediaUrl,
+        mediaMimeType: overlay.mediaMimeType,
+      };
+    }
+
+    return null;
+  }, [overlay?.mediaMimeType, overlay?.mediaPlaylist, overlay?.mediaUrl, playlistIndex]);
+
   if (!overlay?.active) return null;
 
   const isEmergency = overlay.type === 'emergency-weather' || overlay.type === 'emergency-medical';
-  const isImage = overlay.mediaMimeType?.startsWith('image/');
-  const isVideo = overlay.mediaMimeType?.startsWith('video/');
-  const isAudio = overlay.mediaMimeType?.startsWith('audio/');
-  const hasVisualMedia = Boolean(overlay.mediaUrl && (isImage || isVideo));
+  const isImage = activeMedia?.mediaMimeType.startsWith('image/');
+  const isVideo = activeMedia?.mediaMimeType.startsWith('video/');
+  const isAudio = activeMedia?.mediaMimeType.startsWith('audio/');
+  const hasVisualMedia = Boolean(activeMedia?.mediaUrl && (isImage || isVideo));
   const accentClass = ACCENT_CLASSES[overlay.accent];
   const backgroundClass = BACKGROUND_CLASSES[overlay.accent];
 
@@ -44,14 +77,15 @@ export default function PresentationOverlay({ overlay }: PresentationOverlayProp
       <div className="absolute inset-0 z-20 flex h-full w-full items-center justify-center overflow-hidden bg-black">
         {isImage && (
           <img
-            src={overlay.mediaUrl}
+            src={activeMedia?.mediaUrl}
             alt=""
             className="h-full w-full object-contain"
           />
         )}
         {isVideo && (
           <video
-            src={overlay.mediaUrl}
+            key={activeMedia?.mediaUrl}
+            src={activeMedia?.mediaUrl}
             autoPlay
             playsInline
             className="h-full w-full object-contain"
@@ -73,23 +107,24 @@ export default function PresentationOverlay({ overlay }: PresentationOverlayProp
             EMERGENCY
           </div>
         )}
-        {overlay.mediaUrl && isImage && (
+        {activeMedia?.mediaUrl && isImage && (
           <img
-            src={overlay.mediaUrl}
+            src={activeMedia.mediaUrl}
             alt=""
             className="mx-auto max-h-[min(42cqh,44cqw)] max-w-full object-contain"
           />
         )}
-        {overlay.mediaUrl && isVideo && (
+        {activeMedia?.mediaUrl && isVideo && (
           <video
-            src={overlay.mediaUrl}
+            key={activeMedia.mediaUrl}
+            src={activeMedia.mediaUrl}
             autoPlay
             playsInline
             className="mx-auto max-h-[min(42cqh,44cqw)] max-w-full object-contain"
           />
         )}
-        {overlay.mediaUrl && isAudio && (
-          <audio src={overlay.mediaUrl} autoPlay loop={overlay.type === 'music'} />
+        {activeMedia?.mediaUrl && isAudio && (
+          <audio src={activeMedia.mediaUrl} autoPlay loop={overlay.type === 'music'} />
         )}
         <div className="text-[min(22cqh,13cqw)] font-black uppercase leading-[0.9] tracking-normal">
           {overlay.title}

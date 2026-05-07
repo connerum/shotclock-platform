@@ -43,6 +43,7 @@ export default function BasketballPage({ params }: { params: { deviceId: string 
   const [timerRunning, setTimerRunning] = useState(false);
   const [timerLastUpdated, setTimerLastUpdated] = useState(Date.now());
   const [timerNow, setTimerNow] = useState(Date.now());
+  const [previewMode, setPreviewMode] = useState<'regular' | 'advanced'>('regular');
 
   useEffect(() => {
     void fetchDevice();
@@ -251,11 +252,50 @@ export default function BasketballPage({ params }: { params: { deviceId: string 
         </div>
       </div>
 
-      <section className="cc-card mb-4 p-6 text-center md:p-7">
-        <div className="text-xs font-bold uppercase tracking-[0.22em] text-gray-500">Shot Clock</div>
-        <div className={`mt-3 font-mono text-7xl font-black leading-none tabular-nums md:text-[7rem] ${shotClockTone}`}>
-          {displayedShotClock}
+      <section className="cc-card mb-4 p-4 md:p-5">
+        <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <div>
+            <div className="text-xs font-bold uppercase tracking-[0.22em] text-gray-500">Shot Clock Preview</div>
+            <p className="mt-1 text-sm text-gray-400">
+              {previewMode === 'advanced' ? 'Mirrors the current Pi display layout.' : 'Large countdown-only view.'}
+            </p>
+          </div>
+          <div className="flex rounded-lg border border-white/10 bg-black/30 p-1">
+            {(['regular', 'advanced'] as const).map((mode) => (
+              <button
+                key={mode}
+                type="button"
+                onClick={() => setPreviewMode(mode)}
+                className={`rounded-md px-4 py-2 text-sm font-semibold capitalize transition-colors ${
+                  previewMode === mode
+                    ? 'bg-green-600 text-white'
+                    : 'text-gray-400 hover:bg-white/10 hover:text-white'
+                }`}
+              >
+                {mode}
+              </button>
+            ))}
+          </div>
         </div>
+
+        {previewMode === 'advanced' ? (
+          <AdvancedBasketballPreview
+            shotClock={displayedShotClock}
+            gameClock={displayedGameClock}
+            homeScore={homeScore}
+            awayScore={awayScore}
+            period={period}
+            isRunning={timerRunning}
+            shotClockTone={shotClockTone}
+          />
+        ) : (
+          <RegularShotClockPreview
+            shotClock={displayedShotClock}
+            isRunning={timerRunning}
+            shotClockTone={shotClockTone}
+          />
+        )}
+
         <div className="mt-4 flex flex-wrap items-center justify-center gap-3 text-sm font-semibold text-gray-300">
           <span className={`h-3 w-3 rounded-full ${
             timerRunning ? 'bg-green-400 shadow-[0_0_14px_rgba(34,197,94,0.7)]' : 'bg-gray-600'
@@ -372,6 +412,86 @@ export default function BasketballPage({ params }: { params: { deviceId: string 
       </div>
 
       <GamePresentationControls deviceId={deviceId} />
+    </div>
+  );
+}
+
+function RegularShotClockPreview({
+  shotClock,
+  isRunning,
+  shotClockTone,
+}: {
+  shotClock: number;
+  isRunning: boolean;
+  shotClockTone: string;
+}) {
+  return (
+    <div className="rounded-2xl border-4 border-gray-700 bg-black p-4 shadow-inner shadow-black/60">
+      <div className="grid min-h-[18rem] place-items-center rounded-xl border-2 border-gray-800 bg-black md:min-h-[22rem]">
+        <div className="text-center">
+          <div className={`font-mono text-[10rem] font-black leading-none tabular-nums md:text-[15rem] ${shotClockTone}`}>
+            {shotClock.toString().padStart(2, '0')}
+          </div>
+          <div className={`mt-3 text-sm font-black uppercase tracking-[0.28em] ${
+            isRunning ? 'text-green-400' : 'text-yellow-400'
+          }`}>
+            {isRunning ? 'Running' : 'Hold'}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function AdvancedBasketballPreview({
+  shotClock,
+  gameClock,
+  homeScore,
+  awayScore,
+  period,
+  isRunning,
+  shotClockTone,
+}: {
+  shotClock: number;
+  gameClock: number;
+  homeScore: number;
+  awayScore: number;
+  period: number;
+  isRunning: boolean;
+  shotClockTone: string;
+}) {
+  return (
+    <div className="rounded-2xl border-4 border-gray-700 bg-black p-4 shadow-inner shadow-black/60">
+      <div className="mx-auto grid aspect-[4/3] max-h-[28rem] min-h-[20rem] w-full max-w-[38rem] grid-rows-[13%_54%_17%_16%] overflow-hidden rounded-xl border-2 border-gray-800 bg-black px-4 py-3 font-mono text-white">
+        <div className="flex items-center justify-between overflow-hidden text-2xl font-bold leading-none text-gray-400">
+          <span>P{period}</span>
+          <span className={isRunning ? 'text-green-500' : 'text-yellow-500'}>
+            {isRunning ? 'RUN' : 'HOLD'}
+          </span>
+        </div>
+
+        <div className="grid min-h-0 place-items-center border-2 border-gray-700">
+          <div className={`translate-y-[0.06em] font-mono text-[10rem] font-black leading-[0.82] tabular-nums md:text-[13rem] ${shotClockTone}`}>
+            {shotClock.toString().padStart(2, '0')}
+          </div>
+        </div>
+
+        <div className="flex items-center justify-center overflow-hidden text-5xl font-black leading-none tabular-nums text-white">
+          {formatGameClock(gameClock)}
+        </div>
+
+        <div className="grid min-h-0 grid-cols-[1fr_auto_1fr] items-center gap-2 overflow-hidden leading-none">
+          <div className="grid grid-cols-[auto_1fr] items-baseline gap-2 overflow-hidden">
+            <span className="text-lg font-bold text-red-400">H</span>
+            <span className="text-right text-5xl font-black tabular-nums text-red-500">{homeScore}</span>
+          </div>
+          <span className="text-lg font-bold text-gray-600">-</span>
+          <div className="grid grid-cols-[1fr_auto] items-baseline gap-2 overflow-hidden">
+            <span className="text-5xl font-black tabular-nums text-blue-500">{awayScore}</span>
+            <span className="text-lg font-bold text-blue-400">A</span>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

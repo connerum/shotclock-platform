@@ -337,6 +337,18 @@ function normalizePresentationOverlay(raw: unknown): PresentationOverlay | null 
   const durationMs = typeof overlay.durationMs === 'number'
     ? Math.max(0, Math.min(30000, Math.round(overlay.durationMs)))
     : undefined;
+  const mediaPlaylist = Array.isArray(overlay.mediaPlaylist)
+    ? overlay.mediaPlaylist
+        .map((item) => ({
+          mediaUrl: typeof item?.mediaUrl === 'string' ? item.mediaUrl.trim().slice(0, 512) : '',
+          mediaMimeType: typeof item?.mediaMimeType === 'string' ? item.mediaMimeType.trim().slice(0, 80) : '',
+        }))
+        .filter((item) => item.mediaUrl && item.mediaMimeType)
+        .slice(0, 50)
+    : [];
+  const rotationIntervalMs = typeof overlay.rotationIntervalMs === 'number'
+    ? Math.max(1000, Math.min(60000, Math.round(overlay.rotationIntervalMs)))
+    : undefined;
 
   return {
     type: overlay.type,
@@ -354,6 +366,8 @@ function normalizePresentationOverlay(raw: unknown): PresentationOverlay | null 
     ...(typeof overlay.mediaMimeType === 'string' && overlay.mediaMimeType.trim()
       ? { mediaMimeType: overlay.mediaMimeType.trim().slice(0, 80) }
       : {}),
+    ...(mediaPlaylist.length > 0 ? { mediaPlaylist } : {}),
+    ...(rotationIntervalMs ? { rotationIntervalMs } : {}),
   };
 }
 

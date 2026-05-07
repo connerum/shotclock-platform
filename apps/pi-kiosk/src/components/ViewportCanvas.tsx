@@ -39,7 +39,7 @@ export default function ViewportCanvas({ displayProfile, children }: ViewportCan
           width: 'calc(var(--viewport-width) * 1px)',
           height: 'calc(var(--viewport-height) * 1px)',
           transform,
-          transformOrigin: 'top left',
+          transformOrigin: 'center center',
           filter: colorCorrectionEnabled ? 'url(#rgb2bgr)' : undefined,
         }}
       >

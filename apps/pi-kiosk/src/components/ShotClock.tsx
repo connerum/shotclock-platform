@@ -41,6 +41,7 @@ export default function ShotClock({
           fontSize: 'min(48cqw, 64cqh)',
           lineHeight: 0.82,
           letterSpacing: 0,
+          transform: 'translateY(0.06em)',
         }}
       >
         {displayValue}

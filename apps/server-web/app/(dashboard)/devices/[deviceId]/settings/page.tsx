@@ -90,6 +90,7 @@ type CalibrationBox = {
   height: number;
   scaleX: number;
   scaleY: number;
+  rotation: number;
 };
 
 type CalibrationInteraction =
@@ -122,7 +123,12 @@ function clampCalibrationBox(box: CalibrationBox): CalibrationBox {
     height,
     scaleX: 1,
     scaleY: 1,
+    rotation: normalizeCalibrationRotation(box.rotation),
   };
+}
+
+function normalizeCalibrationRotation(rotation: number | undefined): number {
+  return Math.abs(Number(rotation) || 0) === 180 ? 180 : 0;
 }
 
 export default function DeviceDetailPage({ params }: { params: { deviceId: string } }) {
@@ -156,6 +162,7 @@ export default function DeviceDetailPage({ params }: { params: { deviceId: strin
     height: CALIBRATION_CANVAS_HEIGHT,
     scaleX: 1,
     scaleY: 1,
+    rotation: 0,
   });
   const [savedCalibration, setSavedCalibration] = useState<CalibrationBox>(calibration);
   
@@ -192,6 +199,7 @@ export default function DeviceDetailPage({ params }: { params: { deviceId: strin
         height: calibrationData.height ?? viewport?.height ?? CALIBRATION_CANVAS_HEIGHT,
         scaleX: calibrationData.scaleX ?? viewport?.scaleX ?? 1,
         scaleY: calibrationData.scaleY ?? viewport?.scaleY ?? 1,
+        rotation: normalizeCalibrationRotation(calibrationData.rotation ?? viewport?.rotation),
       });
       setCalibration(nextCalibration);
       setSavedCalibration(nextCalibration);
@@ -266,7 +274,8 @@ export default function DeviceDetailPage({ params }: { params: { deviceId: strin
     calibration.x !== savedCalibration.x ||
     calibration.y !== savedCalibration.y ||
     calibration.width !== savedCalibration.width ||
-    calibration.height !== savedCalibration.height;
+    calibration.height !== savedCalibration.height ||
+    calibration.rotation !== savedCalibration.rotation;
   const colorCorrectionChanged = rgbToBgrEnabled !== savedRgbToBgrEnabled;
 
   const buildCalibrationConfig = (box: CalibrationBox, preview = false, rgbToBgr = rgbToBgrEnabled) => {
@@ -275,7 +284,7 @@ export default function DeviceDetailPage({ params }: { params: { deviceId: strin
       y: box.y,
       width: box.width,
       height: box.height,
-      rotation: 0,
+      rotation: box.rotation,
       scaleX: 1,
       scaleY: 1,
     };
@@ -356,6 +365,7 @@ export default function DeviceDetailPage({ params }: { params: { deviceId: strin
       height: MIN_CALIBRATION_SIZE,
       scaleX: 1,
       scaleY: 1,
+      rotation: calibration.rotation,
     });
   };
 
@@ -400,6 +410,7 @@ export default function DeviceDetailPage({ params }: { params: { deviceId: strin
         height: Math.abs(point.y - interaction.startY),
         scaleX: 1,
         scaleY: 1,
+        rotation: calibration.rotation,
       });
       return;
     }
@@ -482,6 +493,7 @@ export default function DeviceDetailPage({ params }: { params: { deviceId: strin
       });
 
       if (res.ok) {
+        setSavedCalibration(calibration);
         setSavedRgbToBgrEnabled(rgbToBgrEnabled);
         setDevice(prev => prev ? { ...prev, displayProfile, calibrationData } : null);
       }
@@ -498,6 +510,14 @@ export default function DeviceDetailPage({ params }: { params: { deviceId: strin
       height: CALIBRATION_CANVAS_HEIGHT,
       scaleX: 1,
       scaleY: 1,
+      rotation: 0,
+    });
+  };
+
+  const toggleDisplayRotation = () => {
+    setCalibrationWithPreview({
+      ...calibration,
+      rotation: calibration.rotation === 180 ? 0 : 180,
     });
   };
 
@@ -859,7 +879,7 @@ export default function DeviceDetailPage({ params }: { params: { deviceId: strin
               </div>
             </div>
 
-            <div className="grid grid-cols-4 gap-2 text-center text-sm">
+            <div className="grid grid-cols-2 gap-2 text-center text-sm sm:grid-cols-5">
               <div className="rounded bg-gray-800 p-2">
                 <div className="text-gray-400">X</div>
                 <div className="mt-1 font-mono text-lg">{calibration.x}</div>
@@ -876,15 +896,42 @@ export default function DeviceDetailPage({ params }: { params: { deviceId: strin
                 <div className="text-gray-400">Height</div>
                 <div className="mt-1 font-mono text-lg">{calibration.height}</div>
               </div>
+              <div className="rounded bg-gray-800 p-2">
+                <div className="text-gray-400">Rotate</div>
+                <div className="mt-1 font-mono text-lg">{calibration.rotation}°</div>
+              </div>
             </div>
 
             <div className="rounded border border-gray-800 bg-gray-950 p-3 text-xs text-gray-400">
               <div className="mb-2 font-medium text-gray-300">Saved calibration</div>
-              <div className="grid grid-cols-4 gap-2 font-mono">
+              <div className="grid grid-cols-2 gap-2 font-mono sm:grid-cols-5">
                 <span>X {savedCalibration.x}</span>
                 <span>Y {savedCalibration.y}</span>
                 <span>W {savedCalibration.width}</span>
                 <span>H {savedCalibration.height}</span>
+                <span>R {savedCalibration.rotation}°</span>
+              </div>
+            </div>
+
+            <div className="rounded border border-gray-800 bg-gray-950 p-3">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <div className="font-medium text-gray-200">Display Rotation</div>
+                  <p className="mt-1 text-sm text-gray-400">
+                    Flip the calibrated output 180° when the board is mounted upside down.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={toggleDisplayRotation}
+                  className={`rounded px-4 py-2 text-sm font-semibold ${
+                    calibration.rotation === 180
+                      ? 'bg-green-600 text-white hover:bg-green-700'
+                      : 'bg-gray-800 text-gray-200 hover:bg-gray-700'
+                  }`}
+                >
+                  {calibration.rotation === 180 ? '180° Enabled' : 'Enable 180°'}
+                </button>
               </div>
             </div>
 

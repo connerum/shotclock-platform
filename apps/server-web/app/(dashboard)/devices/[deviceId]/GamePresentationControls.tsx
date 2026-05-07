@@ -169,6 +169,7 @@ export default function GamePresentationControls({ deviceId }: { deviceId: strin
 
   const sendPresentation = async (action: PresentationAction) => {
     const mediaAsset = getMediaAssetForAction(action.type, activeMediaBySlot);
+    const mediaPlaylist = getMediaPlaylistForAction(action.type, activeMediaBySlot);
     const overlay: PresentationOverlay = {
       type: action.type,
       title: action.title,
@@ -180,6 +181,10 @@ export default function GamePresentationControls({ deviceId }: { deviceId: strin
       ...(mediaAsset && {
         mediaUrl: getPublicMediaUrl(mediaAsset.url),
         mediaMimeType: mediaAsset.mimeType,
+      }),
+      ...(mediaPlaylist.length > 1 && {
+        mediaPlaylist,
+        rotationIntervalMs: 8000,
       }),
     };
 
@@ -296,6 +301,20 @@ function getMediaAssetForAction(
   }
 
   return assets[0];
+}
+
+function getMediaPlaylistForAction(
+  type: PresentationOverlayType,
+  assetsBySlot: Record<MediaSlot, DeviceMediaAsset[]>
+) {
+  if (type !== 'advertisement') return [];
+
+  return assetsBySlot.ads
+    .filter((asset) => asset.mimeType.startsWith('image/') || asset.mimeType.startsWith('video/'))
+    .map((asset) => ({
+      mediaUrl: getPublicMediaUrl(asset.url),
+      mediaMimeType: asset.mimeType,
+    }));
 }
 
 function getSlotForPresentationType(type: PresentationOverlayType): MediaSlot | null {

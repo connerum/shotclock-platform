@@ -131,6 +131,11 @@ export interface PresentationOverlay {
   durationMs?: number;
   mediaUrl?: string;
   mediaMimeType?: string;
+  mediaPlaylist?: Array<{
+    mediaUrl: string;
+    mediaMimeType: string;
+  }>;
+  rotationIntervalMs?: number;
 }
 
 export interface NetworkStatus {
