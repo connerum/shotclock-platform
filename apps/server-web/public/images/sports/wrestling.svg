@@ -1,0 +1,24 @@
+<svg width="960" height="540" viewBox="0 0 960 540" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="960" height="540" fill="#111827"/>
+  <rect width="960" height="540" fill="url(#matGlow)"/>
+  <ellipse cx="480" cy="360" rx="392" ry="118" fill="#1D4ED8" fill-opacity=".36"/>
+  <ellipse cx="480" cy="360" rx="330" ry="94" stroke="#F8FAFC" stroke-opacity=".82" stroke-width="9"/>
+  <ellipse cx="480" cy="360" rx="135" ry="42" stroke="#EF4444" stroke-opacity=".85" stroke-width="7"/>
+  <circle cx="386" cy="236" r="33" fill="#F8FAFC"/>
+  <path d="M410 266C450 294 497 294 538 264" stroke="#F8FAFC" stroke-width="30" stroke-linecap="round"/>
+  <path d="M438 295L390 362M516 295L580 358" stroke="#F8FAFC" stroke-width="26" stroke-linecap="round"/>
+  <path d="M396 306L330 300M528 304L642 276" stroke="#F8FAFC" stroke-width="22" stroke-linecap="round"/>
+  <circle cx="574" cy="226" r="31" fill="#EF4444"/>
+  <path d="M552 259C512 286 465 287 426 260" stroke="#EF4444" stroke-width="28" stroke-linecap="round"/>
+  <path d="M512 292L462 358M440 293L374 352" stroke="#EF4444" stroke-width="24" stroke-linecap="round"/>
+  <path d="M534 303L640 326M421 303L311 280" stroke="#EF4444" stroke-width="20" stroke-linecap="round"/>
+  <path d="M92 76H430" stroke="#F8FAFC" stroke-opacity=".18" stroke-width="34" stroke-linecap="round"/>
+  <path d="M92 128H356" stroke="#F8FAFC" stroke-opacity=".12" stroke-width="18" stroke-linecap="round"/>
+  <defs>
+    <radialGradient id="matGlow" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(734 122) rotate(141) scale(742 606)">
+      <stop stop-color="#3B82F6" stop-opacity=".42"/>
+      <stop offset=".48" stop-color="#7C3AED" stop-opacity=".24"/>
+      <stop offset="1" stop-color="#111827" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+</svg>

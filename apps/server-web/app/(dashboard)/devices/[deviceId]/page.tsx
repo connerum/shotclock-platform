@@ -18,7 +18,7 @@ const SPORTS: Array<{
   title: string;
   description: string;
   href: string;
-  accent: string;
+  imageSrc: string;
   mode?: SportType;
 }> = [
   {
@@ -26,28 +26,28 @@ const SPORTS: Array<{
     title: 'Basketball',
     description: 'Shot clock, game clock, period, and score controls.',
     href: 'basketball',
-    accent: 'from-orange-500/30 to-red-500/20',
+    imageSrc: '/images/sports/basketball.svg',
   },
   {
     id: 'wrestling',
     title: 'Wrestling',
     description: 'Match clock, period, and wrestler score controls.',
     href: 'wrestling',
-    accent: 'from-purple-500/30 to-blue-500/20',
+    imageSrc: '/images/sports/wrestling.svg',
   },
   {
     id: 'volleyball',
     title: 'Volleyball',
     description: 'Set, match, and team score controls.',
     href: 'volleyball',
-    accent: 'from-green-500/30 to-cyan-500/20',
+    imageSrc: '/images/sports/volleyball.svg',
   },
   {
     id: 'settings',
     title: 'Device Details/Settings',
     description: 'Mode, connection, calibration, firmware, and factory reset.',
     href: 'settings',
-    accent: 'from-slate-500/30 to-zinc-500/20',
+    imageSrc: '/images/sports/settings.svg',
   },
 ];
 
@@ -159,13 +159,23 @@ export default function DeviceSportPage({ params }: { params: { deviceId: string
             type="button"
             disabled={selectingSport !== null}
             onClick={() => openSport(sport.id, sport.href, sport.id === 'settings' ? undefined : sport.id)}
-            className="cc-card cc-card-hover min-h-48 p-6 text-left disabled:cursor-wait disabled:opacity-70"
+            className="group cc-card cc-card-hover min-h-48 overflow-hidden p-0 text-left disabled:cursor-wait disabled:opacity-70"
           >
-            <div className={`mb-5 h-20 rounded-lg bg-gradient-to-br ${sport.accent}`} />
-            <h3 className="text-2xl font-bold">{sport.title}</h3>
-            <p className="mt-2 text-sm leading-6 text-white/60">{sport.description}</p>
-            <div className="mt-6 text-sm font-semibold text-green-400">
-              {selectingSport === sport.id ? 'Opening...' : sport.id === 'settings' ? 'Open settings' : 'Open controls'}
+            <div className="relative h-32 overflow-hidden border-b border-white/10 bg-black/30">
+              <img
+                src={sport.imageSrc}
+                alt=""
+                className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                aria-hidden="true"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/45 via-transparent to-transparent" />
+            </div>
+            <div className="p-6">
+              <h3 className="text-2xl font-bold">{sport.title}</h3>
+              <p className="mt-2 text-sm leading-6 text-white/60">{sport.description}</p>
+              <div className="mt-6 text-sm font-semibold text-green-400">
+                {selectingSport === sport.id ? 'Opening...' : sport.id === 'settings' ? 'Open settings' : 'Open controls'}
+              </div>
             </div>
           </button>
         ))}
