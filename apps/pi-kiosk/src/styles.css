@@ -10,8 +10,10 @@ body,
   margin: 0;
   overflow: hidden;
   background: #000;
+  cursor: none;
 }
 
 * {
   box-sizing: border-box;
+  cursor: none !important;
 }

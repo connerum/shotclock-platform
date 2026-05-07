@@ -60,6 +60,12 @@ if command -v xset >/dev/null 2>&1; then
   runuser -u "$KIOSK_RUN_USER" -- env DISPLAY="$DISPLAY" XAUTHORITY="$XAUTHORITY" xset s off -dpms s noblank >/dev/null 2>&1 || true
 fi
 
+if command -v unclutter >/dev/null 2>&1; then
+  pkill -u "$KIOSK_RUN_USER" -x unclutter >/dev/null 2>&1 || true
+  runuser -u "$KIOSK_RUN_USER" -- env DISPLAY="$DISPLAY" XAUTHORITY="$XAUTHORITY" \
+    unclutter -idle 0.1 -root >/dev/null 2>&1 &
+fi
+
 apply_display_mode() {
   if [ -z "${KIOSK_DISPLAY_MODE:-}" ] || [ "$KIOSK_DISPLAY_MODE" = "auto" ]; then
     echo "Kiosk display mode left unchanged"
