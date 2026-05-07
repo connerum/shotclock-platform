@@ -5,45 +5,11 @@ import { useRouter } from 'next/navigation';
 
 export default function PairPage() {
   const router = useRouter();
-  const [deviceName, setDeviceName] = useState('');
   const [pairingCode, setPairingCode] = useState('');
-  const [step, setStep] = useState<'generate' | 'enter' | 'confirm'>('enter');
-  const [generatedCode, setGeneratedCode] = useState<string | null>(null);
+  const [step, setStep] = useState<'enter' | 'confirm'>('enter');
   const [validatedDevice, setValidatedDevice] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  const generatePairingCode = async () => {
-    if (!deviceName.trim()) {
-      setError('Please enter a device name');
-      return;
-    }
-
-    setLoading(true);
-    setError(null);
-
-    try {
-      const res = await fetch('/api/pair', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          deviceName,
-          organizationId: 'default-org',
-        }),
-      });
-
-      if (!res.ok) throw new Error('Failed to generate pairing code');
-      
-      const data = await res.json();
-      setGeneratedCode(data.pairingCode);
-      setStep('generate');
-    } catch (err) {
-      setError('Failed to generate pairing code');
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const validatePairingCode = async () => {
     if (!pairingCode.trim() || pairingCode.length !== 6) {
@@ -105,68 +71,9 @@ export default function PairPage() {
       </div>
 
       <div className="max-w-xl">
-        {/* Tab Switcher */}
-        <div className="cc-card mb-8 flex p-1">
-          <button
-            onClick={() => { setStep('generate'); setError(null); }}
-            className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
-              step === 'generate' ? 'cc-btn-primary' : 'text-gray-400 hover:text-white'
-            }`}
-          >
-            Generate Code
-          </button>
-          <button
-            onClick={() => { setStep('enter'); setError(null); }}
-            className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
-              step === 'enter' ? 'cc-btn-primary' : 'text-gray-400 hover:text-white'
-            }`}
-          >
-            Enter Code
-          </button>
-        </div>
-
         {error && (
           <div className="cc-card border-red-500/40 bg-red-500/10 p-4 mb-6">
             <p className="text-red-400">{error}</p>
-          </div>
-        )}
-
-        {/* Generate Code Section */}
-        {step === 'generate' && (
-          <div className="cc-card p-6">
-            <h2 className="text-xl font-semibold mb-4">Generate Pairing Code</h2>
-            <p className="text-gray-400 mb-6">
-              Optional: pre-register a device. For a physical Pi display, use the code shown on the display instead.
-            </p>
-
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm text-gray-400 mb-1">Device Name</label>
-                <input
-                  type="text"
-                  value={deviceName}
-                  onChange={(e) => setDeviceName(e.target.value)}
-                  placeholder="Shotclock Display"
-                  className="w-full rounded px-3 py-2"
-                />
-              </div>
-
-              <button
-                onClick={generatePairingCode}
-                disabled={loading}
-                className="cc-btn cc-btn-primary w-full py-3 disabled:opacity-50"
-              >
-                {loading ? 'Generating...' : 'Generate Pairing Code'}
-              </button>
-            </div>
-
-            {generatedCode && (
-              <div className="mt-6 cc-card p-4 text-center">
-                <p className="text-sm text-gray-400 mb-2">Pairing Code</p>
-                <p className="text-4xl font-mono text-green-500 tracking-widest">{generatedCode}</p>
-                <p className="text-xs text-gray-500 mt-2">Expires in 24 hours</p>
-              </div>
-            )}
           </div>
         )}
 
