@@ -197,6 +197,8 @@ All items must pass before deployment is considered complete.
 - [ ] Raspberry Pi 5 embedded-power installs schedule `PSU_MAX_CURRENT=5000` in EEPROM
 - [ ] Raspberry Pi 5 embedded-power installs schedule `POWER_OFF_ON_HALT=0` and `WAIT_FOR_POWER_BUTTON=0`
 - [ ] Embedded Raspberry Pi 5 test unit completes one hard power cycle after EEPROM scheduling
+- [ ] Embedded Raspberry Pi 5 cold panel power-on does not fall back to red LED before boot
+- [ ] If cold power-on falls back to red but delayed manual button boot succeeds, hardware power sequencing/delayed J2 pulse is added
 - [ ] `/opt/shotclock` directory structure is created
 - [ ] `/home/shotclock/.shotclock` exists before services start
 - [ ] Config templates are copied to `/opt/shotclock/shared/config/`

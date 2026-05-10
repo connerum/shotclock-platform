@@ -371,7 +371,19 @@ sudo rpi-eeprom-config | grep -E '^(PSU_MAX_CURRENT|POWER_OFF_ON_HALT|WAIT_FOR_P
 sudo shutdown -h now
 ```
 
-Then remove panel power for at least 10 seconds and restore it. The Pi should boot without pressing the power button.
+Then remove panel power for at least 10 seconds and restore it. The Pi should boot without pressing the power button if the embedded 5V rail is stable by the time the Pi starts.
+
+If the Pi turns green, the HDMI output wakes, then it falls back to red until the power button is pressed manually, the EEPROM settings are not the remaining blocker. That pattern means the Pi is starting while the shared LED/display power rail is still ramping, sagging, or recovering from inrush. Pressing the Pi power button later works because the rail has stabilized.
+
+For production, fix this at the power-sequencing layer:
+
+- Measure voltage at the Pi 5V and GND pins during cold panel power-on, not only at the converter output. The Pi should see a stable 5.0-5.2V under startup load.
+- Use a converter/regulator rated for Pi 5 startup current with short, adequately sized power and ground wiring.
+- Add bulk capacitance near the Pi 5V input if the rail dips during startup.
+- Prefer a delayed Pi power-enable circuit, or a delayed pulse across the Pi 5 J2 power-button pads, so the LED power rail stabilizes before the Pi starts.
+- If no delayed auto-start circuit is installed, expose the Pi 5 power button/J2 pads as a service button.
+
+Do not rely on more application changes to solve this case. The app is not running yet when the Pi falls back to red during cold power-on.
 
 If `rpi-eeprom-config` is unavailable, install or update the Raspberry Pi EEPROM tooling:
 
@@ -413,7 +425,8 @@ Set it back to `true` and restart `shotclock-kiosk` before returning the Pi to p
 
 1. Check SD card is properly inserted
 2. Verify power supply. Embedded Raspberry Pi 5 displays should provide a stable 5V/5A at the Pi and have `PSU_MAX_CURRENT=5000` applied in EEPROM.
-3. Try re-flashing the OS
+3. If it starts green/HDMI then returns to red, test whether pressing the Pi power button after 5-10 seconds boots it. If yes, add delayed Pi power sequencing or a delayed J2 power-button pulse.
+4. Try re-flashing the OS
 
 ### No display output
 
