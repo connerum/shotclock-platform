@@ -16,11 +16,13 @@ if [ "$EUID" -ne 0 ]; then
 fi
 
 echo ""
-echo "[1/12] Updating apt cache..."
+TOTAL_STEPS=13
+
+echo "[1/${TOTAL_STEPS}] Updating apt cache..."
 apt-get update -qq
 
 echo ""
-echo "[2/12] Installing Node.js 22 from NodeSource..."
+echo "[2/${TOTAL_STEPS}] Installing Node.js 22 from NodeSource..."
 if ! command -v node &> /dev/null || [ "$(node -v)" != "v22"* ]; then
   curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
   apt-get install -y nodejs
@@ -29,7 +31,7 @@ else
 fi
 
 echo ""
-echo "[3/12] Installing pnpm globally..."
+echo "[3/${TOTAL_STEPS}] Installing pnpm globally..."
 if ! command -v pnpm &> /dev/null; then
   npm install -g pnpm
 else
@@ -37,7 +39,7 @@ else
 fi
 
 echo ""
-echo "[4/12] Installing Chromium and required deps..."
+echo "[4/${TOTAL_STEPS}] Installing Chromium and required deps..."
 package_is_installable() {
   local pkg="$1"
   apt-cache policy "$pkg" 2>/dev/null | awk '/Candidate:/ { found=1; if ($2 != "(none)") exit 0; exit 1 } END { if (!found) exit 1 }'
@@ -89,17 +91,17 @@ done
 apt-get install -y "${AVAILABLE_CHROMIUM_DEPS[@]}"
 
 echo ""
-echo "[5/12] Installing NetworkManager, hostapd, dnsmasq, and local hostname support..."
+echo "[5/${TOTAL_STEPS}] Installing NetworkManager, hostapd, dnsmasq, and local hostname support..."
 apt-get install -y network-manager hostapd dnsmasq avahi-daemon libnss-mdns iproute2 iptables rfkill iw wireless-regdb
 
 echo ""
-echo "[6/12] Creating /opt/shotclock directory structure..."
+echo "[6/${TOTAL_STEPS}] Creating /opt/shotclock directory structure..."
 mkdir -p /opt/shotclock/releases
 mkdir -p /opt/shotclock/shared/config
 mkdir -p /opt/shotclock/shared/media
 
 echo ""
-echo "[7/12] Copying config templates..."
+echo "[7/${TOTAL_STEPS}] Copying config templates..."
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 if [ -d "${SCRIPT_DIR}/config" ]; then
   cp -n "${SCRIPT_DIR}/config/"*.template /opt/shotclock/shared/config/ 2>/dev/null || true
@@ -141,9 +143,80 @@ ensure_env_default "KIOSK_DISPLAY_OUTPUT" "auto"
 ensure_env_default "KIOSK_DISPLAY_MODE" "1024x768"
 ensure_env_default "KIOSK_DISPLAY_RATE" "60"
 ensure_env_default "KIOSK_HIDE_CURSOR" "true"
+ensure_env_default "PI5_PSU_MAX_CURRENT" "5000"
 
 echo ""
-echo "[8/12] Creating shotclock user..."
+echo "[8/${TOTAL_STEPS}] Configuring Raspberry Pi 5 embedded power override..."
+configure_pi5_embedded_power() {
+  local model=""
+  local target_current="${PI5_PSU_MAX_CURRENT:-5000}"
+  local current_config=""
+  local tmp_config=""
+
+  model="$(tr -d '\0' < /proc/device-tree/model 2>/dev/null || true)"
+  if [[ "$model" != *"Raspberry Pi 5"* ]]; then
+    echo "Not a Raspberry Pi 5 (${model:-unknown hardware}); skipping EEPROM power override"
+    return 0
+  fi
+
+  if [[ -z "$target_current" || "$target_current" == "0" || "$target_current" == "false" ]]; then
+    echo "PI5_PSU_MAX_CURRENT disabled; skipping EEPROM power override"
+    return 0
+  fi
+
+  if ! [[ "$target_current" =~ ^[0-9]+$ ]]; then
+    echo "Invalid PI5_PSU_MAX_CURRENT=${target_current}; expected milliamps such as 5000"
+    return 1
+  fi
+
+  if [ "$target_current" -lt 3000 ] || [ "$target_current" -gt 5000 ]; then
+    echo "Invalid PI5_PSU_MAX_CURRENT=${target_current}; Raspberry Pi 5 accepts 3000-5000"
+    return 1
+  fi
+
+  if ! command -v rpi-eeprom-config >/dev/null 2>&1; then
+    echo "Warning: rpi-eeprom-config not found; cannot set PSU_MAX_CURRENT=${target_current}"
+    echo "Install/update rpi-eeprom, then run: sudo rpi-eeprom-config --edit"
+    return 0
+  fi
+
+  current_config="$(rpi-eeprom-config 2>/dev/null || true)"
+  if [ -z "$current_config" ]; then
+    echo "Unable to read current EEPROM config; not applying PSU_MAX_CURRENT"
+    return 1
+  fi
+
+  if echo "$current_config" | grep -q "^PSU_MAX_CURRENT=${target_current}$"; then
+    echo "PSU_MAX_CURRENT=${target_current} already configured"
+    return 0
+  fi
+
+  tmp_config="$(mktemp)"
+  printf '%s\n' "$current_config" > "$tmp_config"
+  if grep -q '^PSU_MAX_CURRENT=' "$tmp_config"; then
+    sed -i "s/^PSU_MAX_CURRENT=.*/PSU_MAX_CURRENT=${target_current}/" "$tmp_config"
+  else
+    printf '\nPSU_MAX_CURRENT=%s\n' "$target_current" >> "$tmp_config"
+  fi
+
+  if ! rpi-eeprom-config --apply "$tmp_config"; then
+    rm -f "$tmp_config"
+    echo "Failed to apply Raspberry Pi EEPROM config"
+    return 1
+  fi
+  rm -f "$tmp_config"
+
+  echo "Scheduled Raspberry Pi 5 EEPROM PSU_MAX_CURRENT=${target_current}"
+  echo "After install, shut down and hard power-cycle the panel for the PMIC to use this setting."
+}
+
+if [ -f /opt/shotclock/shared/.env ] && grep -q '^PI5_PSU_MAX_CURRENT=' /opt/shotclock/shared/.env; then
+  PI5_PSU_MAX_CURRENT="$(grep '^PI5_PSU_MAX_CURRENT=' /opt/shotclock/shared/.env | tail -n 1 | cut -d= -f2-)"
+fi
+configure_pi5_embedded_power
+
+echo ""
+echo "[9/${TOTAL_STEPS}] Creating shotclock user..."
 if ! id -u shotclock > /dev/null 2>&1; then
   useradd -r -m -s /bin/bash shotclock
   echo "Created shotclock user"
@@ -152,13 +225,13 @@ else
 fi
 
 echo ""
-echo "[9/12] Setting ownership..."
+echo "[10/${TOTAL_STEPS}] Setting ownership..."
 mkdir -p /home/shotclock/.shotclock
 chown -R shotclock:shotclock /opt/shotclock
 chown -R shotclock:shotclock /home/shotclock/.shotclock
 
 echo ""
-echo "[10/12] Installing systemd service files..."
+echo "[11/${TOTAL_STEPS}] Installing systemd service files..."
 if [ -d "${SCRIPT_DIR}/../systemd" ]; then
   cp "${SCRIPT_DIR}/../systemd/"*.service /etc/systemd/system/
   systemctl daemon-reload
@@ -168,13 +241,13 @@ else
 fi
 
 echo ""
-echo "[11/12] Enabling services..."
+echo "[12/${TOTAL_STEPS}] Enabling services..."
 systemctl enable shotclock-agent 2>/dev/null || true
 systemctl enable shotclock-kiosk 2>/dev/null || true
 echo "Services enabled"
 
 echo ""
-echo "[12/12] Setting up release symlink..."
+echo "[13/${TOTAL_STEPS}] Setting up release symlink..."
 CURRENT_VERSION="0.1.0"
 if [ -d "/opt/shotclock/releases/${CURRENT_VERSION}" ]; then
   ln -sfn /opt/shotclock/releases/${CURRENT_VERSION} /opt/shotclock/current
@@ -203,6 +276,8 @@ echo "  3. Run 'systemctl start shotclock-agent' to start the agent"
 echo "  4. Run 'systemctl start shotclock-kiosk' to start the kiosk"
 echo "  5. Connect to the AP named like Shotclock-Setup-xxxxxx and open sportsboard.local"
 echo "     Fallback: http://192.168.4.1:8080"
+echo "  6. On embedded Raspberry Pi 5 installs, shut down once and hard power-cycle the panel"
+echo "     after PSU_MAX_CURRENT is scheduled."
 echo ""
 echo "To build the app on the Pi:"
 echo "  cd /opt/shotclock/releases/${CURRENT_VERSION}"

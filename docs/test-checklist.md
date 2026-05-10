@@ -194,6 +194,8 @@ All items must pass before deployment is considered complete.
 - [ ] Chromium and dependencies are installed (`chromium-browser` on older Raspberry Pi OS, `chromium` on Debian/Raspberry Pi OS Trixie)
 - [ ] `unclutter` is installed so the kiosk cursor hides before manual mouse movement
 - [ ] NetworkManager, hostapd, dnsmasq, avahi-daemon, libnss-mdns, iproute2, iptables, rfkill, iw, and wireless-regdb are installed
+- [ ] Raspberry Pi 5 embedded-power installs schedule `PSU_MAX_CURRENT=5000` in EEPROM
+- [ ] Embedded Raspberry Pi 5 test unit completes one hard power cycle after EEPROM scheduling
 - [ ] `/opt/shotclock` directory structure is created
 - [ ] `/home/shotclock/.shotclock` exists before services start
 - [ ] Config templates are copied to `/opt/shotclock/shared/config/`

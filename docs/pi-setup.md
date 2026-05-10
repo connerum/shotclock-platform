@@ -176,6 +176,7 @@ KIOSK_DISPLAY_OUTPUT=auto
 KIOSK_DISPLAY_MODE=1024x768
 KIOSK_DISPLAY_RATE=60
 KIOSK_HIDE_CURSOR=true
+PI5_PSU_MAX_CURRENT=5000
 ```
 
 `KIOSK_USER` should be the Raspberry Pi desktop login user that owns the active HDMI session. On the current field Pi this is `admin`. The kiosk service starts as root, then launches Chromium as this user so it can attach to the visible desktop session.
@@ -183,6 +184,8 @@ KIOSK_HIDE_CURSOR=true
 For NovaStar MSD300-1 controllers, keep the Pi kiosk output at `1024x768@60`. Field testing showed the MSD300-1 displayed moving blue-dot artifacts on running basketball displays at higher Pi output resolutions, while static images and the idle basketball display were clean. `1024x768@60` stopped the artifacts. RGB-to-BGR color correction should remain enabled for this controller path when needed for correct panel colors.
 
 `KIOSK_HIDE_CURSOR=true` starts `unclutter` before Chromium so the mouse pointer is hidden immediately, including before any manual mouse movement. To temporarily get the cursor back for desktop maintenance, set `KIOSK_HIDE_CURSOR=false` in `/opt/shotclock/shared/.env` and restart `shotclock-kiosk`.
+
+`PI5_PSU_MAX_CURRENT=5000` is required for embedded Raspberry Pi 5 installs powered from the LED controller power supply or GPIO 5V rail instead of the USB-C PD input. The installer writes this value to the Pi 5 EEPROM as `PSU_MAX_CURRENT=5000` so soft reboots triggered by network recovery, updates, or factory reset do not hang in a low-power boot state.
 
 The setup AP is only broadcast while the device is unpaired. Its SSID is the configured prefix plus the first six characters of the unique device ID suffix, for example `Shotclock-Setup-1e4b35`.
 
@@ -197,6 +200,7 @@ SETUP_AP_PASSWORD=shotclock123
 SETUP_PORTAL_HOST=sportsboard.local
 KIOSK_USER=admin
 KIOSK_HIDE_CURSOR=true
+PI5_PSU_MAX_CURRENT=5000
 ```
 
 ### 3. Enable Services
@@ -303,6 +307,51 @@ sudo systemctl restart shotclock-kiosk
 
 The launcher applies this with `xrandr` before Chromium starts. Leave `KIOSK_DISPLAY_OUTPUT=auto` unless the Pi has multiple connected outputs; then set it to the exact `xrandr` output name.
 
+## Embedded Pi 5 Power
+
+For Raspberry Pi 5 displays powered from the LED display power supply or direct 5V/GPIO rail, the Pi cannot negotiate USB-C Power Delivery. Set the EEPROM bootloader current override so the Pi treats the supply as a 5A source:
+
+```bash
+cd ~/shotclock-platform
+git pull --ff-only
+grep -q '^PI5_PSU_MAX_CURRENT=' /opt/shotclock/shared/.env \
+  && sudo sed -i 's/^PI5_PSU_MAX_CURRENT=.*/PI5_PSU_MAX_CURRENT=5000/' /opt/shotclock/shared/.env \
+  || echo 'PI5_PSU_MAX_CURRENT=5000' | sudo tee -a /opt/shotclock/shared/.env
+sudo ./scripts/install-pi.sh
+```
+
+Verify the scheduled EEPROM config:
+
+```bash
+sudo rpi-eeprom-config | grep '^PSU_MAX_CURRENT='
+od -An -tu4 /proc/device-tree/chosen/power/max_current 2>/dev/null || true
+```
+
+Then apply it with a hard power cycle:
+
+```bash
+sudo shutdown -h now
+```
+
+Wait for the Pi activity LED to stop, remove wall power from the embedded panel for at least 10 seconds, then plug it back in. Do not rely on only `sudo reboot` for this first application because the PMIC may need a full power removal to leave the prior low-power state.
+
+After boot, confirm:
+
+```bash
+rpi-eeprom-config | grep '^PSU_MAX_CURRENT=5000'
+od -An -tu4 /proc/device-tree/chosen/power/max_current 2>/dev/null || true
+systemctl status shotclock-agent shotclock-kiosk --no-pager
+```
+
+If `rpi-eeprom-config` is unavailable, install or update the Raspberry Pi EEPROM tooling:
+
+```bash
+sudo apt-get update
+sudo apt-get install -y rpi-eeprom
+```
+
+Only set `PSU_MAX_CURRENT=5000` when the embedded 5V supply and wiring can safely provide 5A at the Pi under load. If the supply cannot provide that current, fix the power path rather than masking undervoltage.
+
 ## Kiosk Cursor
 
 Production kiosks should hide the cursor:
@@ -333,7 +382,7 @@ Set it back to `true` and restart `shotclock-kiosk` before returning the Pi to p
 ### Pi doesn't boot
 
 1. Check SD card is properly inserted
-2. Verify power supply (5V 3A minimum)
+2. Verify power supply. Embedded Raspberry Pi 5 displays should provide a stable 5V/5A at the Pi and have `PSU_MAX_CURRENT=5000` applied in EEPROM.
 3. Try re-flashing the OS
 
 ### No display output
