@@ -144,12 +144,14 @@ ensure_env_default "KIOSK_DISPLAY_MODE" "1024x768"
 ensure_env_default "KIOSK_DISPLAY_RATE" "60"
 ensure_env_default "KIOSK_HIDE_CURSOR" "true"
 ensure_env_default "PI5_PSU_MAX_CURRENT" "5000"
+ensure_env_default "PI5_AUTO_BOOT_ON_POWER" "true"
 
 echo ""
 echo "[8/${TOTAL_STEPS}] Configuring Raspberry Pi 5 embedded power override..."
 configure_pi5_embedded_power() {
   local model=""
   local target_current="${PI5_PSU_MAX_CURRENT:-5000}"
+  local auto_boot="${PI5_AUTO_BOOT_ON_POWER:-true}"
   local current_config=""
   local tmp_config=""
 
@@ -186,17 +188,20 @@ configure_pi5_embedded_power() {
     return 1
   fi
 
-  if echo "$current_config" | grep -q "^PSU_MAX_CURRENT=${target_current}$"; then
+  if echo "$current_config" | grep -q "^PSU_MAX_CURRENT=${target_current}$" && \
+    { [[ "${auto_boot,,}" =~ ^(0|false|no|off)$ ]] || \
+      { echo "$current_config" | grep -q '^POWER_OFF_ON_HALT=0$' && echo "$current_config" | grep -q '^WAIT_FOR_POWER_BUTTON=0$'; }; }; then
     echo "PSU_MAX_CURRENT=${target_current} already configured"
     return 0
   fi
 
   tmp_config="$(mktemp)"
   printf '%s\n' "$current_config" > "$tmp_config"
-  if grep -q '^PSU_MAX_CURRENT=' "$tmp_config"; then
-    sed -i "s/^PSU_MAX_CURRENT=.*/PSU_MAX_CURRENT=${target_current}/" "$tmp_config"
-  else
-    printf '\nPSU_MAX_CURRENT=%s\n' "$target_current" >> "$tmp_config"
+  set_eeprom_key "$tmp_config" "PSU_MAX_CURRENT" "$target_current"
+
+  if ! [[ "${auto_boot,,}" =~ ^(0|false|no|off)$ ]]; then
+    set_eeprom_key "$tmp_config" "POWER_OFF_ON_HALT" "0"
+    set_eeprom_key "$tmp_config" "WAIT_FOR_POWER_BUTTON" "0"
   fi
 
   if ! rpi-eeprom-config --apply "$tmp_config"; then
@@ -207,11 +212,29 @@ configure_pi5_embedded_power() {
   rm -f "$tmp_config"
 
   echo "Scheduled Raspberry Pi 5 EEPROM PSU_MAX_CURRENT=${target_current}"
+  if ! [[ "${auto_boot,,}" =~ ^(0|false|no|off)$ ]]; then
+    echo "Scheduled Raspberry Pi 5 EEPROM auto-boot settings: POWER_OFF_ON_HALT=0, WAIT_FOR_POWER_BUTTON=0"
+  fi
   echo "After install, shut down and hard power-cycle the panel for the PMIC to use this setting."
+}
+
+set_eeprom_key() {
+  local file="$1"
+  local key="$2"
+  local value="$3"
+
+  if grep -q "^${key}=" "$file"; then
+    sed -i "s/^${key}=.*/${key}=${value}/" "$file"
+  else
+    printf '\n%s=%s\n' "$key" "$value" >> "$file"
+  fi
 }
 
 if [ -f /opt/shotclock/shared/.env ] && grep -q '^PI5_PSU_MAX_CURRENT=' /opt/shotclock/shared/.env; then
   PI5_PSU_MAX_CURRENT="$(grep '^PI5_PSU_MAX_CURRENT=' /opt/shotclock/shared/.env | tail -n 1 | cut -d= -f2-)"
+fi
+if [ -f /opt/shotclock/shared/.env ] && grep -q '^PI5_AUTO_BOOT_ON_POWER=' /opt/shotclock/shared/.env; then
+  PI5_AUTO_BOOT_ON_POWER="$(grep '^PI5_AUTO_BOOT_ON_POWER=' /opt/shotclock/shared/.env | tail -n 1 | cut -d= -f2-)"
 fi
 configure_pi5_embedded_power
 

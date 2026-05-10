@@ -308,6 +308,7 @@ KIOSK_DISPLAY_MODE=1024x768
 KIOSK_DISPLAY_RATE=60
 KIOSK_HIDE_CURSOR=true
 PI5_PSU_MAX_CURRENT=5000
+PI5_AUTO_BOOT_ON_POWER=true
 ```
 
 Set `KIOSK_USER` to the Pi desktop login user that owns the HDMI session. On `display-40091`, that user is `admin`.
@@ -316,7 +317,7 @@ For NovaStar MSD300-1 controllers, keep the Pi kiosk output at `1024x768@60`. Fi
 
 Keep `KIOSK_HIDE_CURSOR=true` for production displays. The Pi installer installs `unclutter`, and the kiosk launcher starts it so the cursor is hidden immediately when Chromium opens. For Pi desktop maintenance, set `KIOSK_HIDE_CURSOR=false`, run `sudo pkill -x unclutter || true`, and restart `shotclock-kiosk`; set it back to `true` before returning to production.
 
-For embedded Raspberry Pi 5 displays powered from the LED display power supply or direct 5V/GPIO rail, keep `PI5_PSU_MAX_CURRENT=5000`. The installer applies this to the Pi 5 EEPROM as `PSU_MAX_CURRENT=5000`, avoiding low-power boot behavior during agent-triggered reboots for network recovery, updates, or factory reset. After applying it the first time, shut down, remove panel power for at least 10 seconds, then restore power.
+For embedded Raspberry Pi 5 displays powered from the LED display power supply or direct 5V/GPIO rail, keep `PI5_PSU_MAX_CURRENT=5000` and `PI5_AUTO_BOOT_ON_POWER=true`. The installer applies `PSU_MAX_CURRENT=5000`, `POWER_OFF_ON_HALT=0`, and `WAIT_FOR_POWER_BUTTON=0` to EEPROM, avoiding low-power boot behavior during agent-triggered reboots and preventing the Pi from waiting for the power button when panel power is restored. After applying it the first time, shut down, remove panel power for at least 10 seconds, then restore power.
 
 If `/opt/shotclock/shared/.env` still does not exist, the install script did not finish. Create the directory manually only as a recovery step:
 

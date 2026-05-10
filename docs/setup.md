@@ -131,6 +131,7 @@ KIOSK_DISPLAY_MODE=1024x768
 KIOSK_DISPLAY_RATE=60
 KIOSK_HIDE_CURSOR=true
 PI5_PSU_MAX_CURRENT=5000
+PI5_AUTO_BOOT_ON_POWER=true
 ```
 
 Set `KIOSK_USER` to the desktop login user that owns the HDMI session. On the current field Pi this is `admin`.
@@ -139,7 +140,7 @@ For NovaStar MSD300-1 deployments, keep `KIOSK_DISPLAY_MODE=1024x768` and `KIOSK
 
 Keep `KIOSK_HIDE_CURSOR=true` in production. The installer installs `unclutter`, and the kiosk launcher uses it to hide the cursor immediately. To temporarily show the cursor on the Pi desktop, set `KIOSK_HIDE_CURSOR=false` in `/opt/shotclock/shared/.env`, run `sudo pkill -x unclutter || true`, and restart `shotclock-kiosk`.
 
-For embedded Raspberry Pi 5 installs powered from the LED display power supply or direct 5V/GPIO rail, keep `PI5_PSU_MAX_CURRENT=5000`. The installer applies this to the Pi 5 EEPROM as `PSU_MAX_CURRENT=5000`, which tells the bootloader the supply can provide 5A even though USB-C Power Delivery is not present. After this is first scheduled, shut down and remove panel power for at least 10 seconds before restarting.
+For embedded Raspberry Pi 5 installs powered from the LED display power supply or direct 5V/GPIO rail, keep `PI5_PSU_MAX_CURRENT=5000` and `PI5_AUTO_BOOT_ON_POWER=true`. The installer applies `PSU_MAX_CURRENT=5000`, `POWER_OFF_ON_HALT=0`, and `WAIT_FOR_POWER_BUTTON=0` to EEPROM so the Pi has the correct 5A assumption and boots automatically when panel power is restored. After this is first scheduled, shut down and remove panel power for at least 10 seconds before restarting.
 
 Build and point systemd at the checkout:
 
