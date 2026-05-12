@@ -479,6 +479,8 @@ async function resolveTimerCommandState(deviceId: string, incomingState: TimerSt
     ...pausedState,
     homeScore: incomingState.homeScore,
     awayScore: incomingState.awayScore,
+    ...(incomingState.homeSets !== undefined ? { homeSets: incomingState.homeSets } : {}),
+    ...(incomingState.awaySets !== undefined ? { awaySets: incomingState.awaySets } : {}),
     period: incomingState.period ?? pausedState.period,
   });
 }

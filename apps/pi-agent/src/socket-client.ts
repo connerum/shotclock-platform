@@ -287,6 +287,8 @@ function resolveIncomingTimerState(
       ...pausedState,
       homeScore: incomingTimerState.homeScore,
       awayScore: incomingTimerState.awayScore,
+      ...(incomingTimerState.homeSets !== undefined ? { homeSets: incomingTimerState.homeSets } : {}),
+      ...(incomingTimerState.awaySets !== undefined ? { awaySets: incomingTimerState.awaySets } : {}),
       period: incomingTimerState.period ?? pausedState.period,
     });
   }
