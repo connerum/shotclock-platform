@@ -32,9 +32,8 @@ export default function VolleyballMode({ state }: VolleyballModeProps) {
         <span className="text-[min(16cqh,8cqw)] font-black text-gray-700">-</span>
         <TeamScore label="AWAY" value={awayScore} className="text-blue-500" />
       </div>
-      <div className="grid min-h-0 grid-cols-[1fr_auto_1fr] items-center gap-0.5 overflow-hidden border-t border-gray-900 leading-none">
+      <div className="grid min-h-0 grid-cols-2 items-center gap-1 overflow-hidden border-t border-gray-900 leading-none">
         <SetScore label="S" value={homeSets} className="text-red-400" />
-        <span className="text-[min(8cqh,5cqw)] font-black text-gray-700">-</span>
         <SetScore label="S" value={awaySets} className="text-blue-400" />
       </div>
     </div>
@@ -52,8 +51,8 @@ function TeamScore({ label, value, className }: { label: string; value: number; 
 
 function SetScore({ label, value, className }: { label: string; value: number; className: string }) {
   return (
-    <div className="grid min-h-0 grid-cols-[1fr_auto] items-center gap-0.5 overflow-hidden">
-      <span className={`text-right text-[min(6cqh,3.5cqw)] font-black leading-none ${className}`}>{label}</span>
+    <div className="flex min-h-0 items-center justify-center gap-0.5 overflow-hidden">
+      <span className={`text-[min(6cqh,3.5cqw)] font-black leading-none ${className}`}>{label}</span>
       <span className={`text-[min(16cqh,9cqw)] font-black leading-none tabular-nums ${className}`}>{value}</span>
     </div>
   );
