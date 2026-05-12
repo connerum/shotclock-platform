@@ -402,29 +402,38 @@ async function persistTimerCommand(
   deviceId: string,
   displayState: { mode: string; timerState: TimerState; mediaAssetId: null }
 ) {
-  await prisma.$transaction([
+  const serializedTimerState = JSON.stringify(displayState.timerState);
+  const serializedDisplayState = JSON.stringify(displayState);
+  const results = await Promise.allSettled([
+    prisma.device.update({
+      where: { deviceId },
+      data: {
+        mode: displayState.mode,
+        displayState: serializedDisplayState,
+      },
+    }),
     prisma.displayState.upsert({
       where: { deviceId },
       update: {
         mode: displayState.mode,
-        timerState: JSON.stringify(displayState.timerState),
+        timerState: serializedTimerState,
         mediaAssetId: null,
       },
       create: {
         deviceId,
         mode: displayState.mode,
-        timerState: JSON.stringify(displayState.timerState),
+        timerState: serializedTimerState,
         mediaAssetId: null,
       },
     }),
-    prisma.device.update({
-      where: { deviceId },
-      data: {
-        mode: displayState.mode,
-        displayState: JSON.stringify(displayState),
-      },
-    }),
   ]);
+
+  results.forEach((result, index) => {
+    if (result.status === 'rejected') {
+      const target = index === 0 ? 'Device displayState' : 'DisplayState';
+      console.warn(`Unable to persist ${target} for ${deviceId}; live command was already acknowledged`, result.reason);
+    }
+  });
 }
 
 async function resetDeviceRecordAfterFactoryReset(deviceId: string): Promise<void> {
@@ -476,16 +485,41 @@ async function resolveTimerCommandState(deviceId: string, incomingState: TimerSt
 
 async function loadPersistedTimerState(deviceId: string): Promise<TimerState | null> {
   try {
-    const state = await prisma.displayState.findUnique({
+    const device = await prisma.device.findUnique({
       where: { deviceId },
-      select: { timerState: true },
+      select: {
+        displayState: true,
+        state: {
+          select: {
+            timerState: true,
+          },
+        },
+      },
     });
 
-    return state?.timerState ? JSON.parse(state.timerState) as TimerState : null;
+    const cachedDisplayState = device?.displayState ? JSON.parse(device.displayState) : null;
+    const cachedTimerState = cachedDisplayState?.timerState as TimerState | null | undefined;
+    const relationTimerState = device?.state?.timerState
+      ? JSON.parse(device.state.timerState) as TimerState
+      : null;
+
+    return getNewestTimerState(relationTimerState, cachedTimerState);
   } catch (error) {
     console.warn(`Unable to load persisted timer state for ${deviceId}`, error);
     return null;
   }
+}
+
+function getNewestTimerState(
+  first: TimerState | null | undefined,
+  second: TimerState | null | undefined
+): TimerState | null {
+  if (!first) return second || null;
+  if (!second) return first;
+
+  const firstUpdated = typeof first.lastUpdated === 'number' ? first.lastUpdated : 0;
+  const secondUpdated = typeof second.lastUpdated === 'number' ? second.lastUpdated : 0;
+  return secondUpdated > firstUpdated ? second : first;
 }
 
 function rebaseTimerStateToLocalClock(state: TimerState, now = Date.now()): TimerState {
