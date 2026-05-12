@@ -62,7 +62,8 @@ export default function ShotClockMode({ state }: ShotClockModeProps) {
     now >= timerState.lastUpdated + timerState.shotClock * 1000 &&
     now - (timerState.lastUpdated + timerState.shotClock * 1000) <= 3000
   );
-  const isWarning = isRunning && ((shotClock > 0 && shotClock <= 5) || (shotClock === 0 && expiredStrobeActive));
+  const isWarning = shotClock > 0 && shotClock <= 5;
+  const shouldStrobe = isRunning && shotClock === 0 && expiredStrobeActive;
   const isExpired = shotClock === 0;
   const isShotClockOnly = state?.mode?.subMode === 'shot-clock-only';
 
@@ -76,6 +77,7 @@ export default function ShotClockMode({ state }: ShotClockModeProps) {
           <ShotClock
             value={shotClock}
             isWarning={isWarning}
+            shouldStrobe={shouldStrobe}
             isExpired={isExpired}
             isRunning={isRunning}
           />
@@ -100,6 +102,7 @@ export default function ShotClockMode({ state }: ShotClockModeProps) {
         <ShotClock
           value={shotClock}
           isWarning={isWarning}
+          shouldStrobe={shouldStrobe}
           isExpired={isExpired}
           isRunning={isRunning}
         />

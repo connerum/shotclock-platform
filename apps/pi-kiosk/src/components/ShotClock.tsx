@@ -6,6 +6,7 @@ import { formatShotClockDisplay } from '@shotclock/shared/timer';
 interface ShotClockProps {
   value: number;
   isWarning?: boolean;
+  shouldStrobe?: boolean;
   isExpired?: boolean;
   isRunning?: boolean;
 }
@@ -13,6 +14,7 @@ interface ShotClockProps {
 export default function ShotClock({ 
   value, 
   isWarning = false, 
+  shouldStrobe = false,
   isExpired = false,
   isRunning = false 
 }: ShotClockProps) {
@@ -21,20 +23,21 @@ export default function ShotClock({
   }, [value]);
 
   const colorClass = useMemo(() => {
-    if (isWarning) return 'text-white';
+    if (shouldStrobe || isWarning) return 'text-white';
     if (isExpired) return 'text-red-500';
     return 'text-white';
-  }, [isWarning, isExpired]);
+  }, [shouldStrobe, isWarning, isExpired]);
 
   const glowClass = useMemo(() => {
-    if (isWarning) return 'drop-shadow-[0_0_24px_rgba(239,68,68,0.9)]';
+    if (shouldStrobe) return 'drop-shadow-[0_0_24px_rgba(239,68,68,0.9)]';
+    if (isWarning) return 'drop-shadow-[0_0_20px_rgba(250,204,21,0.8)]';
     if (isExpired) return 'drop-shadow-[0_0_20px_rgba(239,68,68,0.8)]';
     if (isRunning) return 'drop-shadow-[0_0_20px_rgba(34,197,94,0.6)]';
     return '';
-  }, [isWarning, isExpired, isRunning]);
+  }, [shouldStrobe, isWarning, isExpired, isRunning]);
 
   return (
-    <div className={`relative flex h-full w-full items-center justify-center ${isWarning ? 'shotclock-strobe' : ''} ${glowClass}`}>
+    <div className={`relative flex h-full w-full items-center justify-center ${shouldStrobe ? 'shotclock-strobe' : ''} ${glowClass}`}>
       {/* Main display */}
       <div
         className={`font-mono font-black tabular-nums ${colorClass}`}
@@ -49,7 +52,7 @@ export default function ShotClock({
       </div>
       
       {/* Decorative border */}
-      <div className={`absolute inset-0 border-2 ${isWarning ? 'border-white' : isExpired ? 'border-red-500' : 'border-gray-700'}`} />
+      <div className={`absolute inset-0 border-2 ${shouldStrobe ? 'border-white' : isExpired ? 'border-red-500' : isWarning ? 'border-yellow-400' : 'border-gray-700'}`} />
       
       {/* Running indicator */}
       {isRunning && (
@@ -65,7 +68,7 @@ export default function ShotClock({
       )}
       
       {/* Warning flash effect */}
-      {isWarning && <div className="absolute inset-0 bg-red-500 opacity-15 pointer-events-none" />}
+      {shouldStrobe && <div className="absolute inset-0 bg-red-500 opacity-15 pointer-events-none" />}
     </div>
   );
 }
