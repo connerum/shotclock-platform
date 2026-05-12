@@ -3,13 +3,24 @@ import { promisify } from 'util';
 import { resetConfig } from './config-store.js';
 import { clearPairedStatus } from './identity.js';
 import { clearPairingCode } from './pairing-code.js';
-import { resetState, saveState } from './state-store.js';
+import { loadState, resetState, saveState } from './state-store.js';
 import { wifiManager } from './wifi-manager.js';
 
 const execFileAsync = promisify(execFile);
 
 export async function prepareFactoryReset(): Promise<void> {
   console.log('Preparing factory reset');
+  const previousState = loadState();
+  const resetDisplayProfile = {
+    ...previousState.displayProfile,
+    viewport: {
+      ...previousState.displayProfile.viewport,
+      x: 0,
+      y: 0,
+      width: 256,
+      height: 192,
+    },
+  };
 
   clearPairingCode();
 
@@ -21,7 +32,20 @@ export async function prepareFactoryReset(): Promise<void> {
 
   resetConfig();
   resetState();
-  saveState({ mode: { type: 'setup' } });
+  saveState({
+    mode: { type: 'setup' },
+    displayProfile: resetDisplayProfile,
+    calibrationData: {
+      x: 0,
+      y: 0,
+      width: 256,
+      height: 192,
+      scaleX: 1,
+      scaleY: 1,
+      rotation: resetDisplayProfile.viewport.rotation || 0,
+      timestamp: Date.now(),
+    },
+  });
 }
 
 export function finishFactoryResetAndReboot(): void {
