@@ -7,6 +7,7 @@ import { DeviceMode, TimerState } from '@shotclock/shared/types';
 import {
   clampSeconds,
   createDefaultTimerState,
+  DEFAULT_SHOT_CLOCK_SECONDS,
   formatShotClockDisplay,
   pausePreciseTimerState,
   projectPreciseTimerState,
@@ -36,7 +37,7 @@ export default function BasketballPage({ params }: { params: { deviceId: string 
   const [error, setError] = useState<string | null>(null);
   const [commandError, setCommandError] = useState<string | null>(null);
 
-  const [shotClock, setShotClock] = useState(24);
+  const [shotClock, setShotClock] = useState(DEFAULT_SHOT_CLOCK_SECONDS);
   const [gameClock, setGameClock] = useState(720);
   const [period, setPeriod] = useState(1);
   const [homeScore, setHomeScore] = useState(0);
@@ -340,18 +341,18 @@ export default function BasketballPage({ params }: { params: { deviceId: string 
         <ControlCard title="Time Settings" icon="TIME" accentClass="bg-purple-500/15 text-purple-300">
           <div className="grid grid-cols-2 gap-3">
             <button
-              onClick={() => updateShotClock(24)}
+              onClick={() => updateShotClock(35)}
               disabled={timerRunning}
               className="cc-btn cc-btn-blue px-4 py-3 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              Reset 24s
+              Reset 35
             </button>
             <button
-              onClick={() => updateShotClock(14)}
+              onClick={() => updateShotClock(25)}
               disabled={timerRunning}
               className="cc-btn cc-btn-blue px-4 py-3 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              Reset 14s
+              Reset 25
             </button>
           </div>
 

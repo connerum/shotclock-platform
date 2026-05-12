@@ -5,6 +5,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getServerIO } from '@/lib/socket';
 import { TimerState } from '@shotclock/shared/types';
+import { DEFAULT_GAME_CLOCK_SECONDS, DEFAULT_SHOT_CLOCK_SECONDS } from '@shotclock/shared/timer';
 import { canAccessDevice, requireApiUser } from '@/lib/auth';
 
 interface RouteParams {
@@ -20,8 +21,8 @@ function createDefaultTimerState(now = Date.now()): TimerState {
     homeScore: 0,
     awayScore: 0,
     period: 1,
-    shotClock: 24,
-    gameClock: 720,
+    shotClock: DEFAULT_SHOT_CLOCK_SECONDS,
+    gameClock: DEFAULT_GAME_CLOCK_SECONDS,
     isRunning: false,
     isPaused: false,
     lastUpdated: now,

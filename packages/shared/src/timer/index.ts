@@ -1,6 +1,6 @@
 import type { TimerState } from '../types/index.js';
 
-export const DEFAULT_SHOT_CLOCK_SECONDS = 24;
+export const DEFAULT_SHOT_CLOCK_SECONDS = 35;
 export const DEFAULT_GAME_CLOCK_SECONDS = 720;
 export const MAX_SHOT_CLOCK_SECONDS = 99;
 export const MAX_GAME_CLOCK_SECONDS = 3600;

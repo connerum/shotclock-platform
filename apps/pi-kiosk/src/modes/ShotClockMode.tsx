@@ -1,7 +1,7 @@
 // Shot Clock Mode - compact display for calibrated LED viewport.
 
 import { useEffect, useState } from 'react';
-import { projectPreciseTimerState } from '@shotclock/shared/timer';
+import { DEFAULT_SHOT_CLOCK_SECONDS, projectPreciseTimerState } from '@shotclock/shared/timer';
 import ShotClock from '../components/ShotClock';
 
 interface ShotClockModeProps {
@@ -43,7 +43,7 @@ export default function ShotClockMode({ state }: ShotClockModeProps) {
     lastUpdated: timerState.lastUpdated ?? now,
   }, now) : null;
 
-  const shotClock = projectedTimerState?.shotClock ?? 24;
+  const shotClock = projectedTimerState?.shotClock ?? DEFAULT_SHOT_CLOCK_SECONDS;
   const gameClock = Math.floor(projectedTimerState?.gameClock ?? 720);
   const homeScore = projectedTimerState?.homeScore ?? 0;
   const awayScore = projectedTimerState?.awayScore ?? 0;
@@ -56,7 +56,13 @@ export default function ShotClockMode({ state }: ShotClockModeProps) {
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
-  const isWarning = shotClock <= 5;
+  const expiredStrobeActive = Boolean(
+    timerState?.isRunning &&
+    typeof timerState.lastUpdated === 'number' &&
+    timerState.shotClock <= 5 &&
+    now - (timerState.lastUpdated + timerState.shotClock * 1000) <= 3000
+  );
+  const isWarning = isRunning && ((shotClock > 0 && shotClock <= 5) || (shotClock === 0 && expiredStrobeActive));
   const isExpired = shotClock === 0;
   const isShotClockOnly = state?.mode?.subMode === 'shot-clock-only';
 
