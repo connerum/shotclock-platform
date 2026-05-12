@@ -56,7 +56,7 @@ export default function ShotClockMode({ state }: ShotClockModeProps) {
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
-  const isWarning = shotClock <= 5 && shotClock > 0;
+  const isWarning = shotClock <= 5;
   const isExpired = shotClock === 0;
   const isShotClockOnly = state?.mode?.subMode === 'shot-clock-only';
 

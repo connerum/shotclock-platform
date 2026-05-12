@@ -21,20 +21,20 @@ export default function ShotClock({
   }, [value]);
 
   const colorClass = useMemo(() => {
-    if (isExpired) return 'text-red-500';
     if (isWarning) return 'text-white';
+    if (isExpired) return 'text-red-500';
     return 'text-white';
   }, [isWarning, isExpired]);
 
   const glowClass = useMemo(() => {
-    if (isExpired) return 'drop-shadow-[0_0_20px_rgba(239,68,68,0.8)]';
     if (isWarning) return 'drop-shadow-[0_0_24px_rgba(239,68,68,0.9)]';
+    if (isExpired) return 'drop-shadow-[0_0_20px_rgba(239,68,68,0.8)]';
     if (isRunning) return 'drop-shadow-[0_0_20px_rgba(34,197,94,0.6)]';
     return '';
   }, [isWarning, isExpired, isRunning]);
 
   return (
-    <div className={`relative flex h-full w-full items-center justify-center ${isWarning && !isExpired ? 'shotclock-strobe' : ''} ${glowClass}`}>
+    <div className={`relative flex h-full w-full items-center justify-center ${isWarning ? 'shotclock-strobe' : ''} ${glowClass}`}>
       {/* Main display */}
       <div
         className={`font-mono font-black tabular-nums ${colorClass}`}
@@ -49,7 +49,7 @@ export default function ShotClock({
       </div>
       
       {/* Decorative border */}
-      <div className={`absolute inset-0 border-2 ${isExpired ? 'border-red-500' : isWarning ? 'border-white' : 'border-gray-700'}`} />
+      <div className={`absolute inset-0 border-2 ${isWarning ? 'border-white' : isExpired ? 'border-red-500' : 'border-gray-700'}`} />
       
       {/* Running indicator */}
       {isRunning && (
@@ -65,7 +65,7 @@ export default function ShotClock({
       )}
       
       {/* Warning flash effect */}
-      {isWarning && !isExpired && <div className="absolute inset-0 bg-red-500 opacity-15 pointer-events-none" />}
+      {isWarning && <div className="absolute inset-0 bg-red-500 opacity-15 pointer-events-none" />}
     </div>
   );
 }
