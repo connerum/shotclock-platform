@@ -279,6 +279,7 @@ sudo nano /opt/shotclock/shared/.env
 # Build the Pi packages
 pnpm install
 pnpm --filter @shotclock/shared build
+pnpm --filter @shotclock/display-core build
 pnpm --filter @shotclock/pi-agent build
 pnpm --filter @shotclock/pi-kiosk build
 

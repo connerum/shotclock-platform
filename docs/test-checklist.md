@@ -266,6 +266,7 @@ Run this command and verify all packages build:
 ```bash
 cd ~/shotclock-platform
 pnpm --filter @shotclock/shared build
+pnpm --filter @shotclock/display-core build
 pnpm --filter @shotclock/pi-agent build
 pnpm --filter @shotclock/pi-kiosk build
 ```

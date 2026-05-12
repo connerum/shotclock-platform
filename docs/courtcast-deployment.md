@@ -333,6 +333,7 @@ Build on the Pi:
 cd ~/shotclock-platform
 pnpm install --frozen-lockfile
 pnpm --filter @shotclock/shared build
+pnpm --filter @shotclock/display-core build
 pnpm --filter @shotclock/pi-agent build
 pnpm --filter @shotclock/pi-kiosk build
 ```
@@ -382,6 +383,7 @@ cd ~/shotclock-platform
 git pull --ff-only
 pnpm install --frozen-lockfile
 pnpm --filter @shotclock/shared build
+pnpm --filter @shotclock/display-core build
 pnpm --filter @shotclock/pi-agent build
 pnpm --filter @shotclock/pi-kiosk build
 sudo ln -sfn "$PWD" /opt/shotclock/current
