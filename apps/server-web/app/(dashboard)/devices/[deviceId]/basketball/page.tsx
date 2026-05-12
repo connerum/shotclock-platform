@@ -67,9 +67,7 @@ export default function BasketballPage({ params }: { params: { deviceId: string 
       const data = await res.json();
       setDevice(data.device);
 
-      const loadedTimerState = data.device.timerState
-        ? projectTimerState(data.device.timerState, Date.now())
-        : createDefaultTimerState();
+      const loadedTimerState = hydrateTimerState(data.device.timerState);
       setShotClock(loadedTimerState.shotClock);
       setGameClock(loadedTimerState.gameClock);
       setPeriod(loadedTimerState.period ?? 1);
@@ -429,6 +427,20 @@ export default function BasketballPage({ params }: { params: { deviceId: string 
       <GamePresentationControls deviceId={deviceId} />
     </div>
   );
+}
+
+function hydrateTimerState(timerState?: TimerState | null): TimerState {
+  const now = Date.now();
+  const projectedTimerState = timerState
+    ? projectTimerState(timerState, now)
+    : createDefaultTimerState(now);
+
+  return {
+    ...projectedTimerState,
+    mode: projectedTimerState.isRunning ? 'run' : 'pause',
+    isPaused: !projectedTimerState.isRunning,
+    lastUpdated: now,
+  };
 }
 
 function RegularShotClockPreview({

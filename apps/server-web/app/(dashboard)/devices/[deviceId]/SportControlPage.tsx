@@ -46,16 +46,11 @@ export default function SportControlPage({ deviceId, config }: { deviceId: strin
         const response = await fetch(`/api/devices/${deviceId}`);
         if (!response.ok) throw new Error('Device not found');
         const data = await response.json();
-        const loadedTimerState = data.device.timerState
-          ? projectTimerState(data.device.timerState)
-          : createDefaultTimerState();
+        const loadedTimerState = hydrateTimerState(data.device.timerState);
 
         setDevice(data.device);
-        setTimerState({
-          ...loadedTimerState,
-          mode: loadedTimerState.isRunning ? 'run' : 'pause',
-          isPaused: !loadedTimerState.isRunning,
-        });
+        setTimerState(loadedTimerState);
+        setNow(loadedTimerState.lastUpdated);
       } finally {
         setLoading(false);
       }
@@ -239,6 +234,20 @@ export default function SportControlPage({ deviceId, config }: { deviceId: strin
       <GamePresentationControls deviceId={deviceId} />
     </div>
   );
+}
+
+function hydrateTimerState(timerState?: TimerState | null): TimerState {
+  const now = Date.now();
+  const projectedTimerState = timerState
+    ? projectTimerState(timerState, now)
+    : createDefaultTimerState(now);
+
+  return {
+    ...projectedTimerState,
+    mode: projectedTimerState.isRunning ? 'run' : 'pause',
+    isPaused: !projectedTimerState.isRunning,
+    lastUpdated: now,
+  };
 }
 
 function ScoreControl({ label, value, onChange }: { label: string; value: number; onChange: (value: number) => void }) {
