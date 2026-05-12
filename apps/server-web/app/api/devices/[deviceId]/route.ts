@@ -9,6 +9,9 @@ interface RouteParams {
   params: { deviceId: string };
 }
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 export async function GET(_request: NextRequest, { params }: RouteParams) {
   try {
     const auth = await requireApiUser();
@@ -37,16 +40,28 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
       return NextResponse.json({ error: 'Device not found' }, { status: 404 });
     }
 
+    const parsedDisplayState = device.displayState ? JSON.parse(device.displayState) : null;
+    const parsedRelationTimerState = device.state?.timerState ? JSON.parse(device.state.timerState) : null;
+    const timerState = getNewestTimerState(parsedRelationTimerState, parsedDisplayState?.timerState);
     const parsedDevice = {
       ...device,
       displayProfile: withDefaultColorCorrection(device.displayProfile ? JSON.parse(device.displayProfile) : null),
-      displayState: device.displayState ? JSON.parse(device.displayState) : null,
+      displayState: parsedDisplayState || (device.state
+        ? {
+            mode: device.state.mode,
+            timerState,
+            mediaAssetId: device.state.mediaAssetId,
+          }
+        : null),
       calibrationData: device.calibrationData ? JSON.parse(device.calibrationData) : null,
       capabilities: JSON.parse(device.capabilities || '[]'),
-      timerState: device.state?.timerState ? JSON.parse(device.state.timerState) : null,
+      timerState,
     };
 
-    return NextResponse.json({ device: parsedDevice });
+    return NextResponse.json(
+      { device: parsedDevice },
+      { headers: { 'Cache-Control': 'no-store, max-age=0' } }
+    );
   } catch (error) {
     console.error('Error fetching device:', error);
     return NextResponse.json({ error: 'Failed to fetch device' }, { status: 500 });
@@ -105,4 +120,13 @@ function withDefaultColorCorrection<T extends Record<string, any> | null>(displa
       rgbToBgr: displayProfile.colorCorrection?.rgbToBgr ?? true,
     },
   } as T;
+}
+
+function getNewestTimerState<T extends { lastUpdated?: number } | null | undefined>(first: T, second: T): T | null {
+  if (!first) return second || null;
+  if (!second) return first;
+
+  const firstUpdated = typeof first.lastUpdated === 'number' ? first.lastUpdated : 0;
+  const secondUpdated = typeof second.lastUpdated === 'number' ? second.lastUpdated : 0;
+  return secondUpdated > firstUpdated ? second : first;
 }

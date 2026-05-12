@@ -11,6 +11,9 @@ interface RouteParams {
   params: { deviceId: string };
 }
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 function createDefaultTimerState(now = Date.now()): TimerState {
   return {
     mode: 'stop',
@@ -48,30 +51,65 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
       return NextResponse.json({ error: 'Device not found' }, { status: 404 });
     }
 
-    const state = await prisma.displayState.findUnique({
+    const deviceWithState = await prisma.device.findUnique({
       where: { deviceId },
-    });
-
-    if (!state) {
-      return NextResponse.json({ 
-        state: {
-          deviceId,
-          mode: 'setup',
-          timerState: null,
-        }
-      });
-    }
-
-    return NextResponse.json({
-      state: {
-        ...state,
-        timerState: state.timerState ? JSON.parse(state.timerState) : null,
+      select: {
+        displayState: true,
+        state: true,
       },
     });
+    const state = deviceWithState?.state;
+    const cachedDisplayState = deviceWithState?.displayState
+      ? JSON.parse(deviceWithState.displayState)
+      : null;
+
+    if (!state && !cachedDisplayState) {
+      return NextResponse.json(
+        {
+          state: {
+            deviceId,
+            mode: 'setup',
+            timerState: null,
+          },
+        },
+        { headers: { 'Cache-Control': 'no-store, max-age=0' } }
+      );
+    }
+
+    const timerState = getNewestTimerState(
+      state?.timerState ? JSON.parse(state.timerState) : null,
+      cachedDisplayState?.timerState
+    );
+
+    return NextResponse.json(
+      {
+        state: state
+          ? {
+              ...state,
+              timerState,
+            }
+          : {
+              deviceId,
+              mode: cachedDisplayState.mode || 'setup',
+              timerState,
+              mediaAssetId: cachedDisplayState.mediaAssetId || null,
+            },
+      },
+      { headers: { 'Cache-Control': 'no-store, max-age=0' } }
+    );
   } catch (error) {
     console.error('Error fetching state:', error);
     return NextResponse.json({ error: 'Failed to fetch state' }, { status: 500 });
   }
+}
+
+function getNewestTimerState<T extends { lastUpdated?: number } | null | undefined>(first: T, second: T): T | null {
+  if (!first) return second || null;
+  if (!second) return first;
+
+  const firstUpdated = typeof first.lastUpdated === 'number' ? first.lastUpdated : 0;
+  const secondUpdated = typeof second.lastUpdated === 'number' ? second.lastUpdated : 0;
+  return secondUpdated > firstUpdated ? second : first;
 }
 
 export async function POST(request: NextRequest, { params }: RouteParams) {

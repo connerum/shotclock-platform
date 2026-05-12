@@ -402,8 +402,8 @@ async function persistTimerCommand(
   deviceId: string,
   displayState: { mode: string; timerState: TimerState; mediaAssetId: null }
 ) {
-  try {
-    await prisma.displayState.upsert({
+  await prisma.$transaction([
+    prisma.displayState.upsert({
       where: { deviceId },
       update: {
         mode: displayState.mode,
@@ -416,22 +416,15 @@ async function persistTimerCommand(
         timerState: JSON.stringify(displayState.timerState),
         mediaAssetId: null,
       },
-    });
-  } catch (error) {
-    console.warn(`Unable to persist DisplayState for ${deviceId}; live command was still dispatched`, error);
-  }
-
-  try {
-    await prisma.device.update({
+    }),
+    prisma.device.update({
       where: { deviceId },
       data: {
         mode: displayState.mode,
         displayState: JSON.stringify(displayState),
       },
-    });
-  } catch (error) {
-    console.warn(`Unable to persist Device display state for ${deviceId}; live command was still dispatched`, error);
-  }
+    }),
+  ]);
 }
 
 async function resetDeviceRecordAfterFactoryReset(deviceId: string): Promise<void> {

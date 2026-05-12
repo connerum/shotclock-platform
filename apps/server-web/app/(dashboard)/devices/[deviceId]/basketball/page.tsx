@@ -62,7 +62,7 @@ export default function BasketballPage({ params }: { params: { deviceId: string 
 
   const fetchDevice = async () => {
     try {
-      const res = await fetch(`/api/devices/${deviceId}`);
+      const res = await fetch(`/api/devices/${deviceId}`, { cache: 'no-store' });
       if (!res.ok) throw new Error('Device not found');
       const data = await res.json();
       setDevice(data.device);

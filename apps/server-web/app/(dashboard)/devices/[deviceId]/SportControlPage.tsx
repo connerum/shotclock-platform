@@ -43,7 +43,7 @@ export default function SportControlPage({ deviceId, config }: { deviceId: strin
   useEffect(() => {
     const fetchDevice = async () => {
       try {
-        const response = await fetch(`/api/devices/${deviceId}`);
+        const response = await fetch(`/api/devices/${deviceId}`, { cache: 'no-store' });
         if (!response.ok) throw new Error('Device not found');
         const data = await response.json();
         const loadedTimerState = hydrateTimerState(data.device.timerState);
