@@ -7,8 +7,9 @@ import { DeviceMode, TimerState } from '@shotclock/shared/types';
 import {
   clampSeconds,
   createDefaultTimerState,
-  pauseTimerState,
-  projectTimerState,
+  formatShotClockDisplay,
+  pausePreciseTimerState,
+  projectPreciseTimerState,
   startTimerState,
   stopTimerState,
 } from '@shotclock/shared/timer';
@@ -51,7 +52,7 @@ export default function BasketballPage({ params }: { params: { deviceId: string 
 
   useEffect(() => {
     if (!timerRunning) return;
-    const interval = setInterval(() => setTimerNow(Date.now()), 250);
+    const interval = setInterval(() => setTimerNow(Date.now()), 50);
     return () => clearInterval(interval);
   }, [timerRunning]);
 
@@ -118,9 +119,10 @@ export default function BasketballPage({ params }: { params: { deviceId: string 
     lastUpdated: timerLastUpdated,
   });
 
-  const projectedTimerState = projectTimerState(buildCurrentTimerState(), timerNow);
+  const projectedTimerState = projectPreciseTimerState(buildCurrentTimerState(), timerNow);
   const displayedShotClock = projectedTimerState.shotClock;
-  const displayedGameClock = projectedTimerState.gameClock;
+  const displayedGameClock = Math.floor(projectedTimerState.gameClock);
+  const displayedShotClockText = formatShotClockDisplay(displayedShotClock);
   const shotClockStatus = timerRunning ? 'Running' : 'Stopped';
   const shotClockTone = displayedShotClock === 0
     ? 'text-red-400 drop-shadow-[0_0_32px_rgba(239,68,68,0.45)]'
@@ -130,10 +132,11 @@ export default function BasketballPage({ params }: { params: { deviceId: string 
 
   const commitTimerUpdates = (updates: Partial<TimerState>) => {
     const now = Date.now();
-    const currentState = projectTimerState(buildCurrentTimerState(), now);
+    const currentState = projectPreciseTimerState(buildCurrentTimerState(), now);
     const timerState: TimerState = {
       ...currentState,
       ...updates,
+      gameClock: Math.floor(updates.gameClock ?? currentState.gameClock),
       mode: currentState.isRunning ? 'run' : 'pause',
       isRunning: currentState.isRunning,
       isPaused: !currentState.isRunning,
@@ -174,7 +177,7 @@ export default function BasketballPage({ params }: { params: { deviceId: string 
   };
 
   const pauseTimer = async () => {
-    const timerState = pauseTimerState(buildCurrentTimerState());
+    const timerState = pausePreciseTimerState(buildCurrentTimerState());
     const success = await sendCommand('set_timer', { timerState, mode: buildBasketballMode() });
     if (success) {
       applyTimerState(timerState);
@@ -293,7 +296,7 @@ export default function BasketballPage({ params }: { params: { deviceId: string 
 
         {previewMode === 'advanced' ? (
           <AdvancedBasketballPreview
-            shotClock={displayedShotClock}
+            shotClockText={displayedShotClockText}
             gameClock={displayedGameClock}
             homeScore={homeScore}
             awayScore={awayScore}
@@ -303,7 +306,7 @@ export default function BasketballPage({ params }: { params: { deviceId: string 
           />
         ) : (
           <RegularShotClockPreview
-            shotClock={displayedShotClock}
+            shotClockText={displayedShotClockText}
             isRunning={timerRunning}
             shotClockTone={shotClockTone}
           />
@@ -358,7 +361,7 @@ export default function BasketballPage({ params }: { params: { deviceId: string 
             </label>
             <div className="flex items-center gap-3">
               <button
-                onClick={() => updateShotClock(displayedShotClock - 1)}
+                onClick={() => updateShotClock(Math.floor(displayedShotClock) - 1)}
                 disabled={timerRunning}
                 className="rounded-lg bg-white/10 px-4 py-2 text-xl font-black hover:bg-white/15 disabled:cursor-not-allowed disabled:opacity-50"
               >
@@ -366,13 +369,13 @@ export default function BasketballPage({ params }: { params: { deviceId: string 
               </button>
               <input
                 type="number"
-                value={displayedShotClock}
+                value={Math.floor(displayedShotClock)}
                 onChange={(e) => updateShotClock(parseInt(e.target.value, 10) || 0)}
                 disabled={timerRunning}
                 className="min-w-0 flex-1 rounded-lg px-3 py-2 text-center font-mono text-2xl font-black disabled:opacity-50"
               />
               <button
-                onClick={() => updateShotClock(displayedShotClock + 1)}
+                onClick={() => updateShotClock(Math.floor(displayedShotClock) + 1)}
                 disabled={timerRunning}
                 className="rounded-lg bg-white/10 px-4 py-2 text-xl font-black hover:bg-white/15 disabled:cursor-not-allowed disabled:opacity-50"
               >
@@ -432,7 +435,7 @@ export default function BasketballPage({ params }: { params: { deviceId: string 
 function hydrateTimerState(timerState?: TimerState | null): TimerState {
   const now = Date.now();
   const projectedTimerState = timerState
-    ? projectTimerState(timerState, now)
+    ? projectPreciseTimerState(timerState, now)
     : createDefaultTimerState(now);
 
   return {
@@ -444,20 +447,24 @@ function hydrateTimerState(timerState?: TimerState | null): TimerState {
 }
 
 function RegularShotClockPreview({
-  shotClock,
+  shotClockText,
   isRunning,
   shotClockTone,
 }: {
-  shotClock: number;
+  shotClockText: string;
   isRunning: boolean;
   shotClockTone: string;
 }) {
+  const shotClockSize = shotClockText.includes('.')
+    ? 'text-[5.5rem] md:text-[8rem]'
+    : 'text-[10rem] md:text-[15rem]';
+
   return (
     <div className="rounded-2xl border-4 border-gray-700 bg-black p-4 shadow-inner shadow-black/60">
       <div className="grid min-h-[18rem] place-items-center rounded-xl border-2 border-gray-800 bg-black md:min-h-[22rem]">
         <div className="text-center">
-          <div className={`font-mono text-[10rem] font-black leading-none tabular-nums md:text-[15rem] ${shotClockTone}`}>
-            {shotClock.toString().padStart(2, '0')}
+          <div className={`font-mono font-black leading-none tabular-nums ${shotClockSize} ${shotClockTone}`}>
+            {shotClockText}
           </div>
           <div className={`mt-3 text-sm font-black uppercase tracking-[0.28em] ${
             isRunning ? 'text-green-400' : 'text-yellow-400'
@@ -471,7 +478,7 @@ function RegularShotClockPreview({
 }
 
 function AdvancedBasketballPreview({
-  shotClock,
+  shotClockText,
   gameClock,
   homeScore,
   awayScore,
@@ -479,7 +486,7 @@ function AdvancedBasketballPreview({
   isRunning,
   shotClockTone,
 }: {
-  shotClock: number;
+  shotClockText: string;
   gameClock: number;
   homeScore: number;
   awayScore: number;
@@ -487,6 +494,10 @@ function AdvancedBasketballPreview({
   isRunning: boolean;
   shotClockTone: string;
 }) {
+  const shotClockSize = shotClockText.includes('.')
+    ? 'text-[5.5rem] md:text-[7rem]'
+    : 'text-[10rem] md:text-[13rem]';
+
   return (
     <div className="rounded-2xl border-4 border-gray-700 bg-black p-4 shadow-inner shadow-black/60">
       <div className="mx-auto grid aspect-[4/3] max-h-[28rem] min-h-[20rem] w-full max-w-[38rem] grid-rows-[13%_54%_17%_16%] overflow-hidden rounded-xl border-2 border-gray-800 bg-black px-4 py-3 font-mono text-white">
@@ -498,8 +509,8 @@ function AdvancedBasketballPreview({
         </div>
 
         <div className="grid min-h-0 place-items-center border-2 border-gray-700">
-          <div className={`translate-y-[0.06em] font-mono text-[10rem] font-black leading-[0.82] tabular-nums md:text-[13rem] ${shotClockTone}`}>
-            {shotClock.toString().padStart(2, '0')}
+          <div className={`translate-y-[0.06em] font-mono font-black leading-[0.82] tabular-nums ${shotClockSize} ${shotClockTone}`}>
+            {shotClockText}
           </div>
         </div>
 

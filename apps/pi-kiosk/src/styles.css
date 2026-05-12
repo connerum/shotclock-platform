@@ -24,3 +24,21 @@ html.show-cursor #root,
 html.show-cursor * {
   cursor: auto !important;
 }
+
+@keyframes shotclock-red-white-strobe {
+  0%,
+  49% {
+    background: #000;
+    color: #fff;
+  }
+
+  50%,
+  100% {
+    background: #ef4444;
+    color: #fff;
+  }
+}
+
+.shotclock-strobe {
+  animation: shotclock-red-white-strobe 0.42s steps(2, end) infinite;
+}

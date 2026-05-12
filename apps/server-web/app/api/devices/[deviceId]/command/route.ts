@@ -544,11 +544,11 @@ function pauseTimerState(state: TimerState, now = Date.now()): TimerState {
 function projectTimerState(state: TimerState, now = Date.now()): TimerState {
   if (!state.isRunning) return state;
 
-  const elapsedSeconds = Math.max(0, Math.floor((now - state.lastUpdated) / 1000));
+  const elapsedSeconds = Math.max(0, (now - state.lastUpdated) / 1000);
 
   return {
     ...state,
-    shotClock: Math.max(0, state.shotClock - elapsedSeconds),
-    gameClock: Math.max(0, state.gameClock - elapsedSeconds),
+    shotClock: Math.round(Math.max(0, state.shotClock - elapsedSeconds) * 100) / 100,
+    gameClock: Math.max(0, Math.floor(state.gameClock - elapsedSeconds)),
   };
 }

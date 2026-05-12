@@ -1,7 +1,7 @@
 // Shot Clock Mode - compact display for calibrated LED viewport.
 
 import { useEffect, useState } from 'react';
-import { projectTimerState } from '@shotclock/shared/timer';
+import { projectPreciseTimerState } from '@shotclock/shared/timer';
 import ShotClock from '../components/ShotClock';
 
 interface ShotClockModeProps {
@@ -27,11 +27,11 @@ export default function ShotClockMode({ state }: ShotClockModeProps) {
   useEffect(() => {
     if (!timerState?.isRunning) return;
 
-    const interval = setInterval(() => setNow(Date.now()), 250);
+    const interval = setInterval(() => setNow(Date.now()), 50);
     return () => clearInterval(interval);
   }, [timerState?.isRunning, timerState?.lastUpdated]);
 
-  const projectedTimerState = timerState ? projectTimerState({
+  const projectedTimerState = timerState ? projectPreciseTimerState({
     mode: timerState.isRunning ? 'run' : timerState.isPaused ? 'pause' : 'stop',
     homeScore: timerState.homeScore,
     awayScore: timerState.awayScore,
@@ -44,7 +44,7 @@ export default function ShotClockMode({ state }: ShotClockModeProps) {
   }, now) : null;
 
   const shotClock = projectedTimerState?.shotClock ?? 24;
-  const gameClock = projectedTimerState?.gameClock ?? 720;
+  const gameClock = Math.floor(projectedTimerState?.gameClock ?? 720);
   const homeScore = projectedTimerState?.homeScore ?? 0;
   const awayScore = projectedTimerState?.awayScore ?? 0;
   const period = projectedTimerState?.period ?? 1;
