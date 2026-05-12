@@ -59,7 +59,7 @@ export default function ShotClockMode({ state }: ShotClockModeProps) {
   const expiredStrobeActive = Boolean(
     timerState?.isRunning &&
     typeof timerState.lastUpdated === 'number' &&
-    timerState.shotClock <= 5 &&
+    now >= timerState.lastUpdated + timerState.shotClock * 1000 &&
     now - (timerState.lastUpdated + timerState.shotClock * 1000) <= 3000
   );
   const isWarning = isRunning && ((shotClock > 0 && shotClock <= 5) || (shotClock === 0 && expiredStrobeActive));
