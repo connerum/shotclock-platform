@@ -3,6 +3,8 @@
 import { useMemo } from 'react';
 import { formatShotClockDisplay } from '@shotclock/shared/timer';
 
+const FINAL_COUNTDOWN_SECONDS = 10;
+
 interface ShotClockProps {
   value: number;
   isWarning?: boolean;
@@ -36,6 +38,19 @@ export default function ShotClock({
     return '';
   }, [shouldStrobe, isWarning, isExpired, isRunning]);
 
+  const borderColor = useMemo(() => {
+    if (shouldStrobe) return '#ffffff';
+    if (isExpired) return '#ef4444';
+    if (isWarning) return '#facc15';
+    return '#374151';
+  }, [shouldStrobe, isWarning, isExpired]);
+
+  const countdownBorderProgress = Math.max(
+    0,
+    Math.min(1, (FINAL_COUNTDOWN_SECONDS - value) / FINAL_COUNTDOWN_SECONDS)
+  );
+  const countdownBorderVisible = Math.max(0, 1 - countdownBorderProgress);
+
   return (
     <div className={`relative flex h-full w-full items-center justify-center ${shouldStrobe ? 'shotclock-strobe' : ''} ${glowClass}`}>
       {/* Main display */}
@@ -51,21 +66,38 @@ export default function ShotClock({
         {displayValue}
       </div>
       
-      {/* Decorative border */}
-      <div className={`absolute inset-0 border-2 ${shouldStrobe ? 'border-white' : isExpired ? 'border-red-500' : isWarning ? 'border-yellow-400' : 'border-gray-700'}`} />
-      
-      {/* Running indicator */}
-      {isRunning && (
-        <div className="absolute right-1 top-1">
-          <div className="flex items-center gap-1 font-mono text-[7px] text-green-500">
-            <span className="relative flex h-1.5 w-1.5">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-              <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-green-500"></span>
-            </span>
-            LIVE
-          </div>
-        </div>
-      )}
+      {/* Countdown border */}
+      <svg
+        className="pointer-events-none absolute inset-0 h-full w-full"
+        viewBox="0 0 100 100"
+        preserveAspectRatio="none"
+        aria-hidden="true"
+      >
+        <path
+          d="M 50 100 H 0 V 0 H 50"
+          pathLength={1}
+          fill="none"
+          stroke={borderColor}
+          strokeWidth={2}
+          vectorEffect="non-scaling-stroke"
+          style={{
+            strokeDasharray: `${countdownBorderVisible} 1`,
+            transition: isRunning ? 'stroke-dasharray 50ms linear' : undefined,
+          }}
+        />
+        <path
+          d="M 50 100 H 100 V 0 H 50"
+          pathLength={1}
+          fill="none"
+          stroke={borderColor}
+          strokeWidth={2}
+          vectorEffect="non-scaling-stroke"
+          style={{
+            strokeDasharray: `${countdownBorderVisible} 1`,
+            transition: isRunning ? 'stroke-dasharray 50ms linear' : undefined,
+          }}
+        />
+      </svg>
       
       {/* Warning flash effect */}
       {shouldStrobe && <div className="absolute inset-0 bg-red-500 opacity-15 pointer-events-none" />}

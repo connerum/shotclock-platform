@@ -4,6 +4,8 @@ import { useEffect, useState } from 'react';
 import { DEFAULT_SHOT_CLOCK_SECONDS, projectPreciseTimerState } from '@shotclock/shared/timer';
 import ShotClock from '../components/ShotClock';
 
+const FINAL_COUNTDOWN_SECONDS = 10;
+
 interface ShotClockModeProps {
   state?: {
     mode?: { type: string; subMode?: string };
@@ -62,7 +64,7 @@ export default function ShotClockMode({ state }: ShotClockModeProps) {
     now >= timerState.lastUpdated + timerState.shotClock * 1000 &&
     now - (timerState.lastUpdated + timerState.shotClock * 1000) <= 3000
   );
-  const isWarning = shotClock > 0 && shotClock <= 5;
+  const isWarning = shotClock > 0 && shotClock <= FINAL_COUNTDOWN_SECONDS;
   const shouldStrobe = isRunning && shotClock === 0 && expiredStrobeActive;
   const isExpired = shotClock === 0;
   const isShotClockOnly = state?.mode?.subMode === 'shot-clock-only';
@@ -73,7 +75,7 @@ export default function ShotClockMode({ state }: ShotClockModeProps) {
         className="flex h-full w-full items-center justify-center overflow-hidden bg-black p-1 text-white"
         style={{ containerType: 'size' }}
       >
-        <div className="relative h-full w-full overflow-hidden border-2 border-gray-700 bg-black">
+        <div className="relative h-full w-full overflow-hidden bg-black">
           <ShotClock
             value={shotClock}
             isWarning={isWarning}
