@@ -18,6 +18,9 @@ import GamePresentationControls from '../GamePresentationControls';
 
 type BasketballPreviewMode = 'regular' | 'advanced' | 'scoreboard';
 
+const DEFAULT_HOME_COLOR = '#ef4444';
+const DEFAULT_AWAY_COLOR = '#3b82f6';
+
 interface Device {
   id: string;
   deviceId: string;
@@ -54,10 +57,13 @@ export default function BasketballPage({ params }: { params: { deviceId: string 
   const [timerNow, setTimerNow] = useState(Date.now());
   const [previewMode, setPreviewMode] = useState<BasketballPreviewMode>('regular');
   const [scoreboardBrandingEnabled, setScoreboardBrandingEnabled] = useState(false);
+  const [scoreboardTimeoutsVisible, setScoreboardTimeoutsVisible] = useState(true);
   const [homeLabel, setHomeLabel] = useState('Home');
   const [awayLabel, setAwayLabel] = useState('Away');
   const [homeLogoUrl, setHomeLogoUrl] = useState('');
   const [awayLogoUrl, setAwayLogoUrl] = useState('');
+  const [homeColor, setHomeColor] = useState(DEFAULT_HOME_COLOR);
+  const [awayColor, setAwayColor] = useState(DEFAULT_AWAY_COLOR);
   const [uploadingLogo, setUploadingLogo] = useState<'home' | 'away' | null>(null);
 
   useEffect(() => {
@@ -76,7 +82,18 @@ export default function BasketballPage({ params }: { params: { deviceId: string 
       void sendCommand('set_mode', { mode: buildBasketballMode(previewMode) });
     }, 250);
     return () => clearTimeout(timeout);
-  }, [device?.deviceId, previewMode, scoreboardBrandingEnabled, homeLabel, awayLabel, homeLogoUrl, awayLogoUrl]);
+  }, [
+    device?.deviceId,
+    previewMode,
+    scoreboardBrandingEnabled,
+    scoreboardTimeoutsVisible,
+    homeLabel,
+    awayLabel,
+    homeLogoUrl,
+    awayLogoUrl,
+    homeColor,
+    awayColor,
+  ]);
 
   const fetchDevice = async () => {
     try {
@@ -96,10 +113,13 @@ export default function BasketballPage({ params }: { params: { deviceId: string 
       setAwayTimeouts(loadedTimerState.awayTimeouts ?? 0);
       setPreviewMode(getPreviewModeFromDeviceMode(loadedMode));
       setScoreboardBrandingEnabled(Boolean(loadedBranding?.enabled));
+      setScoreboardTimeoutsVisible(loadedBranding?.showTimeouts !== false);
       setHomeLabel(loadedBranding?.homeLabel || 'Home');
       setAwayLabel(loadedBranding?.awayLabel || 'Away');
       setHomeLogoUrl(loadedBranding?.homeLogoUrl || '');
       setAwayLogoUrl(loadedBranding?.awayLogoUrl || '');
+      setHomeColor(isHexColor(loadedBranding?.homeColor) ? loadedBranding.homeColor : DEFAULT_HOME_COLOR);
+      setAwayColor(isHexColor(loadedBranding?.awayColor) ? loadedBranding.awayColor : DEFAULT_AWAY_COLOR);
       setTimerRunning(loadedTimerState.isRunning);
       setTimerLastUpdated(loadedTimerState.lastUpdated);
       setTimerNow(Date.now());
@@ -258,8 +278,11 @@ export default function BasketballPage({ params }: { params: { deviceId: string 
 
   const buildScoreboardBranding = (): ScoreboardBranding => ({
     enabled: scoreboardBrandingEnabled,
+    showTimeouts: scoreboardTimeoutsVisible,
     homeLabel: normalizeScoreboardLabel(homeLabel, 'Home'),
     awayLabel: normalizeScoreboardLabel(awayLabel, 'Away'),
+    homeColor,
+    awayColor,
     ...(homeLogoUrl ? { homeLogoUrl } : {}),
     ...(awayLogoUrl ? { awayLogoUrl } : {}),
   });
@@ -443,14 +466,34 @@ export default function BasketballPage({ params }: { params: { deviceId: string 
             </label>
           </div>
 
+          <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-white/10 bg-white/[0.04] px-4 py-3">
+            <div>
+              <div className="text-sm font-semibold text-gray-300">Timeout Counts</div>
+              <div className="mt-1 text-xs text-gray-500">Show or hide timeout counts on the scoreboard display.</div>
+            </div>
+            <label className="flex cursor-pointer items-center gap-3">
+              <span className="text-sm font-semibold text-gray-400">{scoreboardTimeoutsVisible ? 'Visible' : 'Hidden'}</span>
+              <input
+                type="checkbox"
+                checked={scoreboardTimeoutsVisible}
+                onChange={(event) => setScoreboardTimeoutsVisible(event.target.checked)}
+                className="h-5 w-5 accent-green-600"
+              />
+            </label>
+          </div>
+
           {scoreboardBrandingEnabled && (
             <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
               <TeamBrandingControl
                 team="home"
                 label={homeLabel}
                 logoUrl={homeLogoUrl}
+                color={homeColor}
+                defaultColor={DEFAULT_HOME_COLOR}
                 uploading={uploadingLogo === 'home'}
                 onLabelChange={setHomeLabel}
+                onColorChange={setHomeColor}
+                onColorReset={() => setHomeColor(DEFAULT_HOME_COLOR)}
                 onLogoChange={(file) => uploadScoreboardLogo('home', file)}
                 onLogoClear={() => setHomeLogoUrl('')}
               />
@@ -458,8 +501,12 @@ export default function BasketballPage({ params }: { params: { deviceId: string 
                 team="away"
                 label={awayLabel}
                 logoUrl={awayLogoUrl}
+                color={awayColor}
+                defaultColor={DEFAULT_AWAY_COLOR}
                 uploading={uploadingLogo === 'away'}
                 onLabelChange={setAwayLabel}
+                onColorChange={setAwayColor}
+                onColorReset={() => setAwayColor(DEFAULT_AWAY_COLOR)}
                 onLogoChange={(file) => uploadScoreboardLogo('away', file)}
                 onLogoClear={() => setAwayLogoUrl('')}
               />
@@ -692,10 +739,13 @@ function ScoreboardBasketballPreview({
   const homeDisplayLabel = branding.enabled ? normalizeScoreboardLabel(branding.homeLabel, 'Home') : 'Home';
   const awayDisplayLabel = branding.enabled ? normalizeScoreboardLabel(branding.awayLabel, 'Away') : 'Away';
   const showLogos = branding.enabled && (branding.homeLogoUrl || branding.awayLogoUrl);
+  const showTimeouts = branding.showTimeouts !== false;
+  const homeColor = branding.enabled && isHexColor(branding.homeColor) ? branding.homeColor : DEFAULT_HOME_COLOR;
+  const awayColor = branding.enabled && isHexColor(branding.awayColor) ? branding.awayColor : DEFAULT_AWAY_COLOR;
 
   return (
     <div className="rounded-2xl border-4 border-gray-700 bg-black p-4 shadow-inner shadow-black/60">
-      <div className="mx-auto grid aspect-[4/3] max-h-[28rem] min-h-[20rem] w-full max-w-[38rem] grid-rows-[14%_14%_38%_14%_20%] overflow-hidden rounded-xl border-2 border-gray-800 bg-black px-4 py-3 font-mono text-white">
+      <div className="mx-auto grid aspect-[4/3] max-h-[28rem] min-h-[20rem] w-full max-w-[38rem] grid-rows-[13%_13%_34%_13%_27%] overflow-hidden rounded-xl border-2 border-gray-800 bg-black px-4 py-3 font-mono text-white">
         <div className="grid min-h-0 grid-cols-[1fr_auto_1fr] items-center gap-3 overflow-hidden leading-none">
           <div className="text-2xl font-black text-gray-400">Q{period}</div>
           <div className="text-5xl font-black tabular-nums text-white">{formatGameClock(gameClock)}</div>
@@ -703,17 +753,17 @@ function ScoreboardBasketballPreview({
         </div>
 
         <div className="grid min-h-0 grid-cols-[1fr_auto_1fr] items-center gap-2 overflow-hidden leading-none">
-          <div className="truncate text-center text-2xl font-black uppercase text-red-400">{homeDisplayLabel}</div>
+          <div className="truncate text-center text-2xl font-black uppercase" style={{ color: homeColor }}>{homeDisplayLabel}</div>
           <div className="text-xl font-black text-gray-700">-</div>
-          <div className="truncate text-center text-2xl font-black uppercase text-blue-400">{awayDisplayLabel}</div>
+          <div className="truncate text-center text-2xl font-black uppercase" style={{ color: awayColor }}>{awayDisplayLabel}</div>
         </div>
 
         <div className="grid min-h-0 grid-cols-[1fr_auto_1fr] items-center gap-3 overflow-hidden leading-none">
-          <div className="flex min-w-0 items-center justify-center overflow-hidden text-[9rem] font-black tabular-nums text-red-500">
+          <div className="flex min-w-0 items-center justify-center overflow-hidden text-[8rem] font-black tabular-nums" style={{ color: homeColor }}>
             {homeScore}
           </div>
           <div className="text-5xl font-black text-gray-700">-</div>
-          <div className="flex min-w-0 items-center justify-center overflow-hidden text-[9rem] font-black tabular-nums text-blue-500">
+          <div className="flex min-w-0 items-center justify-center overflow-hidden text-[8rem] font-black tabular-nums" style={{ color: awayColor }}>
             {awayScore}
           </div>
         </div>
@@ -734,23 +784,27 @@ function ScoreboardBasketballPreview({
 
         <div className="grid min-h-0 grid-cols-[1fr_auto_1fr] items-center gap-3 overflow-hidden leading-none">
           <div className="grid w-full grid-cols-[auto_1fr] items-center gap-3">
-            <div className="flex items-center gap-2 text-2xl font-black text-red-300">
-              <span className="text-sm uppercase text-gray-500">TO</span>
-              <span className="tabular-nums">{homeTimeouts}</span>
-            </div>
+            {showTimeouts ? (
+              <div className="flex items-center gap-2 text-2xl font-black" style={{ color: homeColor }}>
+                <span className="text-sm uppercase text-gray-500">TO</span>
+                <span className="tabular-nums">{homeTimeouts}</span>
+              </div>
+            ) : <div />}
             <div className="h-[2px] bg-gray-800" />
           </div>
-          <div className="flex h-full min-w-36 items-center justify-center overflow-hidden border-2 border-gray-700 px-4">
-            <div className={`translate-y-[0.04em] text-6xl font-black tabular-nums ${shotClockTone}`}>
+          <div className="flex h-[90%] aspect-square items-center justify-center overflow-hidden border-2 border-gray-700 px-4">
+            <div className={`translate-y-[0.04em] text-7xl font-black leading-[0.82] tabular-nums ${shotClockTone}`}>
               {shotClockText}
             </div>
           </div>
           <div className="grid w-full grid-cols-[1fr_auto] items-center gap-3">
             <div className="h-[2px] bg-gray-800" />
-            <div className="flex items-center gap-2 text-2xl font-black text-blue-300">
-              <span className="tabular-nums">{awayTimeouts}</span>
-              <span className="text-sm uppercase text-gray-500">TO</span>
-            </div>
+            {showTimeouts ? (
+              <div className="flex items-center gap-2 text-2xl font-black" style={{ color: awayColor }}>
+                <span className="tabular-nums">{awayTimeouts}</span>
+                <span className="text-sm uppercase text-gray-500">TO</span>
+              </div>
+            ) : <div />}
           </div>
         </div>
       </div>
@@ -764,6 +818,10 @@ function TeamBrandingControl({
   logoUrl,
   uploading,
   onLabelChange,
+  color,
+  defaultColor,
+  onColorChange,
+  onColorReset,
   onLogoChange,
   onLogoClear,
 }: {
@@ -772,6 +830,10 @@ function TeamBrandingControl({
   logoUrl: string;
   uploading: boolean;
   onLabelChange: (value: string) => void;
+  color: string;
+  defaultColor: string;
+  onColorChange: (value: string) => void;
+  onColorReset: () => void;
   onLogoChange: (file: File | null) => void;
   onLogoClear: () => void;
 }) {
@@ -790,6 +852,31 @@ function TeamBrandingControl({
         className="w-full rounded-lg px-3 py-2 font-semibold"
         placeholder={team === 'home' ? 'Home' : 'Away'}
       />
+
+      <div className="mt-4 rounded-lg border border-white/10 bg-black/20 p-3">
+        <div className="mb-2 flex items-center justify-between gap-3">
+          <label className="text-xs font-bold uppercase tracking-[0.16em] text-gray-500">
+            Team Color
+          </label>
+          <button
+            type="button"
+            onClick={onColorReset}
+            disabled={color.toLowerCase() === defaultColor.toLowerCase()}
+            className="text-xs font-semibold text-gray-400 hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            Reset
+          </button>
+        </div>
+        <div className="flex items-center gap-3">
+          <input
+            type="color"
+            value={color}
+            onChange={(event) => onColorChange(event.target.value)}
+            className="h-11 w-14 cursor-pointer rounded border border-white/10 bg-transparent p-1"
+          />
+          <span className="font-mono text-sm font-semibold uppercase text-gray-300">{color}</span>
+        </div>
+      </div>
 
       <div className="mt-4 flex items-center gap-3">
         <label className="cc-btn cc-btn-secondary cursor-pointer px-4 py-2 text-sm">
@@ -894,6 +981,10 @@ function getPreviewModeFromDeviceMode(mode?: DeviceMode): BasketballPreviewMode 
 function normalizeScoreboardLabel(value: string | undefined, fallback: string): string {
   const normalized = value?.trim();
   return normalized ? normalized.slice(0, 18) : fallback;
+}
+
+function isHexColor(value: string | undefined): value is string {
+  return Boolean(value && /^#[0-9a-fA-F]{6}$/.test(value));
 }
 
 function getPublicMediaUrl(url: string) {

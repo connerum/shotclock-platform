@@ -6,6 +6,8 @@ import { DEFAULT_SHOT_CLOCK_SECONDS, formatShotClockDisplay, projectPreciseTimer
 import ShotClock from '../components/ShotClock';
 
 const FINAL_COUNTDOWN_SECONDS = 10;
+const DEFAULT_HOME_COLOR = '#ef4444';
+const DEFAULT_AWAY_COLOR = '#3b82f6';
 
 interface ShotClockModeProps {
   state?: {
@@ -80,6 +82,9 @@ export default function ShotClockMode({ state }: ShotClockModeProps) {
   const homeLabel = scoreboardBranding?.enabled ? normalizeScoreboardLabel(scoreboardBranding.homeLabel, 'Home') : 'Home';
   const awayLabel = scoreboardBranding?.enabled ? normalizeScoreboardLabel(scoreboardBranding.awayLabel, 'Away') : 'Away';
   const showLogos = Boolean(scoreboardBranding?.enabled && (scoreboardBranding.homeLogoUrl || scoreboardBranding.awayLogoUrl));
+  const showTimeouts = scoreboardBranding?.showTimeouts !== false;
+  const homeColor = scoreboardBranding?.enabled && isHexColor(scoreboardBranding.homeColor) ? scoreboardBranding.homeColor : DEFAULT_HOME_COLOR;
+  const awayColor = scoreboardBranding?.enabled && isHexColor(scoreboardBranding.awayColor) ? scoreboardBranding.awayColor : DEFAULT_AWAY_COLOR;
 
   if (isShotClockOnly) {
     return (
@@ -103,7 +108,7 @@ export default function ShotClockMode({ state }: ShotClockModeProps) {
   if (isScoreboardFocused) {
     return (
       <div
-        className="grid h-full w-full grid-rows-[14%_14%_38%_14%_20%] overflow-hidden bg-black px-2 py-1 font-mono text-white"
+        className="grid h-full w-full grid-rows-[13%_13%_34%_13%_27%] overflow-hidden bg-black px-2 py-1 font-mono text-white"
         style={{ containerType: 'size' }}
       >
         <div className="grid min-h-0 grid-cols-[1fr_auto_1fr] items-center gap-2 overflow-hidden leading-none">
@@ -115,17 +120,17 @@ export default function ShotClockMode({ state }: ShotClockModeProps) {
         </div>
 
         <div className="grid min-h-0 grid-cols-[1fr_auto_1fr] items-center gap-2 overflow-hidden leading-none">
-          <div className="truncate text-center text-[min(7cqh,5cqw)] font-black uppercase text-red-400">{homeLabel}</div>
+          <div className="truncate text-center text-[min(7cqh,5cqw)] font-black uppercase" style={{ color: homeColor }}>{homeLabel}</div>
           <div className="text-[min(5cqh,4cqw)] font-black text-gray-700">-</div>
-          <div className="truncate text-center text-[min(7cqh,5cqw)] font-black uppercase text-blue-400">{awayLabel}</div>
+          <div className="truncate text-center text-[min(7cqh,5cqw)] font-black uppercase" style={{ color: awayColor }}>{awayLabel}</div>
         </div>
 
         <div className="grid min-h-0 grid-cols-[1fr_auto_1fr] items-center gap-2 overflow-hidden leading-none">
-          <div className="flex min-w-0 items-center justify-center overflow-hidden text-[min(41cqh,26cqw)] font-black tabular-nums text-red-500">
+          <div className="flex min-w-0 items-center justify-center overflow-hidden text-[min(38cqh,24cqw)] font-black tabular-nums" style={{ color: homeColor }}>
             {homeScore}
           </div>
           <div className="text-[min(14cqh,6cqw)] font-black text-gray-700">-</div>
-          <div className="flex min-w-0 items-center justify-center overflow-hidden text-[min(41cqh,26cqw)] font-black tabular-nums text-blue-500">
+          <div className="flex min-w-0 items-center justify-center overflow-hidden text-[min(38cqh,24cqw)] font-black tabular-nums" style={{ color: awayColor }}>
             {awayScore}
           </div>
         </div>
@@ -146,23 +151,27 @@ export default function ShotClockMode({ state }: ShotClockModeProps) {
 
         <div className="grid min-h-0 grid-cols-[1fr_auto_1fr] items-start gap-2 overflow-hidden pt-2 leading-none">
           <div className="grid w-full grid-cols-[auto_1fr] items-center gap-2">
-            <div className="flex items-center gap-1 text-[min(7cqh,5cqw)] font-black text-red-300">
-              <span className="text-[min(4cqh,3cqw)] uppercase text-gray-500">TO</span>
-              <span className="tabular-nums">{homeTimeouts}</span>
-            </div>
+            {showTimeouts ? (
+              <div className="flex items-center gap-1 text-[min(7cqh,5cqw)] font-black" style={{ color: homeColor }}>
+                <span className="text-[min(4cqh,3cqw)] uppercase text-gray-500">TO</span>
+                <span className="tabular-nums">{homeTimeouts}</span>
+              </div>
+            ) : <div />}
             <div className="h-[2px] bg-gray-800" />
           </div>
-          <div className="flex h-[74%] min-w-[20cqw] max-w-[32cqw] items-center justify-center overflow-hidden border-2 border-gray-700 px-2">
-            <div className={`translate-y-[0.04em] text-[min(10cqh,8cqw)] font-black leading-[0.82] tabular-nums ${colorClassForShotClock(isWarning, isExpired, shouldStrobe)}`}>
+          <div className="flex h-[90%] aspect-square items-center justify-center overflow-hidden border-2 border-gray-700 px-2">
+            <div className={`translate-y-[0.04em] text-[min(15cqh,11cqw)] font-black leading-[0.82] tabular-nums ${colorClassForShotClock(isWarning, isExpired, shouldStrobe)}`}>
               {formatShotClockDisplay(shotClock)}
             </div>
           </div>
           <div className="grid w-full grid-cols-[1fr_auto] items-center gap-2">
             <div className="h-[2px] bg-gray-800" />
-            <div className="flex items-center gap-1 text-[min(7cqh,5cqw)] font-black text-blue-300">
-              <span className="tabular-nums">{awayTimeouts}</span>
-              <span className="text-[min(4cqh,3cqw)] uppercase text-gray-500">TO</span>
-            </div>
+            {showTimeouts ? (
+              <div className="flex items-center gap-1 text-[min(7cqh,5cqw)] font-black" style={{ color: awayColor }}>
+                <span className="tabular-nums">{awayTimeouts}</span>
+                <span className="text-[min(4cqh,3cqw)] uppercase text-gray-500">TO</span>
+              </div>
+            ) : <div />}
           </div>
         </div>
       </div>
@@ -217,4 +226,8 @@ function colorClassForShotClock(isWarning: boolean, isExpired: boolean, shouldSt
 function normalizeScoreboardLabel(value: string | undefined, fallback: string): string {
   const normalized = value?.trim();
   return normalized ? normalized.slice(0, 18) : fallback;
+}
+
+function isHexColor(value: string | undefined): value is string {
+  return Boolean(value && /^#[0-9a-fA-F]{6}$/.test(value));
 }

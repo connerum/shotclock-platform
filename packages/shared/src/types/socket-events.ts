@@ -112,10 +112,13 @@ export interface DeviceMode {
 
 export interface ScoreboardBranding {
   enabled: boolean;
+  showTimeouts?: boolean;
   homeLabel?: string;
   awayLabel?: string;
   homeLogoUrl?: string;
   awayLogoUrl?: string;
+  homeColor?: string;
+  awayColor?: string;
 }
 
 export type PresentationOverlayType =
