@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import type { PresentationOverlay as PresentationOverlayState } from '@shotclock/shared/types';
+import type { PresentationOverlay as PresentationOverlayState, ScoreboardBranding } from '@shotclock/shared/types';
 import { useLocalApi } from './hooks/useLocalApi';
 import { useDisplayProfile } from './hooks/useDisplayProfile';
 import SetupMode from './modes/SetupMode';
@@ -17,12 +17,14 @@ import PresentationOverlay from './components/PresentationOverlay';
 type KioskMode = 'setup' | 'pairing' | 'offline' | 'basketball' | 'wrestling' | 'volleyball' | 'shot-clock' | 'media' | 'calibration' | 'blank';
 
 interface ShotClockState {
-  mode?: { type: string; subMode?: string };
+  mode?: { type: string; subMode?: string; scoreboardBranding?: ScoreboardBranding };
   timerState?: {
     shotClock: number;
     gameClock: number;
     homeScore: number;
     awayScore: number;
+    homeTimeouts?: number;
+    awayTimeouts?: number;
     homeSets?: number;
     awaySets?: number;
     period?: number;

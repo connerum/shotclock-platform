@@ -91,6 +91,8 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
           return commandAckError(ack);
         }
         
+        await persistDisplayMode(deviceId, mode);
+
         // Update device mode in DB
         await prisma.device.update({
           where: { deviceId },
@@ -128,6 +130,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
         const displayState = {
           mode: displayMode.type,
+          deviceMode: displayMode,
           timerState,
           mediaAssetId: null,
         };
@@ -400,7 +403,7 @@ async function persistPresentationOverlay(deviceId: string, overlay: Presentatio
 
 async function persistTimerCommand(
   deviceId: string,
-  displayState: { mode: string; timerState: TimerState; mediaAssetId: null }
+  displayState: { mode: string; deviceMode: DeviceMode; timerState: TimerState; mediaAssetId: null }
 ) {
   const serializedTimerState = JSON.stringify(displayState.timerState);
   const serializedDisplayState = JSON.stringify(displayState);
@@ -434,6 +437,30 @@ async function persistTimerCommand(
       console.warn(`Unable to persist ${target} for ${deviceId}; live command was already acknowledged`, result.reason);
     }
   });
+}
+
+async function persistDisplayMode(deviceId: string, mode: DeviceMode): Promise<void> {
+  try {
+    const device = await prisma.device.findUnique({
+      where: { deviceId },
+      select: { displayState: true },
+    });
+    const existingDisplayState = device?.displayState ? JSON.parse(device.displayState) : {};
+
+    await prisma.device.update({
+      where: { deviceId },
+      data: {
+        mode: mode.type,
+        displayState: JSON.stringify({
+          ...existingDisplayState,
+          mode: mode.type,
+          deviceMode: mode,
+        }),
+      },
+    });
+  } catch (error) {
+    console.warn(`Unable to persist display mode for ${deviceId}; live command was still dispatched`, error);
+  }
 }
 
 async function resetDeviceRecordAfterFactoryReset(deviceId: string): Promise<void> {
@@ -479,6 +506,8 @@ async function resolveTimerCommandState(deviceId: string, incomingState: TimerSt
     ...pausedState,
     homeScore: incomingState.homeScore,
     awayScore: incomingState.awayScore,
+    homeTimeouts: incomingState.homeTimeouts,
+    awayTimeouts: incomingState.awayTimeouts,
     ...(incomingState.homeSets !== undefined ? { homeSets: incomingState.homeSets } : {}),
     ...(incomingState.awaySets !== undefined ? { awaySets: incomingState.awaySets } : {}),
     period: incomingState.period ?? pausedState.period,

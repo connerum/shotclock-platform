@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
 import Link from 'next/link';
-import { DeviceMode, TimerState } from '@shotclock/shared/types';
+import { DeviceMode, ScoreboardBranding, TimerState } from '@shotclock/shared/types';
 import {
   clampSeconds,
   createDefaultTimerState,
@@ -29,6 +29,9 @@ interface Device {
   controllerType: string;
   isOnline: boolean;
   timerState?: TimerState | null;
+  displayState?: {
+    deviceMode?: DeviceMode;
+  } | null;
 }
 
 export default function BasketballPage({ params }: { params: { deviceId: string } }) {
@@ -44,10 +47,18 @@ export default function BasketballPage({ params }: { params: { deviceId: string 
   const [period, setPeriod] = useState(1);
   const [homeScore, setHomeScore] = useState(0);
   const [awayScore, setAwayScore] = useState(0);
+  const [homeTimeouts, setHomeTimeouts] = useState(0);
+  const [awayTimeouts, setAwayTimeouts] = useState(0);
   const [timerRunning, setTimerRunning] = useState(false);
   const [timerLastUpdated, setTimerLastUpdated] = useState(Date.now());
   const [timerNow, setTimerNow] = useState(Date.now());
   const [previewMode, setPreviewMode] = useState<BasketballPreviewMode>('regular');
+  const [scoreboardBrandingEnabled, setScoreboardBrandingEnabled] = useState(false);
+  const [homeLabel, setHomeLabel] = useState('Home');
+  const [awayLabel, setAwayLabel] = useState('Away');
+  const [homeLogoUrl, setHomeLogoUrl] = useState('');
+  const [awayLogoUrl, setAwayLogoUrl] = useState('');
+  const [uploadingLogo, setUploadingLogo] = useState<'home' | 'away' | null>(null);
 
   useEffect(() => {
     void fetchDevice();
@@ -61,15 +72,19 @@ export default function BasketballPage({ params }: { params: { deviceId: string 
 
   useEffect(() => {
     if (!device) return;
-    void sendCommand('set_mode', { mode: buildBasketballMode(previewMode) });
-  }, [device?.deviceId]);
+    const timeout = setTimeout(() => {
+      void sendCommand('set_mode', { mode: buildBasketballMode(previewMode) });
+    }, 250);
+    return () => clearTimeout(timeout);
+  }, [device?.deviceId, previewMode, scoreboardBrandingEnabled, homeLabel, awayLabel, homeLogoUrl, awayLogoUrl]);
 
   const fetchDevice = async () => {
     try {
       const res = await fetch(`/api/devices/${deviceId}`, { cache: 'no-store' });
       if (!res.ok) throw new Error('Device not found');
       const data = await res.json();
-      setDevice(data.device);
+      const loadedMode = data.device.displayState?.deviceMode as DeviceMode | undefined;
+      const loadedBranding = loadedMode?.scoreboardBranding;
 
       const loadedTimerState = hydrateTimerState(data.device.timerState);
       setShotClock(loadedTimerState.shotClock);
@@ -77,9 +92,18 @@ export default function BasketballPage({ params }: { params: { deviceId: string 
       setPeriod(loadedTimerState.period ?? 1);
       setHomeScore(loadedTimerState.homeScore);
       setAwayScore(loadedTimerState.awayScore);
+      setHomeTimeouts(loadedTimerState.homeTimeouts ?? 0);
+      setAwayTimeouts(loadedTimerState.awayTimeouts ?? 0);
+      setPreviewMode(getPreviewModeFromDeviceMode(loadedMode));
+      setScoreboardBrandingEnabled(Boolean(loadedBranding?.enabled));
+      setHomeLabel(loadedBranding?.homeLabel || 'Home');
+      setAwayLabel(loadedBranding?.awayLabel || 'Away');
+      setHomeLogoUrl(loadedBranding?.homeLogoUrl || '');
+      setAwayLogoUrl(loadedBranding?.awayLogoUrl || '');
       setTimerRunning(loadedTimerState.isRunning);
       setTimerLastUpdated(loadedTimerState.lastUpdated);
       setTimerNow(Date.now());
+      setDevice(data.device);
     } catch (err) {
       setError('Failed to load device');
       console.error(err);
@@ -114,6 +138,8 @@ export default function BasketballPage({ params }: { params: { deviceId: string 
     mode: timerRunning ? 'run' : 'pause',
     homeScore,
     awayScore,
+    homeTimeouts,
+    awayTimeouts,
     period,
     shotClock,
     gameClock,
@@ -170,6 +196,14 @@ export default function BasketballPage({ params }: { params: { deviceId: string 
     commitTimerUpdates({ awayScore: Math.max(0, value) });
   };
 
+  const updateHomeTimeouts = (value: number) => {
+    commitTimerUpdates({ homeTimeouts: clampSeconds(value, 0, 9) });
+  };
+
+  const updateAwayTimeouts = (value: number) => {
+    commitTimerUpdates({ awayTimeouts: clampSeconds(value, 0, 9) });
+  };
+
   const startTimer = async () => {
     const timerState = startTimerState(buildCurrentTimerState());
     const success = await sendCommand('set_timer', { timerState, mode: buildBasketballMode() });
@@ -193,6 +227,8 @@ export default function BasketballPage({ params }: { params: { deviceId: string 
       ...buildCurrentTimerState(),
       homeScore: 0,
       awayScore: 0,
+      homeTimeouts: 0,
+      awayTimeouts: 0,
       period: 1,
     });
     const success = await sendCommand('set_timer', { timerState, mode: buildBasketballMode() });
@@ -201,6 +237,8 @@ export default function BasketballPage({ params }: { params: { deviceId: string 
       setPeriod(timerState.period ?? 1);
       setHomeScore(timerState.homeScore);
       setAwayScore(timerState.awayScore);
+      setHomeTimeouts(timerState.homeTimeouts ?? 0);
+      setAwayTimeouts(timerState.awayTimeouts ?? 0);
       setTimerRunning(false);
     }
   };
@@ -211,19 +249,64 @@ export default function BasketballPage({ params }: { params: { deviceId: string 
     setPeriod(timerState.period ?? 1);
     setHomeScore(timerState.homeScore);
     setAwayScore(timerState.awayScore);
+    setHomeTimeouts(timerState.homeTimeouts ?? 0);
+    setAwayTimeouts(timerState.awayTimeouts ?? 0);
     setTimerRunning(timerState.isRunning);
     setTimerLastUpdated(timerState.lastUpdated);
     setTimerNow(timerState.lastUpdated);
   };
 
+  const buildScoreboardBranding = (): ScoreboardBranding => ({
+    enabled: scoreboardBrandingEnabled,
+    homeLabel: normalizeScoreboardLabel(homeLabel, 'Home'),
+    awayLabel: normalizeScoreboardLabel(awayLabel, 'Away'),
+    ...(homeLogoUrl ? { homeLogoUrl } : {}),
+    ...(awayLogoUrl ? { awayLogoUrl } : {}),
+  });
+
   const buildBasketballMode = (mode: BasketballPreviewMode = previewMode): DeviceMode => ({
     type: 'basketball',
     subMode: mode === 'regular' ? 'shot-clock-only' : mode,
+    ...(mode === 'scoreboard' ? { scoreboardBranding: buildScoreboardBranding() } : {}),
   });
 
   const switchPreviewMode = (mode: BasketballPreviewMode) => {
     setPreviewMode(mode);
     void sendCommand('set_mode', { mode: buildBasketballMode(mode) });
+  };
+
+  const uploadScoreboardLogo = async (team: 'home' | 'away', file: File | null) => {
+    if (!file) return;
+
+    setUploadingLogo(team);
+    setCommandError(null);
+
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const response = await fetch('/api/media', {
+        method: 'POST',
+        body: formData,
+      });
+      const data = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        setCommandError(data?.error || `Upload failed with HTTP ${response.status}`);
+        return;
+      }
+
+      const publicUrl = getPublicMediaUrl(data.mediaAsset.url);
+      if (team === 'home') {
+        setHomeLogoUrl(publicUrl);
+      } else {
+        setAwayLogoUrl(publicUrl);
+      }
+    } catch (err) {
+      setCommandError(err instanceof Error ? err.message : 'Upload failed');
+    } finally {
+      setUploadingLogo(null);
+    }
   };
 
   if (loading) {
@@ -308,7 +391,6 @@ export default function BasketballPage({ params }: { params: { deviceId: string 
             homeScore={homeScore}
             awayScore={awayScore}
             period={period}
-            isRunning={timerRunning}
             shotClockTone={shotClockTone}
           />
         ) : previewMode === 'scoreboard' ? (
@@ -317,14 +399,15 @@ export default function BasketballPage({ params }: { params: { deviceId: string 
             gameClock={displayedGameClock}
             homeScore={homeScore}
             awayScore={awayScore}
+            homeTimeouts={homeTimeouts}
+            awayTimeouts={awayTimeouts}
             period={period}
-            isRunning={timerRunning}
             shotClockTone={shotClockTone}
+            branding={buildScoreboardBranding()}
           />
         ) : (
           <RegularShotClockPreview
             shotClockText={displayedShotClockText}
-            isRunning={timerRunning}
             shotClockTone={shotClockTone}
           />
         )}
@@ -337,9 +420,52 @@ export default function BasketballPage({ params }: { params: { deviceId: string 
           <span className="text-gray-600">/</span>
           <span>Game {formatGameClock(displayedGameClock)}</span>
           <span className="text-gray-600">/</span>
-          <span>Period {period}</span>
+          <span>Quarter {period}</span>
         </div>
       </section>
+
+      {previewMode === 'scoreboard' && (
+        <section className="cc-card mb-4 p-4 md:p-5">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+            <div>
+              <div className="text-xs font-bold uppercase tracking-[0.22em] text-gray-500">Scoreboard Branding</div>
+              <p className="mt-1 text-sm text-gray-400">Custom team labels and logos only apply to scoreboard display mode.</p>
+            </div>
+            <label className="flex cursor-pointer items-center gap-3 rounded-xl border border-white/10 bg-white/[0.04] px-4 py-3">
+              <span className="text-sm font-semibold text-gray-300">Show custom labels/logos</span>
+              <input
+                type="checkbox"
+                checked={scoreboardBrandingEnabled}
+                onChange={(event) => setScoreboardBrandingEnabled(event.target.checked)}
+                className="h-5 w-5 accent-green-600"
+              />
+            </label>
+          </div>
+
+          {scoreboardBrandingEnabled && (
+            <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
+              <TeamBrandingControl
+                team="home"
+                label={homeLabel}
+                logoUrl={homeLogoUrl}
+                uploading={uploadingLogo === 'home'}
+                onLabelChange={setHomeLabel}
+                onLogoChange={(file) => uploadScoreboardLogo('home', file)}
+                onLogoClear={() => setHomeLogoUrl('')}
+              />
+              <TeamBrandingControl
+                team="away"
+                label={awayLabel}
+                logoUrl={awayLogoUrl}
+                uploading={uploadingLogo === 'away'}
+                onLabelChange={setAwayLabel}
+                onLogoChange={(file) => uploadScoreboardLogo('away', file)}
+                onLogoClear={() => setAwayLogoUrl('')}
+              />
+            </div>
+          )}
+        </section>
+      )}
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <ControlCard title="Timer Control" icon="PLAY" accentClass="bg-blue-500/15 text-blue-300">
@@ -423,7 +549,7 @@ export default function BasketballPage({ params }: { params: { deviceId: string 
           </div>
 
           <div className="mt-4 flex items-center justify-between rounded-xl border border-white/10 bg-white/[0.04] p-4">
-            <span className="text-xs font-bold uppercase tracking-[0.16em] text-gray-500">Period</span>
+            <span className="text-xs font-bold uppercase tracking-[0.16em] text-gray-500">Quarter</span>
             <div className="flex items-center gap-3">
               <button onClick={() => updatePeriod(period - 1)} className="rounded-lg bg-white/10 px-3 py-1 font-bold hover:bg-white/15">
                 -
@@ -440,6 +566,8 @@ export default function BasketballPage({ params }: { params: { deviceId: string 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-1">
             <ScoreControl label="Home" value={homeScore} onChange={updateHomeScore} tone="text-red-300" />
             <ScoreControl label="Away" value={awayScore} onChange={updateAwayScore} tone="text-blue-300" />
+            <ScoreControl label="Home Timeouts" value={homeTimeouts} onChange={updateHomeTimeouts} tone="text-red-200" />
+            <ScoreControl label="Away Timeouts" value={awayTimeouts} onChange={updateAwayTimeouts} tone="text-blue-200" />
           </div>
         </ControlCard>
       </div>
@@ -465,11 +593,9 @@ function hydrateTimerState(timerState?: TimerState | null): TimerState {
 
 function RegularShotClockPreview({
   shotClockText,
-  isRunning,
   shotClockTone,
 }: {
   shotClockText: string;
-  isRunning: boolean;
   shotClockTone: string;
 }) {
   const shotClockSize = shotClockText.includes('.')
@@ -483,11 +609,6 @@ function RegularShotClockPreview({
           <div className={`font-mono font-black leading-none tabular-nums ${shotClockSize} ${shotClockTone}`}>
             {shotClockText}
           </div>
-          <div className={`mt-3 text-sm font-black uppercase tracking-[0.28em] ${
-            isRunning ? 'text-green-400' : 'text-yellow-400'
-          }`}>
-            {isRunning ? 'Running' : 'Hold'}
-          </div>
         </div>
       </div>
     </div>
@@ -500,7 +621,6 @@ function AdvancedBasketballPreview({
   homeScore,
   awayScore,
   period,
-  isRunning,
   shotClockTone,
 }: {
   shotClockText: string;
@@ -508,7 +628,6 @@ function AdvancedBasketballPreview({
   homeScore: number;
   awayScore: number;
   period: number;
-  isRunning: boolean;
   shotClockTone: string;
 }) {
   const shotClockSize = shotClockText.includes('.')
@@ -519,10 +638,7 @@ function AdvancedBasketballPreview({
     <div className="rounded-2xl border-4 border-gray-700 bg-black p-4 shadow-inner shadow-black/60">
       <div className="mx-auto grid aspect-[4/3] max-h-[28rem] min-h-[20rem] w-full max-w-[38rem] grid-rows-[13%_54%_17%_16%] overflow-hidden rounded-xl border-2 border-gray-800 bg-black px-4 py-3 font-mono text-white">
         <div className="flex items-center justify-between overflow-hidden text-2xl font-bold leading-none text-gray-400">
-          <span>P{period}</span>
-          <span className={isRunning ? 'text-green-500' : 'text-yellow-500'}>
-            {isRunning ? 'RUN' : 'HOLD'}
-          </span>
+          <span>Q{period}</span>
         </div>
 
         <div className="grid min-h-0 place-items-center border-2 border-gray-700">
@@ -556,33 +672,39 @@ function ScoreboardBasketballPreview({
   gameClock,
   homeScore,
   awayScore,
+  homeTimeouts,
+  awayTimeouts,
   period,
-  isRunning,
   shotClockTone,
+  branding,
 }: {
   shotClockText: string;
   gameClock: number;
   homeScore: number;
   awayScore: number;
+  homeTimeouts: number;
+  awayTimeouts: number;
   period: number;
-  isRunning: boolean;
   shotClockTone: string;
+  branding: ScoreboardBranding;
 }) {
+  const homeDisplayLabel = branding.enabled ? normalizeScoreboardLabel(branding.homeLabel, 'Home') : 'Home';
+  const awayDisplayLabel = branding.enabled ? normalizeScoreboardLabel(branding.awayLabel, 'Away') : 'Away';
+  const showLogos = branding.enabled && (branding.homeLogoUrl || branding.awayLogoUrl);
+
   return (
     <div className="rounded-2xl border-4 border-gray-700 bg-black p-4 shadow-inner shadow-black/60">
-      <div className="mx-auto grid aspect-[4/3] max-h-[28rem] min-h-[20rem] w-full max-w-[38rem] grid-rows-[16%_16%_46%_22%] overflow-hidden rounded-xl border-2 border-gray-800 bg-black px-4 py-3 font-mono text-white">
+      <div className="mx-auto grid aspect-[4/3] max-h-[28rem] min-h-[20rem] w-full max-w-[38rem] grid-rows-[14%_14%_38%_14%_20%] overflow-hidden rounded-xl border-2 border-gray-800 bg-black px-4 py-3 font-mono text-white">
         <div className="grid min-h-0 grid-cols-[1fr_auto_1fr] items-center gap-3 overflow-hidden leading-none">
-          <div className="text-2xl font-black text-gray-400">P{period}</div>
+          <div className="text-2xl font-black text-gray-400">Q{period}</div>
           <div className="text-5xl font-black tabular-nums text-white">{formatGameClock(gameClock)}</div>
-          <div className={`text-right text-2xl font-black ${isRunning ? 'text-green-500' : 'text-yellow-500'}`}>
-            {isRunning ? 'RUN' : 'HOLD'}
-          </div>
+          <div />
         </div>
 
         <div className="grid min-h-0 grid-cols-[1fr_auto_1fr] items-center gap-2 overflow-hidden leading-none">
-          <div className="text-center text-2xl font-black uppercase text-red-400">Home</div>
+          <div className="truncate text-center text-2xl font-black uppercase text-red-400">{homeDisplayLabel}</div>
           <div className="text-xl font-black text-gray-700">-</div>
-          <div className="text-center text-2xl font-black uppercase text-blue-400">Away</div>
+          <div className="truncate text-center text-2xl font-black uppercase text-blue-400">{awayDisplayLabel}</div>
         </div>
 
         <div className="grid min-h-0 grid-cols-[1fr_auto_1fr] items-center gap-3 overflow-hidden leading-none">
@@ -596,14 +718,99 @@ function ScoreboardBasketballPreview({
         </div>
 
         <div className="grid min-h-0 grid-cols-[1fr_auto_1fr] items-center gap-3 overflow-hidden leading-none">
-          <div className="h-[2px] bg-gray-800" />
+          <div className="flex h-full items-center justify-center overflow-hidden">
+            {showLogos && branding.homeLogoUrl ? (
+              <img src={branding.homeLogoUrl} alt="" className="max-h-full max-w-full object-contain" />
+            ) : null}
+          </div>
+          <div />
+          <div className="flex h-full items-center justify-center overflow-hidden">
+            {showLogos && branding.awayLogoUrl ? (
+              <img src={branding.awayLogoUrl} alt="" className="max-h-full max-w-full object-contain" />
+            ) : null}
+          </div>
+        </div>
+
+        <div className="grid min-h-0 grid-cols-[1fr_auto_1fr] items-center gap-3 overflow-hidden leading-none">
+          <div className="flex items-center justify-end gap-2 text-2xl font-black text-red-300">
+            <span className="text-sm uppercase text-gray-500">TO</span>
+            <span className="tabular-nums">{homeTimeouts}</span>
+          </div>
           <div className="flex h-full min-w-36 items-center justify-center overflow-hidden border-2 border-gray-700 px-4">
             <div className={`translate-y-[0.04em] text-6xl font-black tabular-nums ${shotClockTone}`}>
               {shotClockText}
             </div>
           </div>
-          <div className="h-[2px] bg-gray-800" />
+          <div className="flex items-center justify-start gap-2 text-2xl font-black text-blue-300">
+            <span className="tabular-nums">{awayTimeouts}</span>
+            <span className="text-sm uppercase text-gray-500">TO</span>
+          </div>
         </div>
+      </div>
+    </div>
+  );
+}
+
+function TeamBrandingControl({
+  team,
+  label,
+  logoUrl,
+  uploading,
+  onLabelChange,
+  onLogoChange,
+  onLogoClear,
+}: {
+  team: 'home' | 'away';
+  label: string;
+  logoUrl: string;
+  uploading: boolean;
+  onLabelChange: (value: string) => void;
+  onLogoChange: (file: File | null) => void;
+  onLogoClear: () => void;
+}) {
+  const title = team === 'home' ? 'Home Team' : 'Away Team';
+
+  return (
+    <div className="rounded-xl border border-white/10 bg-white/[0.04] p-4">
+      <label className="mb-2 block text-xs font-bold uppercase tracking-[0.16em] text-gray-500">
+        {title} Label
+      </label>
+      <input
+        type="text"
+        value={label}
+        maxLength={18}
+        onChange={(event) => onLabelChange(event.target.value)}
+        className="w-full rounded-lg px-3 py-2 font-semibold"
+        placeholder={team === 'home' ? 'Home' : 'Away'}
+      />
+
+      <div className="mt-4 flex items-center gap-3">
+        <label className="cc-btn cc-btn-secondary cursor-pointer px-4 py-2 text-sm">
+          {uploading ? 'Uploading...' : 'Upload Logo'}
+          <input
+            type="file"
+            accept="image/*"
+            className="hidden"
+            disabled={uploading}
+            onChange={(event) => {
+              onLogoChange(event.currentTarget.files?.[0] || null);
+              event.currentTarget.value = '';
+            }}
+          />
+        </label>
+        {logoUrl && (
+          <button type="button" onClick={onLogoClear} className="text-sm font-semibold text-gray-400 hover:text-white">
+            Clear
+          </button>
+        )}
+      </div>
+
+      <div className="mt-3 grid h-20 place-items-center overflow-hidden rounded-lg border border-white/10 bg-black/40">
+        {logoUrl ? (
+          <img src={logoUrl} alt="" className="max-h-full max-w-full object-contain" />
+        ) : (
+          <span className="text-xs font-semibold text-gray-600">No logo selected</span>
+        )}
       </div>
     </div>
   );
@@ -670,4 +877,20 @@ function formatGameClock(seconds: number): string {
   const mins = Math.floor(seconds / 60);
   const secs = seconds % 60;
   return `${mins}:${secs.toString().padStart(2, '0')}`;
+}
+
+function getPreviewModeFromDeviceMode(mode?: DeviceMode): BasketballPreviewMode {
+  if (mode?.subMode === 'advanced' || mode?.subMode === 'scoreboard') return mode.subMode;
+  return 'regular';
+}
+
+function normalizeScoreboardLabel(value: string | undefined, fallback: string): string {
+  const normalized = value?.trim();
+  return normalized ? normalized.slice(0, 18) : fallback;
+}
+
+function getPublicMediaUrl(url: string) {
+  if (url.startsWith('http://') || url.startsWith('https://')) return url;
+  if (typeof window === 'undefined') return url;
+  return `${window.location.origin}${url}`;
 }

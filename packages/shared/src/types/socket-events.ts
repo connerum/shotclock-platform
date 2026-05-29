@@ -13,6 +13,8 @@ export interface TimerState {
   awayScore: number;
   homeSets?: number;
   awaySets?: number;
+  homeTimeouts?: number;
+  awayTimeouts?: number;
   period?: number;
   shotClock: number;
   gameClock: number;
@@ -105,6 +107,15 @@ export type ModeType =
 export interface DeviceMode {
   type: ModeType;
   subMode?: string;
+  scoreboardBranding?: ScoreboardBranding;
+}
+
+export interface ScoreboardBranding {
+  enabled: boolean;
+  homeLabel?: string;
+  awayLabel?: string;
+  homeLogoUrl?: string;
+  awayLogoUrl?: string;
 }
 
 export type PresentationOverlayType =
