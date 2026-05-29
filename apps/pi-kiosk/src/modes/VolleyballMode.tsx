@@ -138,7 +138,7 @@ function TimeoutDots({ count, side, color }: { count: number; side: 'left' | 'ri
   const remainingTimeouts = Math.max(0, Math.min(2, 2 - count));
 
   return (
-    <div className={`absolute top-[min(1.5cqh,1cqw)] flex flex-col items-center gap-[min(1cqh,0.7cqw)] ${side === 'left' ? 'left-0' : 'right-0'}`}>
+    <div className={`absolute top-0 flex flex-col items-center gap-[min(0.8cqh,0.6cqw)] ${side === 'left' ? 'left-0' : 'right-0'}`}>
       <span className="text-[min(4cqh,2.4cqw)] font-black leading-none" style={{ color }}>TO</span>
       {Array.from({ length: remainingTimeouts }).map((_, index) => (
         <span
