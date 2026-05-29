@@ -7,7 +7,7 @@ type MediaSlot = 'ads' | 'logo' | 'sponsor' | 'team-intro' | 'music';
 
 type DeviceMediaAsset = {
   id: string;
-  slot: MediaSlot;
+  slot: string;
   originalFilename: string;
   url: string;
   mimeType: string;
@@ -162,7 +162,7 @@ export default function GamePresentationControls({ deviceId }: { deviceId: strin
 
   const activeMediaBySlot = useMemo(() => {
     return mediaAssets.reduce<Record<MediaSlot, DeviceMediaAsset[]>>((acc, asset) => {
-      if (asset.isActive) acc[asset.slot].push(asset);
+      if (asset.isActive && isPresentationMediaSlot(asset.slot)) acc[asset.slot].push(asset);
       return acc;
     }, { ads: [], logo: [], sponsor: [], 'team-intro': [], music: [] });
   }, [mediaAssets]);
@@ -324,6 +324,10 @@ function getSlotForPresentationType(type: PresentationOverlayType): MediaSlot | 
   if (type === 'team-intro') return 'team-intro';
   if (type === 'music') return 'music';
   return null;
+}
+
+function isPresentationMediaSlot(slot: string): slot is MediaSlot {
+  return slot === 'ads' || slot === 'logo' || slot === 'sponsor' || slot === 'team-intro' || slot === 'music';
 }
 
 function getPublicMediaUrl(url: string) {

@@ -284,8 +284,9 @@ export default function BasketballPage({ params }: { params: { deviceId: string 
     try {
       const formData = new FormData();
       formData.append('file', file);
+      formData.append('slot', team === 'home' ? 'scoreboard-home-logo' : 'scoreboard-away-logo');
 
-      const response = await fetch('/api/media', {
+      const response = await fetch(`/api/devices/${deviceId}/media`, {
         method: 'POST',
         body: formData,
       });
@@ -732,18 +733,24 @@ function ScoreboardBasketballPreview({
         </div>
 
         <div className="grid min-h-0 grid-cols-[1fr_auto_1fr] items-center gap-3 overflow-hidden leading-none">
-          <div className="flex items-center justify-end gap-2 text-2xl font-black text-red-300">
-            <span className="text-sm uppercase text-gray-500">TO</span>
-            <span className="tabular-nums">{homeTimeouts}</span>
+          <div className="grid w-full grid-cols-[auto_1fr] items-center gap-3">
+            <div className="flex items-center gap-2 text-2xl font-black text-red-300">
+              <span className="text-sm uppercase text-gray-500">TO</span>
+              <span className="tabular-nums">{homeTimeouts}</span>
+            </div>
+            <div className="h-[2px] bg-gray-800" />
           </div>
           <div className="flex h-full min-w-36 items-center justify-center overflow-hidden border-2 border-gray-700 px-4">
             <div className={`translate-y-[0.04em] text-6xl font-black tabular-nums ${shotClockTone}`}>
               {shotClockText}
             </div>
           </div>
-          <div className="flex items-center justify-start gap-2 text-2xl font-black text-blue-300">
-            <span className="tabular-nums">{awayTimeouts}</span>
-            <span className="text-sm uppercase text-gray-500">TO</span>
+          <div className="grid w-full grid-cols-[1fr_auto] items-center gap-3">
+            <div className="h-[2px] bg-gray-800" />
+            <div className="flex items-center gap-2 text-2xl font-black text-blue-300">
+              <span className="tabular-nums">{awayTimeouts}</span>
+              <span className="text-sm uppercase text-gray-500">TO</span>
+            </div>
           </div>
         </div>
       </div>

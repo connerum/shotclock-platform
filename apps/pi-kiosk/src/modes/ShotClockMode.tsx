@@ -145,18 +145,24 @@ export default function ShotClockMode({ state }: ShotClockModeProps) {
         </div>
 
         <div className="grid min-h-0 grid-cols-[1fr_auto_1fr] items-start gap-2 overflow-hidden pt-2 leading-none">
-          <div className="flex items-center justify-end gap-1 text-[min(7cqh,5cqw)] font-black text-red-300">
-            <span className="text-[min(4cqh,3cqw)] uppercase text-gray-500">TO</span>
-            <span className="tabular-nums">{homeTimeouts}</span>
+          <div className="grid w-full grid-cols-[auto_1fr] items-center gap-2">
+            <div className="flex items-center gap-1 text-[min(7cqh,5cqw)] font-black text-red-300">
+              <span className="text-[min(4cqh,3cqw)] uppercase text-gray-500">TO</span>
+              <span className="tabular-nums">{homeTimeouts}</span>
+            </div>
+            <div className="h-[2px] bg-gray-800" />
           </div>
           <div className="flex h-[74%] min-w-[20cqw] max-w-[32cqw] items-center justify-center overflow-hidden border-2 border-gray-700 px-2">
             <div className={`translate-y-[0.04em] text-[min(10cqh,8cqw)] font-black leading-[0.82] tabular-nums ${colorClassForShotClock(isWarning, isExpired, shouldStrobe)}`}>
               {formatShotClockDisplay(shotClock)}
             </div>
           </div>
-          <div className="flex items-center justify-start gap-1 text-[min(7cqh,5cqw)] font-black text-blue-300">
-            <span className="tabular-nums">{awayTimeouts}</span>
-            <span className="text-[min(4cqh,3cqw)] uppercase text-gray-500">TO</span>
+          <div className="grid w-full grid-cols-[1fr_auto] items-center gap-2">
+            <div className="h-[2px] bg-gray-800" />
+            <div className="flex items-center gap-1 text-[min(7cqh,5cqw)] font-black text-blue-300">
+              <span className="tabular-nums">{awayTimeouts}</span>
+              <span className="text-[min(4cqh,3cqw)] uppercase text-gray-500">TO</span>
+            </div>
           </div>
         </div>
       </div>
