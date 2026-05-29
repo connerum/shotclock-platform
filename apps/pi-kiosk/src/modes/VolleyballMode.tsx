@@ -72,7 +72,7 @@ export default function VolleyballMode({ state }: VolleyballModeProps) {
       className="grid h-full w-full grid-rows-[13%_62%_25%] overflow-hidden bg-black px-1.5 py-1 font-mono text-white"
       style={{ containerType: 'size' }}
     >
-      <div className="relative flex min-h-0 items-center justify-between gap-1 overflow-hidden text-[min(8cqh,4cqw)] font-black leading-none text-gray-400">
+      <div className="relative flex min-h-0 items-center justify-between gap-1 overflow-visible text-[min(8cqh,4cqw)] font-black leading-none text-gray-400">
         <span>VBALL</span>
         <TopMedia media={topMedia} />
         <span>SET {set}</span>
@@ -127,7 +127,7 @@ function TopMedia({ media }: { media: { mediaUrl: string; mediaMimeType: string 
   if (!isImage && !isVideo) return null;
 
   return (
-    <div className="pointer-events-none absolute left-1/2 top-1/2 flex h-full max-h-full w-[34cqw] -translate-x-1/2 -translate-y-1/2 items-center justify-center overflow-hidden">
+    <div className="pointer-events-none absolute left-1/2 top-[min(0.8cqh,0.5cqw)] z-10 flex h-[min(18cqh,14cqw)] w-[46cqw] -translate-x-1/2 items-center justify-center overflow-hidden">
       {isImage && <img src={media.mediaUrl} alt="" className="max-h-full max-w-full object-contain" />}
       {isVideo && <video key={media.mediaUrl} src={media.mediaUrl} autoPlay muted playsInline loop className="max-h-full max-w-full object-contain" />}
     </div>
@@ -135,15 +135,18 @@ function TopMedia({ media }: { media: { mediaUrl: string; mediaMimeType: string 
 }
 
 function TimeoutDots({ count, side, color }: { count: number; side: 'left' | 'right'; color: string }) {
+  const remainingTimeouts = Math.max(0, Math.min(2, 2 - count));
+
   return (
-    <div className={`absolute top-1/2 flex -translate-y-1/2 flex-col gap-[min(1cqh,0.7cqw)] ${side === 'left' ? 'left-0' : 'right-0'}`}>
-      {[0, 1].map((index) => (
+    <div className={`absolute top-[min(1.5cqh,1cqw)] flex flex-col items-center gap-[min(1cqh,0.7cqw)] ${side === 'left' ? 'left-0' : 'right-0'}`}>
+      <span className="text-[min(4cqh,2.4cqw)] font-black leading-none" style={{ color }}>TO</span>
+      {Array.from({ length: remainingTimeouts }).map((_, index) => (
         <span
           key={index}
           className="h-[min(4cqh,2.6cqw)] w-[min(4cqh,2.6cqw)] rounded-full border-2"
           style={{
             borderColor: color,
-            backgroundColor: index < Math.max(0, Math.min(2, count)) ? color : 'transparent',
+            backgroundColor: color,
           }}
         />
       ))}
