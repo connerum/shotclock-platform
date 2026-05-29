@@ -290,7 +290,7 @@ export default function BasketballPage({ params }: { params: { deviceId: string 
   const buildBasketballMode = (mode: BasketballPreviewMode = previewMode): DeviceMode => ({
     type: 'basketball',
     subMode: mode === 'regular' ? 'shot-clock-only' : mode,
-    ...(mode === 'scoreboard' ? { scoreboardBranding: buildScoreboardBranding() } : {}),
+    ...(mode !== 'regular' ? { scoreboardBranding: buildScoreboardBranding() } : {}),
   });
 
   const switchPreviewMode = (mode: BasketballPreviewMode) => {
@@ -416,6 +416,7 @@ export default function BasketballPage({ params }: { params: { deviceId: string 
             awayScore={awayScore}
             period={period}
             shotClockTone={shotClockTone}
+            branding={buildScoreboardBranding()}
           />
         ) : previewMode === 'scoreboard' ? (
           <ScoreboardBasketballPreview
@@ -447,73 +448,6 @@ export default function BasketballPage({ params }: { params: { deviceId: string 
           <span>Quarter {period}</span>
         </div>
       </section>
-
-      {previewMode === 'scoreboard' && (
-        <section className="cc-card mb-4 p-4 md:p-5">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-            <div>
-              <div className="text-xs font-bold uppercase tracking-[0.22em] text-gray-500">Scoreboard Branding</div>
-              <p className="mt-1 text-sm text-gray-400">Custom team labels and logos only apply to scoreboard display mode.</p>
-            </div>
-            <label className="flex cursor-pointer items-center gap-3 rounded-xl border border-white/10 bg-white/[0.04] px-4 py-3">
-              <span className="text-sm font-semibold text-gray-300">Show custom labels/logos</span>
-              <input
-                type="checkbox"
-                checked={scoreboardBrandingEnabled}
-                onChange={(event) => setScoreboardBrandingEnabled(event.target.checked)}
-                className="h-5 w-5 accent-green-600"
-              />
-            </label>
-          </div>
-
-          <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-white/10 bg-white/[0.04] px-4 py-3">
-            <div>
-              <div className="text-sm font-semibold text-gray-300">Timeout Counts</div>
-              <div className="mt-1 text-xs text-gray-500">Show or hide timeout counts on the scoreboard display.</div>
-            </div>
-            <label className="flex cursor-pointer items-center gap-3">
-              <span className="text-sm font-semibold text-gray-400">{scoreboardTimeoutsVisible ? 'Visible' : 'Hidden'}</span>
-              <input
-                type="checkbox"
-                checked={scoreboardTimeoutsVisible}
-                onChange={(event) => setScoreboardTimeoutsVisible(event.target.checked)}
-                className="h-5 w-5 accent-green-600"
-              />
-            </label>
-          </div>
-
-          {scoreboardBrandingEnabled && (
-            <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
-              <TeamBrandingControl
-                team="home"
-                label={homeLabel}
-                logoUrl={homeLogoUrl}
-                color={homeColor}
-                defaultColor={DEFAULT_HOME_COLOR}
-                uploading={uploadingLogo === 'home'}
-                onLabelChange={setHomeLabel}
-                onColorChange={setHomeColor}
-                onColorReset={() => setHomeColor(DEFAULT_HOME_COLOR)}
-                onLogoChange={(file) => uploadScoreboardLogo('home', file)}
-                onLogoClear={() => setHomeLogoUrl('')}
-              />
-              <TeamBrandingControl
-                team="away"
-                label={awayLabel}
-                logoUrl={awayLogoUrl}
-                color={awayColor}
-                defaultColor={DEFAULT_AWAY_COLOR}
-                uploading={uploadingLogo === 'away'}
-                onLabelChange={setAwayLabel}
-                onColorChange={setAwayColor}
-                onColorReset={() => setAwayColor(DEFAULT_AWAY_COLOR)}
-                onLogoChange={(file) => uploadScoreboardLogo('away', file)}
-                onLogoClear={() => setAwayLogoUrl('')}
-              />
-            </div>
-          )}
-        </section>
-      )}
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <ControlCard title="Timer Control" icon="PLAY" accentClass="bg-blue-500/15 text-blue-300">
@@ -620,6 +554,85 @@ export default function BasketballPage({ params }: { params: { deviceId: string 
         </ControlCard>
       </div>
 
+      {(previewMode === 'advanced' || previewMode === 'scoreboard') && (
+        <section className="cc-card mt-4 p-4 md:p-5">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+            <div>
+              <div className="text-xs font-bold uppercase tracking-[0.22em] text-gray-500">
+                {previewMode === 'scoreboard' ? 'Scoreboard Branding' : 'Advanced Branding'}
+              </div>
+              <p className="mt-1 text-sm text-gray-400">
+                {previewMode === 'scoreboard'
+                  ? 'Custom team labels, colors, and logos apply to scoreboard display mode.'
+                  : 'Custom team labels and colors apply to advanced display mode.'}
+              </p>
+            </div>
+            <label className="flex cursor-pointer items-center gap-3 rounded-xl border border-white/10 bg-white/[0.04] px-4 py-3">
+              <span className="text-sm font-semibold text-gray-300">
+                {previewMode === 'scoreboard' ? 'Show custom labels/logos' : 'Show custom labels/colors'}
+              </span>
+              <input
+                type="checkbox"
+                checked={scoreboardBrandingEnabled}
+                onChange={(event) => setScoreboardBrandingEnabled(event.target.checked)}
+                className="h-5 w-5 accent-green-600"
+              />
+            </label>
+          </div>
+
+          {previewMode === 'scoreboard' && (
+            <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-white/10 bg-white/[0.04] px-4 py-3">
+              <div>
+                <div className="text-sm font-semibold text-gray-300">Timeout Counts</div>
+                <div className="mt-1 text-xs text-gray-500">Show or hide timeout counts on the scoreboard display.</div>
+              </div>
+              <label className="flex cursor-pointer items-center gap-3">
+                <span className="text-sm font-semibold text-gray-400">{scoreboardTimeoutsVisible ? 'Visible' : 'Hidden'}</span>
+                <input
+                  type="checkbox"
+                  checked={scoreboardTimeoutsVisible}
+                  onChange={(event) => setScoreboardTimeoutsVisible(event.target.checked)}
+                  className="h-5 w-5 accent-green-600"
+                />
+              </label>
+            </div>
+          )}
+
+          {scoreboardBrandingEnabled && (
+            <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
+              <TeamBrandingControl
+                team="home"
+                label={homeLabel}
+                logoUrl={homeLogoUrl}
+                color={homeColor}
+                defaultColor={DEFAULT_HOME_COLOR}
+                uploading={uploadingLogo === 'home'}
+                showLogo={previewMode === 'scoreboard'}
+                onLabelChange={setHomeLabel}
+                onColorChange={setHomeColor}
+                onColorReset={() => setHomeColor(DEFAULT_HOME_COLOR)}
+                onLogoChange={(file) => uploadScoreboardLogo('home', file)}
+                onLogoClear={() => setHomeLogoUrl('')}
+              />
+              <TeamBrandingControl
+                team="away"
+                label={awayLabel}
+                logoUrl={awayLogoUrl}
+                color={awayColor}
+                defaultColor={DEFAULT_AWAY_COLOR}
+                uploading={uploadingLogo === 'away'}
+                showLogo={previewMode === 'scoreboard'}
+                onLabelChange={setAwayLabel}
+                onColorChange={setAwayColor}
+                onColorReset={() => setAwayColor(DEFAULT_AWAY_COLOR)}
+                onLogoChange={(file) => uploadScoreboardLogo('away', file)}
+                onLogoClear={() => setAwayLogoUrl('')}
+              />
+            </div>
+          )}
+        </section>
+      )}
+
       <GamePresentationControls deviceId={deviceId} />
     </div>
   );
@@ -670,6 +683,7 @@ function AdvancedBasketballPreview({
   awayScore,
   period,
   shotClockTone,
+  branding,
 }: {
   shotClockText: string;
   gameClock: number;
@@ -677,14 +691,19 @@ function AdvancedBasketballPreview({
   awayScore: number;
   period: number;
   shotClockTone: string;
+  branding: ScoreboardBranding;
 }) {
   const shotClockSize = shotClockText.includes('.')
     ? 'text-[5.5rem] md:text-[7rem]'
     : 'text-[10rem] md:text-[13rem]';
+  const homeDisplayLabel = branding.enabled ? normalizeScoreboardLabel(branding.homeLabel, 'H') : 'H';
+  const awayDisplayLabel = branding.enabled ? normalizeScoreboardLabel(branding.awayLabel, 'A') : 'A';
+  const homeColor = branding.enabled && isHexColor(branding.homeColor) ? branding.homeColor : DEFAULT_HOME_COLOR;
+  const awayColor = branding.enabled && isHexColor(branding.awayColor) ? branding.awayColor : DEFAULT_AWAY_COLOR;
 
   return (
     <div className="rounded-2xl border-4 border-gray-700 bg-black p-4 shadow-inner shadow-black/60">
-      <div className="mx-auto grid aspect-[4/3] max-h-[28rem] min-h-[20rem] w-full max-w-[38rem] grid-rows-[13%_54%_17%_16%] overflow-hidden rounded-xl border-2 border-gray-800 bg-black px-4 py-3 font-mono text-white">
+      <div className="mx-auto grid aspect-[4/3] max-h-[28rem] min-h-[20rem] w-full max-w-[38rem] grid-rows-[13%_50%_15%_22%] overflow-hidden rounded-xl border-2 border-gray-800 bg-black px-4 py-3 font-mono text-white">
         <div className="flex items-center justify-between overflow-hidden text-2xl font-bold leading-none text-gray-400">
           <span>Q{period}</span>
         </div>
@@ -700,14 +719,14 @@ function AdvancedBasketballPreview({
         </div>
 
         <div className="grid min-h-0 grid-cols-[1fr_auto_1fr] items-center gap-2 overflow-hidden leading-none">
-          <div className="grid grid-cols-[auto_1fr] items-baseline gap-2 overflow-hidden">
-            <span className="text-lg font-bold text-red-400">H</span>
-            <span className="text-right text-5xl font-black tabular-nums text-red-500">{homeScore}</span>
+          <div className="grid min-h-0 grid-rows-[35%_65%] overflow-hidden">
+            <span className="truncate text-center text-lg font-bold uppercase leading-none" style={{ color: homeColor }}>{homeDisplayLabel}</span>
+            <span className="text-center text-4xl font-black leading-none tabular-nums" style={{ color: homeColor }}>{homeScore}</span>
           </div>
           <span className="text-lg font-bold text-gray-600">-</span>
-          <div className="grid grid-cols-[1fr_auto] items-baseline gap-2 overflow-hidden">
-            <span className="text-5xl font-black tabular-nums text-blue-500">{awayScore}</span>
-            <span className="text-lg font-bold text-blue-400">A</span>
+          <div className="grid min-h-0 grid-rows-[35%_65%] overflow-hidden">
+            <span className="truncate text-center text-lg font-bold uppercase leading-none" style={{ color: awayColor }}>{awayDisplayLabel}</span>
+            <span className="text-center text-4xl font-black leading-none tabular-nums" style={{ color: awayColor }}>{awayScore}</span>
           </div>
         </div>
       </div>
@@ -817,6 +836,7 @@ function TeamBrandingControl({
   label,
   logoUrl,
   uploading,
+  showLogo,
   onLabelChange,
   color,
   defaultColor,
@@ -829,6 +849,7 @@ function TeamBrandingControl({
   label: string;
   logoUrl: string;
   uploading: boolean;
+  showLogo: boolean;
   onLabelChange: (value: string) => void;
   color: string;
   defaultColor: string;
@@ -878,34 +899,38 @@ function TeamBrandingControl({
         </div>
       </div>
 
-      <div className="mt-4 flex items-center gap-3">
-        <label className="cc-btn cc-btn-secondary cursor-pointer px-4 py-2 text-sm">
-          {uploading ? 'Uploading...' : 'Upload Logo'}
-          <input
-            type="file"
-            accept="image/*"
-            className="hidden"
-            disabled={uploading}
-            onChange={(event) => {
-              onLogoChange(event.currentTarget.files?.[0] || null);
-              event.currentTarget.value = '';
-            }}
-          />
-        </label>
-        {logoUrl && (
-          <button type="button" onClick={onLogoClear} className="text-sm font-semibold text-gray-400 hover:text-white">
-            Clear
-          </button>
-        )}
-      </div>
+      {showLogo && (
+        <>
+          <div className="mt-4 flex items-center gap-3">
+            <label className="cc-btn cc-btn-secondary cursor-pointer px-4 py-2 text-sm">
+              {uploading ? 'Uploading...' : 'Upload Logo'}
+              <input
+                type="file"
+                accept="image/*"
+                className="hidden"
+                disabled={uploading}
+                onChange={(event) => {
+                  onLogoChange(event.currentTarget.files?.[0] || null);
+                  event.currentTarget.value = '';
+                }}
+              />
+            </label>
+            {logoUrl && (
+              <button type="button" onClick={onLogoClear} className="text-sm font-semibold text-gray-400 hover:text-white">
+                Clear
+              </button>
+            )}
+          </div>
 
-      <div className="mt-3 grid h-20 place-items-center overflow-hidden rounded-lg border border-white/10 bg-black/40">
-        {logoUrl ? (
-          <img src={logoUrl} alt="" className="max-h-full max-w-full object-contain" />
-        ) : (
-          <span className="text-xs font-semibold text-gray-600">No logo selected</span>
-        )}
-      </div>
+          <div className="mt-3 grid h-20 place-items-center overflow-hidden rounded-lg border border-white/10 bg-black/40">
+            {logoUrl ? (
+              <img src={logoUrl} alt="" className="max-h-full max-w-full object-contain" />
+            ) : (
+              <span className="text-xs font-semibold text-gray-600">No logo selected</span>
+            )}
+          </div>
+        </>
+      )}
     </div>
   );
 }

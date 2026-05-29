@@ -81,6 +81,8 @@ export default function ShotClockMode({ state }: ShotClockModeProps) {
   const scoreboardBranding = state?.mode?.scoreboardBranding;
   const homeLabel = scoreboardBranding?.enabled ? normalizeScoreboardLabel(scoreboardBranding.homeLabel, 'Home') : 'Home';
   const awayLabel = scoreboardBranding?.enabled ? normalizeScoreboardLabel(scoreboardBranding.awayLabel, 'Away') : 'Away';
+  const advancedHomeLabel = scoreboardBranding?.enabled ? normalizeScoreboardLabel(scoreboardBranding.homeLabel, 'H') : 'H';
+  const advancedAwayLabel = scoreboardBranding?.enabled ? normalizeScoreboardLabel(scoreboardBranding.awayLabel, 'A') : 'A';
   const showLogos = Boolean(scoreboardBranding?.enabled && (scoreboardBranding.homeLogoUrl || scoreboardBranding.awayLogoUrl));
   const showTimeouts = scoreboardBranding?.showTimeouts !== false;
   const homeColor = scoreboardBranding?.enabled && isHexColor(scoreboardBranding.homeColor) ? scoreboardBranding.homeColor : DEFAULT_HOME_COLOR;
@@ -180,7 +182,7 @@ export default function ShotClockMode({ state }: ShotClockModeProps) {
 
   return (
     <div
-      className="grid h-full w-full grid-rows-[13%_54%_17%_16%] overflow-hidden bg-black px-2 py-1 text-white"
+      className="grid h-full w-full grid-rows-[13%_50%_15%_22%] overflow-hidden bg-black px-2 py-1 text-white"
       style={{ containerType: 'size' }}
     >
       <div className="flex items-center justify-between overflow-hidden font-mono text-[min(7cqh,5cqw)] font-bold leading-none text-gray-400">
@@ -202,14 +204,14 @@ export default function ShotClockMode({ state }: ShotClockModeProps) {
       </div>
 
       <div className="grid min-h-0 grid-cols-[1fr_auto_1fr] items-center gap-1 overflow-hidden font-mono leading-none">
-        <div className="grid grid-cols-[auto_1fr] items-baseline gap-1 overflow-hidden">
-          <span className="text-[min(5cqh,4cqw)] font-bold text-red-400">H</span>
-          <span className="text-right text-[min(13cqh,12cqw)] font-black tabular-nums text-red-500">{homeScore}</span>
+        <div className="grid min-h-0 grid-rows-[35%_65%] overflow-hidden">
+          <span className="truncate text-center text-[min(4cqh,3.5cqw)] font-bold uppercase leading-none" style={{ color: homeColor }}>{advancedHomeLabel}</span>
+          <span className="text-center text-[min(7cqh,8cqw)] font-black leading-none tabular-nums" style={{ color: homeColor }}>{homeScore}</span>
         </div>
         <span className="text-[min(5cqh,4cqw)] font-bold text-gray-600">-</span>
-        <div className="grid grid-cols-[1fr_auto] items-baseline gap-1 overflow-hidden">
-          <span className="text-[min(13cqh,12cqw)] font-black tabular-nums text-blue-500">{awayScore}</span>
-          <span className="text-[min(5cqh,4cqw)] font-bold text-blue-400">A</span>
+        <div className="grid min-h-0 grid-rows-[35%_65%] overflow-hidden">
+          <span className="truncate text-center text-[min(4cqh,3.5cqw)] font-bold uppercase leading-none" style={{ color: awayColor }}>{advancedAwayLabel}</span>
+          <span className="text-center text-[min(7cqh,8cqw)] font-black leading-none tabular-nums" style={{ color: awayColor }}>{awayScore}</span>
         </div>
       </div>
     </div>
