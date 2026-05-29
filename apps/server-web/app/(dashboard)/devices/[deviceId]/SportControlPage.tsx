@@ -14,6 +14,7 @@ import GamePresentationControls from './GamePresentationControls';
 
 const DEFAULT_HOME_COLOR = '#ef4444';
 const DEFAULT_AWAY_COLOR = '#3b82f6';
+const DEFAULT_WRESTLING_AWAY_COLOR = '#22c55e';
 
 type SportConfig = {
   sport: SportType;
@@ -58,8 +59,8 @@ export default function SportControlPage({ deviceId, config }: { deviceId: strin
   const [brandingEnabled, setBrandingEnabled] = useState(false);
   const [homeLabel, setHomeLabel] = useState(config.homeLabel);
   const [awayLabel, setAwayLabel] = useState(config.awayLabel);
-  const [homeColor, setHomeColor] = useState(DEFAULT_HOME_COLOR);
-  const [awayColor, setAwayColor] = useState(DEFAULT_AWAY_COLOR);
+  const [homeColor, setHomeColor] = useState(() => getDefaultHomeColor(config.sport));
+  const [awayColor, setAwayColor] = useState(() => getDefaultAwayColor(config.sport));
   const [volleyballTopDisplay, setVolleyballTopDisplay] = useState<VolleyballTopDisplay>('empty');
   const [mediaAssets, setMediaAssets] = useState<DeviceMediaAsset[]>([]);
 
@@ -75,12 +76,14 @@ export default function SportControlPage({ deviceId, config }: { deviceId: strin
 
         setTimerState(loadedTimerState);
         setNow(loadedTimerState.lastUpdated);
-        if (config.sport === 'volleyball') {
+        if (supportsTeamBranding(config.sport)) {
           setBrandingEnabled(Boolean(loadedBranding?.enabled));
           setHomeLabel(loadedBranding?.homeLabel || config.homeLabel);
           setAwayLabel(loadedBranding?.awayLabel || config.awayLabel);
-          setHomeColor(isHexColor(loadedBranding?.homeColor) ? loadedBranding.homeColor : DEFAULT_HOME_COLOR);
-          setAwayColor(isHexColor(loadedBranding?.awayColor) ? loadedBranding.awayColor : DEFAULT_AWAY_COLOR);
+          setHomeColor(isHexColor(loadedBranding?.homeColor) ? loadedBranding.homeColor : getDefaultHomeColor(config.sport));
+          setAwayColor(isHexColor(loadedBranding?.awayColor) ? loadedBranding.awayColor : getDefaultAwayColor(config.sport));
+        }
+        if (config.sport === 'volleyball') {
           setVolleyballTopDisplay(isVolleyballTopDisplay(loadedBranding?.volleyballTopDisplay)
             ? loadedBranding.volleyballTopDisplay
             : 'empty');
@@ -140,7 +143,7 @@ export default function SportControlPage({ deviceId, config }: { deviceId: strin
 
   const buildSportMode = (): DeviceMode => ({
     type: config.sport,
-    ...(config.sport === 'volleyball' ? { scoreboardBranding: buildTeamBranding() } : {}),
+    ...(supportsTeamBranding(config.sport) ? { scoreboardBranding: buildTeamBranding() } : {}),
   });
 
   const setSportMode = async () => {
@@ -348,12 +351,12 @@ export default function SportControlPage({ deviceId, config }: { deviceId: strin
         </section>
       )}
 
-      {config.sport === 'volleyball' && (
+      {supportsTeamBranding(config.sport) && (
         <section className="cc-card mt-4 p-4 md:p-5">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
             <div>
-              <div className="text-xs font-bold uppercase tracking-[0.22em] text-gray-500">Volleyball Branding</div>
-              <p className="mt-1 text-sm text-gray-400">Custom team labels and colors apply to the volleyball display.</p>
+              <div className="text-xs font-bold uppercase tracking-[0.22em] text-gray-500">{formatSportLabel(config.sport)} Branding</div>
+              <p className="mt-1 text-sm text-gray-400">Custom team labels and colors apply to the {formatSportLabel(config.sport).toLowerCase()} display.</p>
             </div>
             <label className="flex cursor-pointer items-center gap-3 rounded-xl border border-white/10 bg-white/[0.04] px-4 py-3">
               <span className="text-sm font-semibold text-gray-300">Show custom labels/colors</span>
@@ -372,21 +375,21 @@ export default function SportControlPage({ deviceId, config }: { deviceId: strin
                 title="Home Team"
                 label={homeLabel}
                 color={homeColor}
-                defaultColor={DEFAULT_HOME_COLOR}
+                defaultColor={getDefaultHomeColor(config.sport)}
                 fallbackLabel={config.homeLabel}
                 onLabelChange={setHomeLabel}
                 onColorChange={setHomeColor}
-                onColorReset={() => setHomeColor(DEFAULT_HOME_COLOR)}
+                onColorReset={() => setHomeColor(getDefaultHomeColor(config.sport))}
               />
               <TeamBrandingControl
                 title="Away Team"
                 label={awayLabel}
                 color={awayColor}
-                defaultColor={DEFAULT_AWAY_COLOR}
+                defaultColor={getDefaultAwayColor(config.sport)}
                 fallbackLabel={config.awayLabel}
                 onLabelChange={setAwayLabel}
                 onColorChange={setAwayColor}
-                onColorReset={() => setAwayColor(DEFAULT_AWAY_COLOR)}
+                onColorReset={() => setAwayColor(getDefaultAwayColor(config.sport))}
               />
             </div>
           )}
@@ -497,6 +500,22 @@ function normalizeTeamLabel(value: string | undefined, fallback: string): string
 
 function isHexColor(value: string | undefined): value is string {
   return Boolean(value && /^#[0-9a-fA-F]{6}$/.test(value));
+}
+
+function supportsTeamBranding(sport: SportType) {
+  return sport === 'volleyball' || sport === 'wrestling';
+}
+
+function getDefaultHomeColor(_sport: SportType) {
+  return DEFAULT_HOME_COLOR;
+}
+
+function getDefaultAwayColor(sport: SportType) {
+  return sport === 'wrestling' ? DEFAULT_WRESTLING_AWAY_COLOR : DEFAULT_AWAY_COLOR;
+}
+
+function formatSportLabel(sport: SportType) {
+  return sport.charAt(0).toUpperCase() + sport.slice(1);
 }
 
 function isVolleyballTopDisplay(value: string | undefined): value is VolleyballTopDisplay {
