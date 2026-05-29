@@ -704,8 +704,10 @@ function AdvancedBasketballPreview({
   return (
     <div className="rounded-2xl border-4 border-gray-700 bg-black p-4 shadow-inner shadow-black/60">
       <div className="mx-auto grid aspect-[4/3] max-h-[28rem] min-h-[20rem] w-full max-w-[38rem] grid-rows-[13%_50%_15%_22%] overflow-hidden rounded-xl border-2 border-gray-800 bg-black px-4 py-3 font-mono text-white">
-        <div className="flex items-center justify-between overflow-hidden text-2xl font-bold leading-none text-gray-400">
-          <span>Q{period}</span>
+        <div className="grid min-h-0 grid-cols-[1fr_auto_1fr] items-center overflow-hidden leading-none">
+          <span className="text-2xl font-bold text-gray-400">Q{period}</span>
+          <span className="text-5xl font-black tabular-nums text-white">{formatGameClock(gameClock)}</span>
+          <span />
         </div>
 
         <div className="grid min-h-0 place-items-center border-2 border-gray-700">
@@ -714,12 +716,10 @@ function AdvancedBasketballPreview({
           </div>
         </div>
 
-        <div className="grid min-h-0 grid-cols-[1fr_auto_1fr] items-center gap-4 overflow-hidden leading-none">
-          <div className="truncate text-center text-2xl font-black uppercase" style={{ color: homeColor }}>{homeDisplayLabel}</div>
-          <div className="text-5xl font-black tabular-nums text-white">
-            {formatGameClock(gameClock)}
-          </div>
-          <div className="truncate text-center text-2xl font-black uppercase" style={{ color: awayColor }}>{awayDisplayLabel}</div>
+        <div className="grid min-h-0 grid-cols-[1fr_auto_1fr] items-center gap-4 overflow-hidden leading-tight">
+          <div className="whitespace-normal text-center text-2xl font-black uppercase" style={{ color: homeColor }}>{homeDisplayLabel}</div>
+          <div className="w-10" />
+          <div className="whitespace-normal text-center text-2xl font-black uppercase" style={{ color: awayColor }}>{awayDisplayLabel}</div>
         </div>
 
         <div className="grid min-h-0 grid-cols-[1fr_auto_1fr] items-center gap-2 overflow-hidden leading-none">

@@ -185,8 +185,10 @@ export default function ShotClockMode({ state }: ShotClockModeProps) {
       className="grid h-full w-full grid-rows-[13%_50%_15%_22%] overflow-hidden bg-black px-2 py-1 text-white"
       style={{ containerType: 'size' }}
     >
-      <div className="flex items-center justify-between overflow-hidden font-mono text-[min(7cqh,5cqw)] font-bold leading-none text-gray-400">
-        <span>Q{period}</span>
+      <div className="grid min-h-0 grid-cols-[1fr_auto_1fr] items-center overflow-hidden font-mono leading-none">
+        <span className="text-[min(7cqh,5cqw)] font-bold text-gray-400">Q{period}</span>
+        <span className="text-[min(14cqh,15cqw)] font-black tabular-nums text-white">{formatGameClock(gameClock)}</span>
+        <span />
       </div>
 
       <div className="min-h-0">
@@ -199,12 +201,10 @@ export default function ShotClockMode({ state }: ShotClockModeProps) {
         />
       </div>
 
-      <div className="grid min-h-0 grid-cols-[1fr_auto_1fr] items-center gap-2 overflow-hidden font-mono leading-none">
-        <div className="truncate text-center text-[min(6cqh,5cqw)] font-black uppercase" style={{ color: homeColor }}>{advancedHomeLabel}</div>
-        <div className="text-[min(14cqh,15cqw)] font-black tabular-nums text-white">
-          {formatGameClock(gameClock)}
-        </div>
-        <div className="truncate text-center text-[min(6cqh,5cqw)] font-black uppercase" style={{ color: awayColor }}>{advancedAwayLabel}</div>
+      <div className="grid min-h-0 grid-cols-[1fr_auto_1fr] items-center gap-2 overflow-hidden font-mono leading-tight">
+        <div className="whitespace-normal text-center text-[min(5.5cqh,5cqw)] font-black uppercase" style={{ color: homeColor }}>{advancedHomeLabel}</div>
+        <div className="w-[min(8cqw,8cqh)]" />
+        <div className="whitespace-normal text-center text-[min(5.5cqh,5cqw)] font-black uppercase" style={{ color: awayColor }}>{advancedAwayLabel}</div>
       </div>
 
       <div className="grid min-h-0 grid-cols-[1fr_auto_1fr] items-center gap-1 overflow-hidden font-mono leading-none">
