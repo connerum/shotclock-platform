@@ -91,7 +91,7 @@ export function formatShotClockDisplay(value: number): string {
   const clampedValue = roundTimerDisplay(clampDurationSeconds(value, 0, MAX_SHOT_CLOCK_SECONDS));
   const wholeSeconds = clampedValue === 0 ? 0 : Math.ceil(clampedValue);
 
-  return wholeSeconds.toString().padStart(2, '0');
+  return wholeSeconds.toString();
 }
 
 export function startTimerState(state: TimerState, now = Date.now()): TimerState {

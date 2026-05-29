@@ -391,6 +391,8 @@ sudo systemctl restart shotclock-agent shotclock-kiosk
 sudo systemctl status shotclock-agent shotclock-kiosk --no-pager
 ```
 
+For displays that are running on minimal power or have crashed during local builds, do not compile on the Pi. Build on a Mac or server and deploy only the built output tarball instead. See [Low-Power Pi Tarball Update Runbook](./low-power-pi-tarball-update.md).
+
 If `git pull --ff-only` is blocked by local database changes, do not commit the production SQLite file. On the server the production DB should be outside the repository at `/opt/courtcast/data/prod.db`. For accidental repo-local DB changes:
 
 ```bash
