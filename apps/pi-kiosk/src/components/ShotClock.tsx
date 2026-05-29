@@ -1,9 +1,10 @@
 // ShotClock component - Shot clock digit renderer
 
-import { useMemo } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { formatShotClockDisplay } from '@shotclock/shared/timer';
 
 const FINAL_COUNTDOWN_SECONDS = 10;
+const BORDER_WIDTH = 2;
 
 interface ShotClockProps {
   value: number;
@@ -20,6 +21,28 @@ export default function ShotClock({
   isExpired = false,
   isRunning = false 
 }: ShotClockProps) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [borderSize, setBorderSize] = useState({ width: 0, height: 0 });
+
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    const updateSize = () => {
+      setBorderSize({
+        width: container.clientWidth,
+        height: container.clientHeight,
+      });
+    };
+
+    updateSize();
+
+    const observer = new ResizeObserver(updateSize);
+    observer.observe(container);
+
+    return () => observer.disconnect();
+  }, []);
+
   const displayValue = useMemo(() => {
     return formatShotClockDisplay(value);
   }, [value]);
@@ -49,10 +72,33 @@ export default function ShotClock({
     0,
     Math.min(1, (FINAL_COUNTDOWN_SECONDS - value) / FINAL_COUNTDOWN_SECONDS)
   );
-  const countdownBorderVisible = Math.max(0, 1 - countdownBorderProgress);
+  const borderMetrics = useMemo(() => {
+    const width = borderSize.width;
+    const height = borderSize.height;
+    const topLength = width / 2;
+    const halfPerimeter = width + height;
+    const gap = countdownBorderProgress * halfPerimeter;
+    const topVisible = Math.max(0, topLength - gap);
+    const sideHidden = Math.max(0, Math.min(height, gap - topLength));
+    const sideVisible = Math.max(0, height - sideHidden);
+    const bottomHidden = Math.max(0, gap - topLength - height);
+    const bottomVisible = Math.max(0, topLength - bottomHidden);
+
+    return {
+      topVisible,
+      sideVisible,
+      bottomVisible,
+      bottomLeftStart: topLength - bottomVisible,
+      bottomRightStart: topLength,
+    };
+  }, [borderSize.height, borderSize.width, countdownBorderProgress]);
+
+  const borderTransition = isRunning
+    ? 'height 50ms linear, left 50ms linear, width 50ms linear'
+    : undefined;
 
   return (
-    <div className={`relative flex h-full w-full items-center justify-center ${shouldStrobe ? 'shotclock-strobe' : ''} ${glowClass}`}>
+    <div ref={containerRef} className={`relative flex h-full w-full items-center justify-center ${shouldStrobe ? 'shotclock-strobe' : ''} ${glowClass}`}>
       {/* Main display */}
       <div
         className={`font-mono font-black tabular-nums ${colorClass}`}
@@ -67,37 +113,64 @@ export default function ShotClock({
       </div>
       
       {/* Countdown border */}
-      <svg
-        className="pointer-events-none absolute inset-0 h-full w-full"
-        viewBox="0 0 100 100"
-        preserveAspectRatio="none"
-        aria-hidden="true"
-      >
-        <path
-          d="M 50 100 H 0 V 0 H 50"
-          pathLength={1}
-          fill="none"
-          stroke={borderColor}
-          strokeWidth={2}
-          vectorEffect="non-scaling-stroke"
+      <div className="pointer-events-none absolute inset-0" aria-hidden="true">
+        <div
+          className="absolute left-0 top-0"
           style={{
-            strokeDasharray: `${countdownBorderVisible} 1`,
-            transition: isRunning ? 'stroke-dasharray 50ms linear' : undefined,
+            width: borderMetrics.topVisible,
+            height: BORDER_WIDTH,
+            backgroundColor: borderColor,
+            transition: borderTransition,
           }}
         />
-        <path
-          d="M 50 100 H 100 V 0 H 50"
-          pathLength={1}
-          fill="none"
-          stroke={borderColor}
-          strokeWidth={2}
-          vectorEffect="non-scaling-stroke"
+        <div
+          className="absolute right-0 top-0"
           style={{
-            strokeDasharray: `${countdownBorderVisible} 1`,
-            transition: isRunning ? 'stroke-dasharray 50ms linear' : undefined,
+            width: borderMetrics.topVisible,
+            height: BORDER_WIDTH,
+            backgroundColor: borderColor,
+            transition: borderTransition,
           }}
         />
-      </svg>
+        <div
+          className="absolute bottom-0 left-0"
+          style={{
+            width: BORDER_WIDTH,
+            height: borderMetrics.sideVisible,
+            backgroundColor: borderColor,
+            transition: borderTransition,
+          }}
+        />
+        <div
+          className="absolute bottom-0 right-0"
+          style={{
+            width: BORDER_WIDTH,
+            height: borderMetrics.sideVisible,
+            backgroundColor: borderColor,
+            transition: borderTransition,
+          }}
+        />
+        <div
+          className="absolute bottom-0"
+          style={{
+            left: borderMetrics.bottomLeftStart,
+            width: borderMetrics.bottomVisible,
+            height: BORDER_WIDTH,
+            backgroundColor: borderColor,
+            transition: borderTransition,
+          }}
+        />
+        <div
+          className="absolute bottom-0"
+          style={{
+            left: borderMetrics.bottomRightStart,
+            width: borderMetrics.bottomVisible,
+            height: BORDER_WIDTH,
+            backgroundColor: borderColor,
+            transition: borderTransition,
+          }}
+        />
+      </div>
       
       {/* Warning flash effect */}
       {shouldStrobe && <div className="absolute inset-0 bg-red-500 opacity-15 pointer-events-none" />}
