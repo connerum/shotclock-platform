@@ -1,5 +1,11 @@
+import type { ScoreboardBranding } from '@shotclock/shared/types';
+
+const DEFAULT_HOME_COLOR = '#ef4444';
+const DEFAULT_AWAY_COLOR = '#3b82f6';
+
 interface VolleyballModeProps {
   state?: {
+    mode?: { scoreboardBranding?: ScoreboardBranding };
     timerState?: {
       homeScore: number;
       awayScore: number;
@@ -17,6 +23,11 @@ export default function VolleyballMode({ state }: VolleyballModeProps) {
   const homeSets = timerState?.homeSets ?? 0;
   const awaySets = timerState?.awaySets ?? 0;
   const set = timerState?.period ?? 1;
+  const branding = state?.mode?.scoreboardBranding;
+  const homeLabel = branding?.enabled ? normalizeLabel(branding.homeLabel, 'HOME') : 'HOME';
+  const awayLabel = branding?.enabled ? normalizeLabel(branding.awayLabel, 'AWAY') : 'AWAY';
+  const homeColor = branding?.enabled && isHexColor(branding.homeColor) ? branding.homeColor : DEFAULT_HOME_COLOR;
+  const awayColor = branding?.enabled && isHexColor(branding.awayColor) ? branding.awayColor : DEFAULT_AWAY_COLOR;
 
   return (
     <div
@@ -28,32 +39,42 @@ export default function VolleyballMode({ state }: VolleyballModeProps) {
         <span>SET {set}</span>
       </div>
       <div className="grid min-h-0 grid-cols-[1fr_auto_1fr] items-center gap-0.5 overflow-hidden leading-none">
-        <TeamScore label="HOME" value={homeScore} className="text-red-500" />
+        <TeamScore label={homeLabel} value={homeScore} color={homeColor} />
         <span className="text-[min(16cqh,8cqw)] font-black text-gray-700">-</span>
-        <TeamScore label="AWAY" value={awayScore} className="text-blue-500" />
+        <TeamScore label={awayLabel} value={awayScore} color={awayColor} />
       </div>
-      <div className="grid min-h-0 grid-cols-2 items-center gap-1 overflow-hidden border-t border-gray-900 leading-none">
-        <SetScore label="S" value={homeSets} className="text-red-400" />
-        <SetScore label="S" value={awaySets} className="text-blue-400" />
+      <div className="grid min-h-0 grid-cols-[1fr_auto_1fr] items-center gap-1 overflow-hidden border-t border-gray-900 leading-none">
+        <SetScore label="S" value={homeSets} color={homeColor} />
+        <span className="text-[min(5cqh,3cqw)] font-black leading-none text-gray-500">SET</span>
+        <SetScore label="S" value={awaySets} color={awayColor} />
       </div>
     </div>
   );
 }
 
-function TeamScore({ label, value, className }: { label: string; value: number; className: string }) {
+function TeamScore({ label, value, color }: { label: string; value: number; color: string }) {
   return (
     <div className="grid min-h-0 grid-rows-[18%_82%] overflow-hidden">
-      <div className={`flex min-h-0 items-center justify-center text-[min(7cqh,4cqw)] font-black leading-none ${className}`}>{label}</div>
-      <div className={`flex min-h-0 items-center justify-center text-[min(48cqh,30cqw)] font-black leading-none tabular-nums ${className}`}>{value}</div>
+      <div className="flex min-h-0 items-center justify-center text-[min(7cqh,4cqw)] font-black uppercase leading-none" style={{ color }}>{label}</div>
+      <div className="flex min-h-0 items-center justify-center text-[min(48cqh,30cqw)] font-black leading-none tabular-nums" style={{ color }}>{value}</div>
     </div>
   );
 }
 
-function SetScore({ label, value, className }: { label: string; value: number; className: string }) {
+function SetScore({ label, value, color }: { label: string; value: number; color: string }) {
   return (
     <div className="flex min-h-0 items-center justify-center gap-0.5 overflow-hidden">
-      <span className={`text-[min(6cqh,3.5cqw)] font-black leading-none ${className}`}>{label}</span>
-      <span className={`text-[min(16cqh,9cqw)] font-black leading-none tabular-nums ${className}`}>{value}</span>
+      <span className="text-[min(6cqh,3.5cqw)] font-black leading-none" style={{ color }}>{label}</span>
+      <span className="text-[min(16cqh,9cqw)] font-black leading-none tabular-nums" style={{ color }}>{value}</span>
     </div>
   );
+}
+
+function normalizeLabel(value: string | undefined, fallback: string): string {
+  const normalized = value?.trim();
+  return normalized ? normalized.slice(0, 18) : fallback;
+}
+
+function isHexColor(value: string | undefined): value is string {
+  return Boolean(value && /^#[0-9a-fA-F]{6}$/.test(value));
 }

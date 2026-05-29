@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import type { DeviceMode, SportType, TimerState } from '@shotclock/shared/types';
+import type { DeviceMode, ScoreboardBranding, SportType, TimerState } from '@shotclock/shared/types';
 import {
   createDefaultTimerState,
   pauseTimerState,
@@ -11,6 +11,9 @@ import {
   stopTimerState,
 } from '@shotclock/shared/timer';
 import GamePresentationControls from './GamePresentationControls';
+
+const DEFAULT_HOME_COLOR = '#ef4444';
+const DEFAULT_AWAY_COLOR = '#3b82f6';
 
 type SportConfig = {
   sport: SportType;
@@ -27,6 +30,9 @@ interface Device {
   name: string;
   isOnline: boolean;
   timerState?: TimerState | null;
+  displayState?: {
+    deviceMode?: DeviceMode;
+  } | null;
 }
 
 export default function SportControlPage({ deviceId, config }: { deviceId: string; config: SportConfig }) {
@@ -39,6 +45,11 @@ export default function SportControlPage({ deviceId, config }: { deviceId: strin
     isPaused: true,
   }));
   const [now, setNow] = useState(Date.now());
+  const [brandingEnabled, setBrandingEnabled] = useState(false);
+  const [homeLabel, setHomeLabel] = useState(config.homeLabel);
+  const [awayLabel, setAwayLabel] = useState(config.awayLabel);
+  const [homeColor, setHomeColor] = useState(DEFAULT_HOME_COLOR);
+  const [awayColor, setAwayColor] = useState(DEFAULT_AWAY_COLOR);
 
   useEffect(() => {
     const fetchDevice = async () => {
@@ -46,19 +57,37 @@ export default function SportControlPage({ deviceId, config }: { deviceId: strin
         const response = await fetch(`/api/devices/${deviceId}`, { cache: 'no-store' });
         if (!response.ok) throw new Error('Device not found');
         const data = await response.json();
+        const loadedMode = data.device.displayState?.deviceMode as DeviceMode | undefined;
+        const loadedBranding = loadedMode?.scoreboardBranding;
         const loadedTimerState = hydrateTimerState(data.device.timerState);
 
-        setDevice(data.device);
         setTimerState(loadedTimerState);
         setNow(loadedTimerState.lastUpdated);
+        if (config.sport === 'volleyball') {
+          setBrandingEnabled(Boolean(loadedBranding?.enabled));
+          setHomeLabel(loadedBranding?.homeLabel || config.homeLabel);
+          setAwayLabel(loadedBranding?.awayLabel || config.awayLabel);
+          setHomeColor(isHexColor(loadedBranding?.homeColor) ? loadedBranding.homeColor : DEFAULT_HOME_COLOR);
+          setAwayColor(isHexColor(loadedBranding?.awayColor) ? loadedBranding.awayColor : DEFAULT_AWAY_COLOR);
+        }
+        setDevice(data.device);
       } finally {
         setLoading(false);
       }
     };
 
     void fetchDevice();
-    void setSportMode();
   }, [deviceId, config.sport]);
+
+  useEffect(() => {
+    if (!device) return;
+
+    const timeout = setTimeout(() => {
+      void setSportMode();
+    }, 250);
+
+    return () => clearTimeout(timeout);
+  }, [device?.deviceId, config.sport, brandingEnabled, homeLabel, awayLabel, homeColor, awayColor]);
 
   useEffect(() => {
     if (!timerState.isRunning) return;
@@ -68,8 +97,21 @@ export default function SportControlPage({ deviceId, config }: { deviceId: strin
 
   const projectedState = projectTimerState(timerState, now);
 
+  const buildTeamBranding = (): ScoreboardBranding => ({
+    enabled: brandingEnabled,
+    homeLabel: normalizeTeamLabel(homeLabel, config.homeLabel),
+    awayLabel: normalizeTeamLabel(awayLabel, config.awayLabel),
+    homeColor,
+    awayColor,
+  });
+
+  const buildSportMode = (): DeviceMode => ({
+    type: config.sport,
+    ...(config.sport === 'volleyball' ? { scoreboardBranding: buildTeamBranding() } : {}),
+  });
+
   const setSportMode = async () => {
-    const mode: DeviceMode = { type: config.sport };
+    const mode = buildSportMode();
     await sendCommand('set_mode', { mode });
   };
 
@@ -89,7 +131,7 @@ export default function SportControlPage({ deviceId, config }: { deviceId: strin
   };
 
   const sendTimerState = async (nextState: TimerState) => {
-    const mode: DeviceMode = { type: config.sport };
+    const mode = buildSportMode();
     const success = await sendCommand('set_timer', { timerState: nextState, mode });
     if (success) {
       setTimerState(nextState);
@@ -203,12 +245,12 @@ export default function SportControlPage({ deviceId, config }: { deviceId: strin
 
           <div className="grid grid-cols-2 gap-4">
             <ScoreControl
-              label={config.homeLabel}
+              label={brandingEnabled ? normalizeTeamLabel(homeLabel, config.homeLabel) : config.homeLabel}
               value={projectedState.homeScore}
               onChange={(homeScore) => updateTimerState({ homeScore })}
             />
             <ScoreControl
-              label={config.awayLabel}
+              label={brandingEnabled ? normalizeTeamLabel(awayLabel, config.awayLabel) : config.awayLabel}
               value={projectedState.awayScore}
               onChange={(awayScore) => updateTimerState({ awayScore })}
             />
@@ -230,6 +272,51 @@ export default function SportControlPage({ deviceId, config }: { deviceId: strin
           )}
         </div>
       </div>
+
+      {config.sport === 'volleyball' && (
+        <section className="cc-card mt-4 p-4 md:p-5">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+            <div>
+              <div className="text-xs font-bold uppercase tracking-[0.22em] text-gray-500">Volleyball Branding</div>
+              <p className="mt-1 text-sm text-gray-400">Custom team labels and colors apply to the volleyball display.</p>
+            </div>
+            <label className="flex cursor-pointer items-center gap-3 rounded-xl border border-white/10 bg-white/[0.04] px-4 py-3">
+              <span className="text-sm font-semibold text-gray-300">Show custom labels/colors</span>
+              <input
+                type="checkbox"
+                checked={brandingEnabled}
+                onChange={(event) => setBrandingEnabled(event.target.checked)}
+                className="h-5 w-5 accent-green-600"
+              />
+            </label>
+          </div>
+
+          {brandingEnabled && (
+            <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
+              <TeamBrandingControl
+                title="Home Team"
+                label={homeLabel}
+                color={homeColor}
+                defaultColor={DEFAULT_HOME_COLOR}
+                fallbackLabel={config.homeLabel}
+                onLabelChange={setHomeLabel}
+                onColorChange={setHomeColor}
+                onColorReset={() => setHomeColor(DEFAULT_HOME_COLOR)}
+              />
+              <TeamBrandingControl
+                title="Away Team"
+                label={awayLabel}
+                color={awayColor}
+                defaultColor={DEFAULT_AWAY_COLOR}
+                fallbackLabel={config.awayLabel}
+                onLabelChange={setAwayLabel}
+                onColorChange={setAwayColor}
+                onColorReset={() => setAwayColor(DEFAULT_AWAY_COLOR)}
+              />
+            </div>
+          )}
+        </section>
+      )}
 
       <GamePresentationControls deviceId={deviceId} />
     </div>
@@ -265,4 +352,74 @@ function ScoreControl({ label, value, onChange }: { label: string; value: number
       </div>
     </div>
   );
+}
+
+function TeamBrandingControl({
+  title,
+  label,
+  color,
+  defaultColor,
+  fallbackLabel,
+  onLabelChange,
+  onColorChange,
+  onColorReset,
+}: {
+  title: string;
+  label: string;
+  color: string;
+  defaultColor: string;
+  fallbackLabel: string;
+  onLabelChange: (value: string) => void;
+  onColorChange: (value: string) => void;
+  onColorReset: () => void;
+}) {
+  return (
+    <div className="rounded-xl border border-white/10 bg-white/[0.04] p-4">
+      <label className="mb-2 block text-xs font-bold uppercase tracking-[0.16em] text-gray-500">
+        {title} Label
+      </label>
+      <input
+        type="text"
+        value={label}
+        maxLength={18}
+        onChange={(event) => onLabelChange(event.target.value)}
+        className="w-full rounded-lg px-3 py-2 font-semibold"
+        placeholder={fallbackLabel}
+      />
+
+      <div className="mt-4 rounded-lg border border-white/10 bg-black/20 p-3">
+        <div className="mb-2 flex items-center justify-between gap-3">
+          <label className="text-xs font-bold uppercase tracking-[0.16em] text-gray-500">
+            Team Color
+          </label>
+          <button
+            type="button"
+            onClick={onColorReset}
+            disabled={color.toLowerCase() === defaultColor.toLowerCase()}
+            className="text-xs font-semibold text-gray-400 hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            Reset
+          </button>
+        </div>
+        <div className="flex items-center gap-3">
+          <input
+            type="color"
+            value={color}
+            onChange={(event) => onColorChange(event.target.value)}
+            className="h-11 w-14 cursor-pointer rounded border border-white/10 bg-transparent p-1"
+          />
+          <span className="font-mono text-sm font-semibold uppercase text-gray-300">{color}</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function normalizeTeamLabel(value: string | undefined, fallback: string): string {
+  const normalized = value?.trim();
+  return normalized ? normalized.slice(0, 18) : fallback;
+}
+
+function isHexColor(value: string | undefined): value is string {
+  return Boolean(value && /^#[0-9a-fA-F]{6}$/.test(value));
 }
