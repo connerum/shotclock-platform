@@ -25,6 +25,16 @@ type SportConfig = {
   showSets?: boolean;
 };
 
+type VolleyballTopDisplay = 'empty' | 'school-logo' | 'ads';
+
+type DeviceMediaAsset = {
+  id: string;
+  slot: string;
+  url: string;
+  mimeType: string;
+  isActive: boolean;
+};
+
 interface Device {
   deviceId: string;
   name: string;
@@ -50,6 +60,8 @@ export default function SportControlPage({ deviceId, config }: { deviceId: strin
   const [awayLabel, setAwayLabel] = useState(config.awayLabel);
   const [homeColor, setHomeColor] = useState(DEFAULT_HOME_COLOR);
   const [awayColor, setAwayColor] = useState(DEFAULT_AWAY_COLOR);
+  const [volleyballTopDisplay, setVolleyballTopDisplay] = useState<VolleyballTopDisplay>('empty');
+  const [mediaAssets, setMediaAssets] = useState<DeviceMediaAsset[]>([]);
 
   useEffect(() => {
     const fetchDevice = async () => {
@@ -69,6 +81,9 @@ export default function SportControlPage({ deviceId, config }: { deviceId: strin
           setAwayLabel(loadedBranding?.awayLabel || config.awayLabel);
           setHomeColor(isHexColor(loadedBranding?.homeColor) ? loadedBranding.homeColor : DEFAULT_HOME_COLOR);
           setAwayColor(isHexColor(loadedBranding?.awayColor) ? loadedBranding.awayColor : DEFAULT_AWAY_COLOR);
+          setVolleyballTopDisplay(isVolleyballTopDisplay(loadedBranding?.volleyballTopDisplay)
+            ? loadedBranding.volleyballTopDisplay
+            : 'empty');
         }
         setDevice(data.device);
       } finally {
@@ -80,6 +95,23 @@ export default function SportControlPage({ deviceId, config }: { deviceId: strin
   }, [deviceId, config.sport]);
 
   useEffect(() => {
+    if (config.sport !== 'volleyball') return;
+
+    const fetchMediaAssets = async () => {
+      try {
+        const response = await fetch(`/api/devices/${deviceId}/media`);
+        if (!response.ok) return;
+        const data = await response.json();
+        setMediaAssets(data.mediaAssets || []);
+      } catch {
+        setMediaAssets([]);
+      }
+    };
+
+    void fetchMediaAssets();
+  }, [deviceId, config.sport]);
+
+  useEffect(() => {
     if (!device) return;
 
     const timeout = setTimeout(() => {
@@ -87,7 +119,7 @@ export default function SportControlPage({ deviceId, config }: { deviceId: strin
     }, 250);
 
     return () => clearTimeout(timeout);
-  }, [device?.deviceId, config.sport, brandingEnabled, homeLabel, awayLabel, homeColor, awayColor]);
+  }, [device?.deviceId, config.sport, brandingEnabled, homeLabel, awayLabel, homeColor, awayColor, volleyballTopDisplay, mediaAssets]);
 
   useEffect(() => {
     if (!timerState.isRunning) return;
@@ -103,6 +135,7 @@ export default function SportControlPage({ deviceId, config }: { deviceId: strin
     awayLabel: normalizeTeamLabel(awayLabel, config.awayLabel),
     homeColor,
     awayColor,
+    ...(config.sport === 'volleyball' ? buildVolleyballTopMediaPayload(volleyballTopDisplay, mediaAssets) : {}),
   });
 
   const buildSportMode = (): DeviceMode => ({
@@ -168,6 +201,8 @@ export default function SportControlPage({ deviceId, config }: { deviceId: strin
       awayScore: 0,
       homeSets: 0,
       awaySets: 0,
+      homeTimeouts: 0,
+      awayTimeouts: 0,
       period: 1,
     }));
   };
@@ -270,8 +305,48 @@ export default function SportControlPage({ deviceId, config }: { deviceId: strin
               />
             </div>
           )}
+
+          {config.sport === 'volleyball' && (
+            <div className="mt-4 grid grid-cols-2 gap-4">
+              <ScoreControl
+                label="Home Timeouts"
+                value={projectedState.homeTimeouts ?? 0}
+                onChange={(homeTimeouts) => updateTimerState({ homeTimeouts: Math.min(2, homeTimeouts) })}
+              />
+              <ScoreControl
+                label="Away Timeouts"
+                value={projectedState.awayTimeouts ?? 0}
+                onChange={(awayTimeouts) => updateTimerState({ awayTimeouts: Math.min(2, awayTimeouts) })}
+              />
+            </div>
+          )}
         </div>
       </div>
+
+      {config.sport === 'volleyball' && (
+        <section className="cc-card mt-4 p-4 md:p-5">
+          <div className="mb-4">
+            <div className="text-xs font-bold uppercase tracking-[0.22em] text-gray-500">Top Display</div>
+            <p className="mt-1 text-sm text-gray-400">Choose what appears in the top-center volleyball display area.</p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {(['empty', 'school-logo', 'ads'] as const).map((option) => (
+              <button
+                key={option}
+                type="button"
+                onClick={() => setVolleyballTopDisplay(option)}
+                className={`rounded-lg px-4 py-2 text-sm font-semibold capitalize transition-colors ${
+                  volleyballTopDisplay === option
+                    ? 'bg-green-600 text-white'
+                    : 'bg-white/10 text-gray-300 hover:bg-white/15'
+                }`}
+              >
+                {option === 'school-logo' ? 'School Logo' : option}
+              </button>
+            ))}
+          </div>
+        </section>
+      )}
 
       {config.sport === 'volleyball' && (
         <section className="cc-card mt-4 p-4 md:p-5">
@@ -422,4 +497,57 @@ function normalizeTeamLabel(value: string | undefined, fallback: string): string
 
 function isHexColor(value: string | undefined): value is string {
   return Boolean(value && /^#[0-9a-fA-F]{6}$/.test(value));
+}
+
+function isVolleyballTopDisplay(value: string | undefined): value is VolleyballTopDisplay {
+  return value === 'empty' || value === 'school-logo' || value === 'ads';
+}
+
+function buildVolleyballTopMediaPayload(
+  topDisplay: VolleyballTopDisplay,
+  mediaAssets: DeviceMediaAsset[]
+): Partial<ScoreboardBranding> {
+  if (topDisplay === 'empty') {
+    return { volleyballTopDisplay: 'empty' };
+  }
+
+  if (topDisplay === 'school-logo') {
+    const logo = mediaAssets.find((asset) => asset.slot === 'logo' && asset.isActive && isVisualMedia(asset));
+    return {
+      volleyballTopDisplay: 'school-logo',
+      ...(logo ? {
+        volleyballTopMediaUrl: getPublicMediaUrl(logo.url),
+        volleyballTopMediaMimeType: logo.mimeType,
+      } : {}),
+    };
+  }
+
+  const playlist = mediaAssets
+    .filter((asset) => asset.slot === 'ads' && asset.isActive && isVisualMedia(asset))
+    .map((asset) => ({
+      mediaUrl: getPublicMediaUrl(asset.url),
+      mediaMimeType: asset.mimeType,
+    }));
+
+  return {
+    volleyballTopDisplay: 'ads',
+    ...(playlist[0] ? {
+      volleyballTopMediaUrl: playlist[0].mediaUrl,
+      volleyballTopMediaMimeType: playlist[0].mediaMimeType,
+    } : {}),
+    ...(playlist.length > 1 ? {
+      volleyballTopMediaPlaylist: playlist,
+      volleyballTopRotationIntervalMs: 8000,
+    } : {}),
+  };
+}
+
+function isVisualMedia(asset: DeviceMediaAsset) {
+  return asset.mimeType.startsWith('image/') || asset.mimeType.startsWith('video/');
+}
+
+function getPublicMediaUrl(url: string) {
+  if (url.startsWith('http://') || url.startsWith('https://')) return url;
+  if (typeof window === 'undefined') return url;
+  return `${window.location.origin}${url}`;
 }

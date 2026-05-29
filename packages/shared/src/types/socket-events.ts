@@ -119,6 +119,14 @@ export interface ScoreboardBranding {
   awayLogoUrl?: string;
   homeColor?: string;
   awayColor?: string;
+  volleyballTopDisplay?: 'empty' | 'school-logo' | 'ads';
+  volleyballTopMediaUrl?: string;
+  volleyballTopMediaMimeType?: string;
+  volleyballTopMediaPlaylist?: Array<{
+    mediaUrl: string;
+    mediaMimeType: string;
+  }>;
+  volleyballTopRotationIntervalMs?: number;
 }
 
 export type PresentationOverlayType =
