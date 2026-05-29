@@ -714,19 +714,21 @@ function AdvancedBasketballPreview({
           </div>
         </div>
 
-        <div className="flex items-center justify-center overflow-hidden text-5xl font-black leading-none tabular-nums text-white">
-          {formatGameClock(gameClock)}
+        <div className="grid min-h-0 grid-cols-[1fr_auto_1fr] items-center gap-4 overflow-hidden leading-none">
+          <div className="truncate text-center text-2xl font-black uppercase" style={{ color: homeColor }}>{homeDisplayLabel}</div>
+          <div className="text-5xl font-black tabular-nums text-white">
+            {formatGameClock(gameClock)}
+          </div>
+          <div className="truncate text-center text-2xl font-black uppercase" style={{ color: awayColor }}>{awayDisplayLabel}</div>
         </div>
 
         <div className="grid min-h-0 grid-cols-[1fr_auto_1fr] items-center gap-2 overflow-hidden leading-none">
-          <div className="grid min-h-0 grid-rows-[35%_65%] overflow-hidden">
-            <span className="truncate text-center text-lg font-bold uppercase leading-none" style={{ color: homeColor }}>{homeDisplayLabel}</span>
-            <span className="text-center text-4xl font-black leading-none tabular-nums" style={{ color: homeColor }}>{homeScore}</span>
+          <div className="flex min-h-0 items-center justify-center overflow-hidden">
+            <span className="text-center text-6xl font-black leading-none tabular-nums" style={{ color: homeColor }}>{homeScore}</span>
           </div>
-          <span className="text-lg font-bold text-gray-600">-</span>
-          <div className="grid min-h-0 grid-rows-[35%_65%] overflow-hidden">
-            <span className="truncate text-center text-lg font-bold uppercase leading-none" style={{ color: awayColor }}>{awayDisplayLabel}</span>
-            <span className="text-center text-4xl font-black leading-none tabular-nums" style={{ color: awayColor }}>{awayScore}</span>
+          <span className="text-2xl font-bold text-gray-600">-</span>
+          <div className="flex min-h-0 items-center justify-center overflow-hidden">
+            <span className="text-center text-6xl font-black leading-none tabular-nums" style={{ color: awayColor }}>{awayScore}</span>
           </div>
         </div>
       </div>

@@ -199,19 +199,21 @@ export default function ShotClockMode({ state }: ShotClockModeProps) {
         />
       </div>
 
-      <div className="flex items-center justify-center overflow-hidden font-mono text-[min(14cqh,15cqw)] font-black leading-none tabular-nums text-white">
-        {formatGameClock(gameClock)}
+      <div className="grid min-h-0 grid-cols-[1fr_auto_1fr] items-center gap-2 overflow-hidden font-mono leading-none">
+        <div className="truncate text-center text-[min(6cqh,5cqw)] font-black uppercase" style={{ color: homeColor }}>{advancedHomeLabel}</div>
+        <div className="text-[min(14cqh,15cqw)] font-black tabular-nums text-white">
+          {formatGameClock(gameClock)}
+        </div>
+        <div className="truncate text-center text-[min(6cqh,5cqw)] font-black uppercase" style={{ color: awayColor }}>{advancedAwayLabel}</div>
       </div>
 
       <div className="grid min-h-0 grid-cols-[1fr_auto_1fr] items-center gap-1 overflow-hidden font-mono leading-none">
-        <div className="grid min-h-0 grid-rows-[35%_65%] overflow-hidden">
-          <span className="truncate text-center text-[min(4cqh,3.5cqw)] font-bold uppercase leading-none" style={{ color: homeColor }}>{advancedHomeLabel}</span>
-          <span className="text-center text-[min(7cqh,8cqw)] font-black leading-none tabular-nums" style={{ color: homeColor }}>{homeScore}</span>
+        <div className="flex min-h-0 items-center justify-center overflow-hidden">
+          <span className="text-center text-[min(12cqh,11cqw)] font-black leading-none tabular-nums" style={{ color: homeColor }}>{homeScore}</span>
         </div>
         <span className="text-[min(5cqh,4cqw)] font-bold text-gray-600">-</span>
-        <div className="grid min-h-0 grid-rows-[35%_65%] overflow-hidden">
-          <span className="truncate text-center text-[min(4cqh,3.5cqw)] font-bold uppercase leading-none" style={{ color: awayColor }}>{advancedAwayLabel}</span>
-          <span className="text-center text-[min(7cqh,8cqw)] font-black leading-none tabular-nums" style={{ color: awayColor }}>{awayScore}</span>
+        <div className="flex min-h-0 items-center justify-center overflow-hidden">
+          <span className="text-center text-[min(12cqh,11cqw)] font-black leading-none tabular-nums" style={{ color: awayColor }}>{awayScore}</span>
         </div>
       </div>
     </div>
