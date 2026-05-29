@@ -1,7 +1,7 @@
 // Shot Clock Mode - compact display for calibrated LED viewport.
 
 import { useEffect, useState } from 'react';
-import { DEFAULT_SHOT_CLOCK_SECONDS, projectPreciseTimerState } from '@shotclock/shared/timer';
+import { DEFAULT_SHOT_CLOCK_SECONDS, formatShotClockDisplay, projectPreciseTimerState } from '@shotclock/shared/timer';
 import ShotClock from '../components/ShotClock';
 
 const FINAL_COUNTDOWN_SECONDS = 10;
@@ -68,6 +68,7 @@ export default function ShotClockMode({ state }: ShotClockModeProps) {
   const shouldStrobe = isRunning && shotClock === 0 && expiredStrobeActive;
   const isExpired = shotClock === 0;
   const isShotClockOnly = state?.mode?.subMode === 'shot-clock-only';
+  const isScoreboardFocused = state?.mode?.subMode === 'scoreboard';
 
   if (isShotClockOnly) {
     return (
@@ -83,6 +84,51 @@ export default function ShotClockMode({ state }: ShotClockModeProps) {
             isExpired={isExpired}
             isRunning={isRunning}
           />
+        </div>
+      </div>
+    );
+  }
+
+  if (isScoreboardFocused) {
+    return (
+      <div
+        className="grid h-full w-full grid-rows-[16%_16%_46%_22%] overflow-hidden bg-black px-2 py-1 font-mono text-white"
+        style={{ containerType: 'size' }}
+      >
+        <div className="grid min-h-0 grid-cols-[1fr_auto_1fr] items-center gap-2 overflow-hidden leading-none">
+          <div className="text-[min(7cqh,5cqw)] font-black text-gray-400">P{period}</div>
+          <div className="text-[min(13cqh,12cqw)] font-black tabular-nums text-white">
+            {formatGameClock(gameClock)}
+          </div>
+          <div className={`text-right text-[min(7cqh,5cqw)] font-black ${isRunning ? 'text-green-500' : 'text-yellow-500'}`}>
+            {isRunning ? 'RUN' : 'HOLD'}
+          </div>
+        </div>
+
+        <div className="grid min-h-0 grid-cols-[1fr_auto_1fr] items-center gap-2 overflow-hidden leading-none">
+          <div className="text-center text-[min(7cqh,5cqw)] font-black uppercase text-red-400">Home</div>
+          <div className="text-[min(5cqh,4cqw)] font-black text-gray-700">-</div>
+          <div className="text-center text-[min(7cqh,5cqw)] font-black uppercase text-blue-400">Away</div>
+        </div>
+
+        <div className="grid min-h-0 grid-cols-[1fr_auto_1fr] items-center gap-2 overflow-hidden leading-none">
+          <div className="flex min-w-0 items-center justify-center overflow-hidden text-[min(41cqh,26cqw)] font-black tabular-nums text-red-500">
+            {homeScore}
+          </div>
+          <div className="text-[min(14cqh,6cqw)] font-black text-gray-700">-</div>
+          <div className="flex min-w-0 items-center justify-center overflow-hidden text-[min(41cqh,26cqw)] font-black tabular-nums text-blue-500">
+            {awayScore}
+          </div>
+        </div>
+
+        <div className="grid min-h-0 grid-cols-[1fr_auto_1fr] items-start gap-2 overflow-hidden pt-2 leading-none">
+          <div className="h-[2px] bg-gray-800" />
+          <div className="flex h-[74%] min-w-[20cqw] max-w-[32cqw] items-center justify-center overflow-hidden border-2 border-gray-700 px-2">
+            <div className={`translate-y-[0.04em] text-[min(10cqh,8cqw)] font-black leading-[0.82] tabular-nums ${colorClassForShotClock(isWarning, isExpired, shouldStrobe)}`}>
+              {formatShotClockDisplay(shotClock)}
+            </div>
+          </div>
+          <div className="h-[2px] bg-gray-800" />
         </div>
       </div>
     );
@@ -127,4 +173,11 @@ export default function ShotClockMode({ state }: ShotClockModeProps) {
       </div>
     </div>
   );
+}
+
+function colorClassForShotClock(isWarning: boolean, isExpired: boolean, shouldStrobe: boolean): string {
+  if (shouldStrobe) return 'text-white drop-shadow-[0_0_20px_rgba(239,68,68,0.9)]';
+  if (isWarning) return 'text-yellow-300 drop-shadow-[0_0_18px_rgba(250,204,21,0.75)]';
+  if (isExpired) return 'text-red-500 drop-shadow-[0_0_18px_rgba(239,68,68,0.8)]';
+  return 'text-white';
 }

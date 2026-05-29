@@ -16,6 +16,8 @@ import {
 } from '@shotclock/shared/timer';
 import GamePresentationControls from '../GamePresentationControls';
 
+type BasketballPreviewMode = 'regular' | 'advanced' | 'scoreboard';
+
 interface Device {
   id: string;
   deviceId: string;
@@ -45,7 +47,7 @@ export default function BasketballPage({ params }: { params: { deviceId: string 
   const [timerRunning, setTimerRunning] = useState(false);
   const [timerLastUpdated, setTimerLastUpdated] = useState(Date.now());
   const [timerNow, setTimerNow] = useState(Date.now());
-  const [previewMode, setPreviewMode] = useState<'regular' | 'advanced'>('regular');
+  const [previewMode, setPreviewMode] = useState<BasketballPreviewMode>('regular');
 
   useEffect(() => {
     void fetchDevice();
@@ -214,12 +216,12 @@ export default function BasketballPage({ params }: { params: { deviceId: string 
     setTimerNow(timerState.lastUpdated);
   };
 
-  const buildBasketballMode = (mode = previewMode): DeviceMode => ({
+  const buildBasketballMode = (mode: BasketballPreviewMode = previewMode): DeviceMode => ({
     type: 'basketball',
-    subMode: mode === 'regular' ? 'shot-clock-only' : 'advanced',
+    subMode: mode === 'regular' ? 'shot-clock-only' : mode,
   });
 
-  const switchPreviewMode = (mode: 'regular' | 'advanced') => {
+  const switchPreviewMode = (mode: BasketballPreviewMode) => {
     setPreviewMode(mode);
     void sendCommand('set_mode', { mode: buildBasketballMode(mode) });
   };
@@ -274,11 +276,15 @@ export default function BasketballPage({ params }: { params: { deviceId: string 
           <div>
             <div className="text-xs font-bold uppercase tracking-[0.22em] text-gray-500">Shot Clock Preview</div>
             <p className="mt-1 text-sm text-gray-400">
-              {previewMode === 'advanced' ? 'Mirrors the current Pi display layout.' : 'Large countdown-only view.'}
+              {previewMode === 'regular'
+                ? 'Large countdown-only view.'
+                : previewMode === 'scoreboard'
+                  ? 'Score-first view with a compact shot clock.'
+                  : 'Mirrors the current Pi display layout.'}
             </p>
           </div>
           <div className="flex rounded-lg border border-white/10 bg-black/30 p-1">
-            {(['regular', 'advanced'] as const).map((mode) => (
+            {(['regular', 'advanced', 'scoreboard'] as const).map((mode) => (
               <button
                 key={mode}
                 type="button"
@@ -297,6 +303,16 @@ export default function BasketballPage({ params }: { params: { deviceId: string 
 
         {previewMode === 'advanced' ? (
           <AdvancedBasketballPreview
+            shotClockText={displayedShotClockText}
+            gameClock={displayedGameClock}
+            homeScore={homeScore}
+            awayScore={awayScore}
+            period={period}
+            isRunning={timerRunning}
+            shotClockTone={shotClockTone}
+          />
+        ) : previewMode === 'scoreboard' ? (
+          <ScoreboardBasketballPreview
             shotClockText={displayedShotClockText}
             gameClock={displayedGameClock}
             homeScore={homeScore}
@@ -529,6 +545,64 @@ function AdvancedBasketballPreview({
             <span className="text-5xl font-black tabular-nums text-blue-500">{awayScore}</span>
             <span className="text-lg font-bold text-blue-400">A</span>
           </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ScoreboardBasketballPreview({
+  shotClockText,
+  gameClock,
+  homeScore,
+  awayScore,
+  period,
+  isRunning,
+  shotClockTone,
+}: {
+  shotClockText: string;
+  gameClock: number;
+  homeScore: number;
+  awayScore: number;
+  period: number;
+  isRunning: boolean;
+  shotClockTone: string;
+}) {
+  return (
+    <div className="rounded-2xl border-4 border-gray-700 bg-black p-4 shadow-inner shadow-black/60">
+      <div className="mx-auto grid aspect-[4/3] max-h-[28rem] min-h-[20rem] w-full max-w-[38rem] grid-rows-[16%_16%_46%_22%] overflow-hidden rounded-xl border-2 border-gray-800 bg-black px-4 py-3 font-mono text-white">
+        <div className="grid min-h-0 grid-cols-[1fr_auto_1fr] items-center gap-3 overflow-hidden leading-none">
+          <div className="text-2xl font-black text-gray-400">P{period}</div>
+          <div className="text-5xl font-black tabular-nums text-white">{formatGameClock(gameClock)}</div>
+          <div className={`text-right text-2xl font-black ${isRunning ? 'text-green-500' : 'text-yellow-500'}`}>
+            {isRunning ? 'RUN' : 'HOLD'}
+          </div>
+        </div>
+
+        <div className="grid min-h-0 grid-cols-[1fr_auto_1fr] items-center gap-2 overflow-hidden leading-none">
+          <div className="text-center text-2xl font-black uppercase text-red-400">Home</div>
+          <div className="text-xl font-black text-gray-700">-</div>
+          <div className="text-center text-2xl font-black uppercase text-blue-400">Away</div>
+        </div>
+
+        <div className="grid min-h-0 grid-cols-[1fr_auto_1fr] items-center gap-3 overflow-hidden leading-none">
+          <div className="flex min-w-0 items-center justify-center overflow-hidden text-[9rem] font-black tabular-nums text-red-500">
+            {homeScore}
+          </div>
+          <div className="text-5xl font-black text-gray-700">-</div>
+          <div className="flex min-w-0 items-center justify-center overflow-hidden text-[9rem] font-black tabular-nums text-blue-500">
+            {awayScore}
+          </div>
+        </div>
+
+        <div className="grid min-h-0 grid-cols-[1fr_auto_1fr] items-center gap-3 overflow-hidden leading-none">
+          <div className="h-[2px] bg-gray-800" />
+          <div className="flex h-full min-w-36 items-center justify-center overflow-hidden border-2 border-gray-700 px-4">
+            <div className={`translate-y-[0.04em] text-6xl font-black tabular-nums ${shotClockTone}`}>
+              {shotClockText}
+            </div>
+          </div>
+          <div className="h-[2px] bg-gray-800" />
         </div>
       </div>
     </div>
