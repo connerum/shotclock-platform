@@ -248,9 +248,13 @@ ps aux | grep chromium
 2. Verify pairing code hasn't expired
 3. Check firewall settings
 
+For intermittent WiFi drops or kiosk `Offline Mode` events, capture agent, NetworkManager, kernel, and local API logs with [pi-network-offline-debugging.md](./pi-network-offline-debugging.md).
+
 ## Next Steps
 
 - See [pi-setup.md](./pi-setup.md) for detailed Pi setup
+- See [pi-network-offline-debugging.md](./pi-network-offline-debugging.md) for intermittent WiFi/offline diagnostics
+- See [pi-embedded-power-smoothing.md](./pi-embedded-power-smoothing.md) for embedded Pi 5 power mitigation and validation
 - See [captive-portal.md](./captive-portal.md) for portal flow
 - See [remote-updates.md](./remote-updates.md) for firmware updates
 - See [controller-abstraction.md](./controller-abstraction.md) for display profiles

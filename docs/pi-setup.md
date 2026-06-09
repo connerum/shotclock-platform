@@ -11,6 +11,8 @@ Detailed setup instructions for deploying Shotclock on Raspberry Pi.
 
 ## Raspberry Pi OS Setup
 
+For intermittent WiFi drops or kiosk `Offline Mode` events after deployment, see [Raspberry Pi Network And Offline Debugging](./pi-network-offline-debugging.md).
+
 ### 1. Flash the OS
 
 Use Raspberry Pi Imager and choose Raspberry Pi OS with Desktop for display units. Raspberry Pi OS Lite can run the agent, but the Chromium kiosk expects an active graphical desktop session on the HDMI output.
