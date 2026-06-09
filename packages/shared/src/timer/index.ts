@@ -44,7 +44,7 @@ export function normalizeTimerState(state: Partial<TimerState> | null | undefine
     ...(state?.awaySets !== undefined ? { awaySets: clampSeconds(state.awaySets, 0) } : {}),
     period: clampSeconds(state?.period ?? fallback.period ?? 1, 1, 99),
     shotClock: clampDurationSeconds(state?.shotClock ?? fallback.shotClock, 0, MAX_SHOT_CLOCK_SECONDS),
-    gameClock: clampSeconds(state?.gameClock ?? fallback.gameClock, 0, MAX_GAME_CLOCK_SECONDS),
+    gameClock: clampDurationSeconds(state?.gameClock ?? fallback.gameClock, 0, MAX_GAME_CLOCK_SECONDS),
     isRunning: Boolean(state?.isRunning),
     isPaused: Boolean(state?.isPaused),
     lastUpdated: typeof state?.lastUpdated === 'number' && Number.isFinite(state.lastUpdated)

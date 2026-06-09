@@ -11,7 +11,7 @@ import type {
   DeviceCommandAck,
   PresentationOverlay,
 } from '@shotclock/shared/types';
-import { pauseTimerState, rebaseTimerStateToLocalClock } from '@shotclock/shared/timer';
+import { rebaseTimerStateToLocalClock } from '@shotclock/shared/timer';
 import { loadIdentity, markAsPaired, isPaired } from './identity.js';
 import { loadState, saveState, setConfigPreview } from './state-store.js';
 import { saveConfig } from './config-store.js';
@@ -278,21 +278,9 @@ export function reconnectSocketClient(): void {
 }
 
 function resolveIncomingTimerState(
-  currentTimerState: ReturnType<typeof loadState>['timerState'],
+  _currentTimerState: ReturnType<typeof loadState>['timerState'],
   incomingTimerState: Parameters<typeof rebaseTimerStateToLocalClock>[0]
 ) {
-  if ((incomingTimerState.mode === 'pause' || incomingTimerState.isPaused) && currentTimerState?.isRunning) {
-    const pausedState = pauseTimerState(currentTimerState);
-    return rebaseTimerStateToLocalClock({
-      ...pausedState,
-      homeScore: incomingTimerState.homeScore,
-      awayScore: incomingTimerState.awayScore,
-      ...(incomingTimerState.homeSets !== undefined ? { homeSets: incomingTimerState.homeSets } : {}),
-      ...(incomingTimerState.awaySets !== undefined ? { awaySets: incomingTimerState.awaySets } : {}),
-      period: incomingTimerState.period ?? pausedState.period,
-    });
-  }
-
   return rebaseTimerStateToLocalClock(incomingTimerState);
 }
 

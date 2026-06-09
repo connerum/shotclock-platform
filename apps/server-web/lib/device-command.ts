@@ -274,95 +274,13 @@ export async function resetDeviceRecordAfterFactoryReset(deviceId: string): Prom
   });
 }
 
-export async function resolveTimerCommandState(deviceId: string, incomingState: TimerState): Promise<TimerState> {
-  if (incomingState.mode !== 'pause' && !incomingState.isPaused) {
-    return rebaseTimerStateToLocalClock(incomingState);
-  }
-
-  const previousState = await loadPersistedTimerState(deviceId);
-  if (!previousState?.isRunning) {
-    return rebaseTimerStateToLocalClock(incomingState);
-  }
-
-  const pausedState = pauseTimerState(previousState);
-  return rebaseTimerStateToLocalClock({
-    ...pausedState,
-    homeScore: incomingState.homeScore,
-    awayScore: incomingState.awayScore,
-    homeTimeouts: incomingState.homeTimeouts,
-    awayTimeouts: incomingState.awayTimeouts,
-    ...(incomingState.homeSets !== undefined ? { homeSets: incomingState.homeSets } : {}),
-    ...(incomingState.awaySets !== undefined ? { awaySets: incomingState.awaySets } : {}),
-    period: incomingState.period ?? pausedState.period,
-  });
-}
-
-async function loadPersistedTimerState(deviceId: string): Promise<TimerState | null> {
-  try {
-    const device = await prisma.device.findUnique({
-      where: { deviceId },
-      select: {
-        displayState: true,
-        state: {
-          select: {
-            timerState: true,
-          },
-        },
-      },
-    });
-
-    const cachedDisplayState = device?.displayState ? JSON.parse(device.displayState) : null;
-    const cachedTimerState = cachedDisplayState?.timerState as TimerState | null | undefined;
-    const relationTimerState = device?.state?.timerState
-      ? JSON.parse(device.state.timerState) as TimerState
-      : null;
-
-    return getNewestTimerState(relationTimerState, cachedTimerState);
-  } catch (error) {
-    console.warn(`Unable to load persisted timer state for ${deviceId}`, error);
-    return null;
-  }
-}
-
-function getNewestTimerState(
-  first: TimerState | null | undefined,
-  second: TimerState | null | undefined
-): TimerState | null {
-  if (!first) return second || null;
-  if (!second) return first;
-
-  const firstUpdated = typeof first.lastUpdated === 'number' ? first.lastUpdated : 0;
-  const secondUpdated = typeof second.lastUpdated === 'number' ? second.lastUpdated : 0;
-  return secondUpdated > firstUpdated ? second : first;
+export async function resolveTimerCommandState(_deviceId: string, incomingState: TimerState): Promise<TimerState> {
+  return rebaseTimerStateToLocalClock(incomingState);
 }
 
 function rebaseTimerStateToLocalClock(state: TimerState, now = Date.now()): TimerState {
   return {
     ...state,
     lastUpdated: now,
-  };
-}
-
-function pauseTimerState(state: TimerState, now = Date.now()): TimerState {
-  const projected = projectTimerState(state, now);
-
-  return {
-    ...projected,
-    mode: 'pause',
-    isRunning: false,
-    isPaused: true,
-    lastUpdated: now,
-  };
-}
-
-function projectTimerState(state: TimerState, now = Date.now()): TimerState {
-  if (!state.isRunning) return state;
-
-  const elapsedSeconds = Math.max(0, (now - state.lastUpdated) / 1000);
-
-  return {
-    ...state,
-    shotClock: Math.round(Math.max(0, state.shotClock - elapsedSeconds) * 100) / 100,
-    gameClock: Math.max(0, Math.floor(state.gameClock - elapsedSeconds)),
   };
 }
