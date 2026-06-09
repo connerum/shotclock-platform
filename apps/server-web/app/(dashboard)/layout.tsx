@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { isSuperUser, requireUser } from '@/lib/auth';
+import { SelectedDevicesProvider } from './SelectedDevicesProvider';
 
 export default async function DashboardLayout({
   children,
@@ -57,7 +58,9 @@ export default async function DashboardLayout({
           </div>
         </div>
       </nav>
-      <main className="max-w-7xl mx-auto px-4 py-8">{children}</main>
+      <main className="max-w-7xl mx-auto px-4 py-8">
+        <SelectedDevicesProvider>{children}</SelectedDevicesProvider>
+      </main>
     </div>
   );
 }

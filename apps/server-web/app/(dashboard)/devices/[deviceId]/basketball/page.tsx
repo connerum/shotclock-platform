@@ -15,6 +15,7 @@ import {
   stopTimerState,
 } from '@shotclock/shared/timer';
 import GamePresentationControls from '../GamePresentationControls';
+import { SyncTargetBanner, useDeviceCommandDispatcher } from '../../../SelectedDevicesProvider';
 
 type BasketballPreviewMode = 'regular' | 'advanced' | 'scoreboard';
 
@@ -65,6 +66,7 @@ export default function BasketballPage({ params }: { params: { deviceId: string 
   const [homeColor, setHomeColor] = useState(DEFAULT_HOME_COLOR);
   const [awayColor, setAwayColor] = useState(DEFAULT_AWAY_COLOR);
   const [uploadingLogo, setUploadingLogo] = useState<'home' | 'away' | null>(null);
+  const { sendCommand: dispatchCommand } = useDeviceCommandDispatcher(deviceId);
 
   useEffect(() => {
     void fetchDevice();
@@ -135,14 +137,9 @@ export default function BasketballPage({ params }: { params: { deviceId: string 
   const sendCommand = async (type: string, payload?: unknown) => {
     setCommandError(null);
     try {
-      const res = await fetch(`/api/devices/${deviceId}/command`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type, payload }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        const message = data?.error || `Command failed with HTTP ${res.status}`;
+      const { response, data } = await dispatchCommand(type, payload);
+      if (!response.ok) {
+        const message = data?.error || `Command failed with HTTP ${response.status}`;
         setCommandError(message);
         return false;
       }
@@ -365,6 +362,7 @@ export default function BasketballPage({ params }: { params: { deviceId: string 
             {commandError}
           </div>
         )}
+        <SyncTargetBanner deviceId={deviceId} />
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div>
             <h1 className="text-2xl font-bold md:text-3xl">Basketball Controls</h1>

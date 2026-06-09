@@ -11,6 +11,7 @@ import {
   stopTimerState,
 } from '@shotclock/shared/timer';
 import GamePresentationControls from './GamePresentationControls';
+import { SyncTargetBanner, useDeviceCommandDispatcher } from '../../SelectedDevicesProvider';
 
 const DEFAULT_HOME_COLOR = '#ef4444';
 const DEFAULT_AWAY_COLOR = '#3b82f6';
@@ -63,6 +64,7 @@ export default function SportControlPage({ deviceId, config }: { deviceId: strin
   const [awayColor, setAwayColor] = useState(() => getDefaultAwayColor(config.sport));
   const [volleyballTopDisplay, setVolleyballTopDisplay] = useState<VolleyballTopDisplay>('empty');
   const [mediaAssets, setMediaAssets] = useState<DeviceMediaAsset[]>([]);
+  const { sendCommand: dispatchCommand } = useDeviceCommandDispatcher(deviceId);
 
   useEffect(() => {
     const fetchDevice = async () => {
@@ -153,12 +155,7 @@ export default function SportControlPage({ deviceId, config }: { deviceId: strin
 
   const sendCommand = async (type: string, payload?: unknown) => {
     setCommandError(null);
-    const response = await fetch(`/api/devices/${deviceId}/command`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ type, payload }),
-    });
-    const data = await response.json().catch(() => ({}));
+    const { response, data } = await dispatchCommand(type, payload);
     if (!response.ok) {
       setCommandError(data?.error || `Command failed with HTTP ${response.status}`);
       return false;
@@ -244,6 +241,8 @@ export default function SportControlPage({ deviceId, config }: { deviceId: strin
           {commandError}
         </div>
       )}
+
+      <SyncTargetBanner deviceId={deviceId} />
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <div className="cc-card p-5">

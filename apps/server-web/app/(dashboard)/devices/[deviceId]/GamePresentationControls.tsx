@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import type { PresentationOverlay, PresentationOverlayAccent, PresentationOverlayType } from '@shotclock/shared/types';
+import { useDeviceCommandDispatcher } from '../../SelectedDevicesProvider';
 
 type MediaSlot = 'ads' | 'logo' | 'sponsor' | 'team-intro' | 'music';
 
@@ -144,6 +145,7 @@ export default function GamePresentationControls({ deviceId }: { deviceId: strin
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [mediaAssets, setMediaAssets] = useState<DeviceMediaAsset[]>([]);
+  const { activeTargetDeviceIds, isSyncActive, sendCommand } = useDeviceCommandDispatcher(deviceId);
 
   useEffect(() => {
     const fetchMediaAssets = async () => {
@@ -209,19 +211,16 @@ export default function GamePresentationControls({ deviceId }: { deviceId: strin
     setErrorMessage(null);
 
     try {
-      const response = await fetch(`/api/devices/${deviceId}/command`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type: 'presentation', payload: { overlay } }),
-      });
-      const data = await response.json().catch(() => ({}));
+      const { response, data } = await sendCommand('presentation', { overlay });
 
       if (!response.ok) {
         setErrorMessage(data?.error || `Command failed with HTTP ${response.status}`);
         return;
       }
 
-      setStatusMessage(`${label} sent to display`);
+      setStatusMessage(isSyncActive
+        ? `${label} sent to ${activeTargetDeviceIds.length} displays`
+        : `${label} sent to display`);
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : 'Command failed');
     } finally {

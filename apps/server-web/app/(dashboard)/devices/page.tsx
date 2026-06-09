@@ -4,6 +4,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { useSelectedDevices } from '../SelectedDevicesProvider';
 
 interface Device {
   id: string;
@@ -21,6 +22,13 @@ export default function DevicesPage() {
   const [devices, setDevices] = useState<Device[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const {
+    selectedDeviceIds,
+    isHydrated,
+    isSelected,
+    setDeviceSelected,
+    clearSelection,
+  } = useSelectedDevices();
 
   useEffect(() => {
     fetchDevices();
@@ -64,6 +72,14 @@ export default function DevicesPage() {
     if (minutes < 1440) return `${Math.floor(minutes / 60)}h ago`;
     return date.toLocaleDateString();
   };
+
+  const selectedDeviceDetails = selectedDeviceIds.map((deviceId) => {
+    const device = devices.find((item) => item.deviceId === deviceId);
+    return {
+      deviceId,
+      name: device?.name || 'Unknown display',
+    };
+  });
 
   if (loading) {
     return (
@@ -113,12 +129,42 @@ export default function DevicesPage() {
           </Link>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <>
+        {isHydrated && selectedDeviceDetails.length > 0 && (
+          <section className="mb-6 rounded-lg border border-blue-500/30 bg-blue-950/35 p-4">
+            <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+              <div>
+                <h2 className="text-base font-bold text-blue-100">
+                  {selectedDeviceDetails.length} display{selectedDeviceDetails.length === 1 ? '' : 's'} selected for sync
+                </h2>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {selectedDeviceDetails.map((device) => (
+                    <span
+                      key={device.deviceId}
+                      className="rounded-full border border-blue-400/30 bg-blue-900/45 px-3 py-1 text-xs font-semibold text-blue-100"
+                    >
+                      {device.name}
+                      <span className="ml-2 font-mono text-blue-200">{device.deviceId}</span>
+                    </span>
+                  ))}
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={clearSelection}
+                className="cc-btn cc-btn-secondary w-fit px-3 py-2 text-sm"
+              >
+                Clear Selection
+              </button>
+            </div>
+          </section>
+        )}
+
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
           {devices.map((device) => (
-            <Link
+            <div
               key={device.id}
-              href={`/devices/${device.deviceId}`}
-              className="cc-card cc-card-hover p-6"
+              className={`cc-card p-6 ${isSelected(device.deviceId) ? 'ring-2 ring-blue-500/60' : ''}`}
             >
               <div className="flex justify-between items-start mb-4">
                 <div>
@@ -132,6 +178,16 @@ export default function DevicesPage() {
                   {device.status}
                 </span>
               </div>
+
+              <label className="mb-4 flex cursor-pointer items-center gap-3 rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2">
+                <input
+                  type="checkbox"
+                  checked={isSelected(device.deviceId)}
+                  onChange={(event) => setDeviceSelected(device.deviceId, event.target.checked)}
+                  className="h-5 w-5 accent-blue-600"
+                />
+                <span className="text-sm font-semibold text-gray-200">Select for sync</span>
+              </label>
               
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between">
@@ -155,9 +211,17 @@ export default function DevicesPage() {
                   </div>
                 )}
               </div>
-            </Link>
+
+              <Link
+                href={`/devices/${device.deviceId}`}
+                className="cc-btn cc-btn-primary mt-5 w-full px-4 py-2 text-sm"
+              >
+                Open Controls
+              </Link>
+            </div>
           ))}
         </div>
+        </>
       )}
     </div>
   );

@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import type { DeviceMode, SportType } from '@shotclock/shared/types';
+import { SyncTargetBanner, useDeviceCommandDispatcher } from '../../SelectedDevicesProvider';
 
 interface Device {
   deviceId: string;
@@ -59,6 +60,7 @@ export default function DeviceSportPage({ params }: { params: { deviceId: string
   const [error, setError] = useState<string | null>(null);
   const [commandError, setCommandError] = useState<string | null>(null);
   const [selectingSport, setSelectingSport] = useState<SportType | null>(null);
+  const { sendCommand } = useDeviceCommandDispatcher(deviceId);
 
   useEffect(() => {
     const fetchDevice = async () => {
@@ -89,12 +91,7 @@ export default function DeviceSportPage({ params }: { params: { deviceId: string
     const modePayload: DeviceMode = { type: mode };
 
     try {
-      const response = await fetch(`/api/devices/${deviceId}/command`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type: 'set_mode', payload: { mode: modePayload } }),
-      });
-      const data = await response.json().catch(() => ({}));
+      const { response, data } = await sendCommand('set_mode', { mode: modePayload });
       if (!response.ok) {
         throw new Error(data?.error || `Unable to switch display to ${mode}`);
       }
@@ -151,6 +148,8 @@ export default function DeviceSportPage({ params }: { params: { deviceId: string
           {commandError}
         </div>
       )}
+
+      <SyncTargetBanner deviceId={deviceId} />
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
         {SPORTS.map((sport) => (

@@ -1,0 +1,303 @@
+// POST /api/devices/sync-command → dispatch game commands to selected devices in sync
+// Commands: set_mode, set_timer, presentation
+
+import { NextRequest, NextResponse } from 'next/server';
+import { prisma } from '@/lib/prisma';
+import { getServerIO } from '@/lib/socket';
+import { canAccessDevice, requireApiUser } from '@/lib/auth';
+import type { DeviceMode, TimerState } from '@shotclock/shared/types';
+import type { DeviceCommandResult, GameCommandType } from '@/lib/device-command';
+import {
+  emitDeviceCommandToDevice,
+  getConnectedDeviceSocketCount,
+  markDeviceOffline,
+  normalizePresentationOverlay,
+  persistDisplayMode,
+  persistPresentationOverlay,
+  persistTimerCommand,
+  resolveTimerCommandState,
+} from '@/lib/device-command';
+
+const GAME_COMMAND_TYPES = new Set<GameCommandType>(['set_mode', 'set_timer', 'presentation']);
+const SYNC_MODE_TYPES = new Set(['basketball', 'wrestling', 'volleyball', 'shot-clock']);
+
+export async function POST(request: NextRequest) {
+  try {
+    const auth = await requireApiUser();
+    if (auth instanceof Response) return auth;
+
+    const body = await request.json().catch(() => null);
+    if (!body || typeof body !== 'object') {
+      return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
+    }
+
+    const {
+      primaryDeviceId,
+      targetDeviceIds: rawTargetDeviceIds,
+      type,
+      payload,
+    } = body as {
+      primaryDeviceId?: unknown;
+      targetDeviceIds?: unknown;
+      type?: unknown;
+      payload?: unknown;
+    };
+
+    if (typeof primaryDeviceId !== 'string' || !primaryDeviceId.trim()) {
+      return NextResponse.json({ error: 'Missing required field: primaryDeviceId' }, { status: 400 });
+    }
+
+    if (!isGameCommandType(type)) {
+      return NextResponse.json({ error: `Invalid sync command type: ${String(type || '')}` }, { status: 400 });
+    }
+
+    const targetDeviceIds = normalizeTargetDeviceIds(rawTargetDeviceIds);
+    if (targetDeviceIds.length === 0) {
+      return NextResponse.json({ error: 'At least one targetDeviceId is required' }, { status: 400 });
+    }
+
+    if (!targetDeviceIds.includes(primaryDeviceId)) {
+      return NextResponse.json(
+        { error: 'primaryDeviceId must be included in targetDeviceIds' },
+        { status: 400 }
+      );
+    }
+
+    const devices = await prisma.device.findMany({
+      where: { deviceId: { in: targetDeviceIds } },
+      select: { deviceId: true, ownerUserId: true },
+    });
+    const foundDeviceIds = new Set(devices.map((device) => device.deviceId));
+    const missingDeviceIds = targetDeviceIds.filter((deviceId) => !foundDeviceIds.has(deviceId));
+
+    if (missingDeviceIds.length > 0 || devices.some((device) => !canAccessDevice(auth, device))) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'One or more selected devices were not found',
+          missingDeviceIds,
+        },
+        { status: 404 }
+      );
+    }
+
+    const io = getServerIO();
+    if (!io) {
+      return NextResponse.json(
+        { success: false, error: 'Socket.IO server not available' },
+        { status: 503 }
+      );
+    }
+
+    const deviceNamespace = io.of('/device');
+    const disconnectedDeviceIds = targetDeviceIds.filter((deviceId) => {
+      return getConnectedDeviceSocketCount(deviceNamespace, deviceId) === 0;
+    });
+
+    if (disconnectedDeviceIds.length > 0) {
+      await Promise.all(disconnectedDeviceIds.map((deviceId) => markDeviceOffline(deviceId)));
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'One or more selected devices are not connected',
+          disconnectedDeviceIds,
+          results: targetDeviceIds.map((deviceId) => ({
+            deviceId,
+            success: false,
+            error: disconnectedDeviceIds.includes(deviceId)
+              ? 'Device is not connected'
+              : 'Command was not dispatched because another selected device is offline',
+          })),
+        },
+        { status: 409 }
+      );
+    }
+
+    switch (type) {
+      case 'set_mode': {
+        const mode = getSyncDeviceMode((payload as any)?.mode);
+        if (!mode) {
+          return NextResponse.json(
+            { success: false, error: 'Missing or invalid game mode for synchronized set_mode command' },
+            { status: 400 }
+          );
+        }
+
+        const results = await emitToTargets(deviceNamespace, targetDeviceIds, 'mode:set', mode);
+        await persistDisplayModesForSuccessfulResults(results, mode);
+
+        if (hasFailedResult(results)) {
+          return commandResultsError(type, primaryDeviceId, targetDeviceIds, results);
+        }
+
+        return commandResultsSuccess(type, primaryDeviceId, targetDeviceIds, results);
+      }
+
+      case 'set_timer': {
+        const rawTimerState = (payload as any)?.timerState as TimerState | undefined;
+        if (!rawTimerState) {
+          return NextResponse.json(
+            { success: false, error: 'Missing timerState for synchronized set_timer command' },
+            { status: 400 }
+          );
+        }
+
+        const displayMode = getSyncDeviceMode((payload as any)?.mode) || { type: 'basketball' };
+        const timerState = await resolveTimerCommandState(primaryDeviceId, rawTimerState);
+        const modeResults = await emitToTargets(deviceNamespace, targetDeviceIds, 'mode:set', displayMode);
+        await persistDisplayModesForSuccessfulResults(modeResults, displayMode);
+
+        if (hasFailedResult(modeResults)) {
+          return commandResultsError(
+            type,
+            primaryDeviceId,
+            targetDeviceIds,
+            modeResults.map((result) => result.success
+              ? {
+                  deviceId: result.deviceId,
+                  success: false,
+                  error: 'Timer state was not dispatched because another selected device did not acknowledge mode:set',
+                }
+              : result)
+          );
+        }
+
+        const stateResults = await emitToTargets(deviceNamespace, targetDeviceIds, 'state:update', timerState);
+        const displayState = {
+          mode: displayMode.type,
+          deviceMode: displayMode,
+          timerState,
+          mediaAssetId: null,
+        };
+        await Promise.all(stateResults
+          .filter((result) => result.success)
+          .map((result) => persistTimerCommand(result.deviceId, displayState)));
+
+        if (hasFailedResult(stateResults)) {
+          return commandResultsError(type, primaryDeviceId, targetDeviceIds, stateResults);
+        }
+
+        return commandResultsSuccess(type, primaryDeviceId, targetDeviceIds, stateResults);
+      }
+
+      case 'presentation': {
+        const overlay = normalizePresentationOverlay((payload as any)?.overlay);
+        if (!overlay) {
+          return NextResponse.json(
+            { success: false, error: 'Missing or invalid presentation overlay' },
+            { status: 400 }
+          );
+        }
+
+        const results = await emitToTargets(deviceNamespace, targetDeviceIds, 'presentation:show', overlay);
+        await Promise.all(results
+          .filter((result) => result.success)
+          .map((result) => persistPresentationOverlay(result.deviceId, overlay)));
+
+        if (hasFailedResult(results)) {
+          return commandResultsError(type, primaryDeviceId, targetDeviceIds, results);
+        }
+
+        return commandResultsSuccess(type, primaryDeviceId, targetDeviceIds, results);
+      }
+    }
+
+    return NextResponse.json(
+      { success: false, error: `Invalid sync command type: ${String(type)}` },
+      { status: 400 }
+    );
+  } catch (error) {
+    console.error('Error dispatching synchronized command:', error);
+    return NextResponse.json(
+      { success: false, error: 'Failed to dispatch synchronized command' },
+      { status: 500 }
+    );
+  }
+}
+
+function normalizeTargetDeviceIds(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+
+  const seen = new Set<string>();
+  const normalized: string[] = [];
+  value.forEach((deviceId) => {
+    if (typeof deviceId !== 'string') return;
+    const trimmed = deviceId.trim();
+    if (!trimmed || seen.has(trimmed)) return;
+    seen.add(trimmed);
+    normalized.push(trimmed);
+  });
+
+  return normalized;
+}
+
+function isGameCommandType(value: unknown): value is GameCommandType {
+  return typeof value === 'string' && GAME_COMMAND_TYPES.has(value as GameCommandType);
+}
+
+function getSyncDeviceMode(value: unknown): DeviceMode | null {
+  if (!value || typeof value !== 'object') return null;
+  const mode = value as Partial<DeviceMode>;
+  if (typeof mode.type !== 'string' || !SYNC_MODE_TYPES.has(mode.type)) return null;
+  return mode as DeviceMode;
+}
+
+function emitToTargets(
+  deviceNamespace: any,
+  targetDeviceIds: string[],
+  event: string,
+  payload?: unknown
+): Promise<DeviceCommandResult[]> {
+  return Promise.all(
+    targetDeviceIds.map((deviceId) => emitDeviceCommandToDevice(deviceNamespace, deviceId, event, payload))
+  );
+}
+
+async function persistDisplayModesForSuccessfulResults(
+  results: DeviceCommandResult[],
+  mode: DeviceMode
+): Promise<void> {
+  await Promise.all(results
+    .filter((result) => result.success)
+    .map((result) => persistDisplayMode(result.deviceId, mode)));
+}
+
+function hasFailedResult(results: DeviceCommandResult[]): boolean {
+  return results.some((result) => !result.success);
+}
+
+function commandResultsSuccess(
+  command: GameCommandType,
+  primaryDeviceId: string,
+  targetDeviceIds: string[],
+  results: DeviceCommandResult[]
+) {
+  return NextResponse.json({
+    success: true,
+    command,
+    primaryDeviceId,
+    targetDeviceIds,
+    results,
+    dispatchedAt: new Date().toISOString(),
+  });
+}
+
+function commandResultsError(
+  command: GameCommandType,
+  primaryDeviceId: string,
+  targetDeviceIds: string[],
+  results: DeviceCommandResult[]
+) {
+  return NextResponse.json(
+    {
+      success: false,
+      command,
+      primaryDeviceId,
+      targetDeviceIds,
+      results,
+      error: 'One or more selected devices did not acknowledge the synchronized command',
+      dispatchedAt: new Date().toISOString(),
+    },
+    { status: 504 }
+  );
+}
