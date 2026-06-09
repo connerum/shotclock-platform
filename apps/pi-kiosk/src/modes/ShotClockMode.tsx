@@ -53,14 +53,13 @@ export default function ShotClockMode({ state }: ShotClockModeProps) {
   }, now) : null;
 
   const shotClock = projectedTimerState?.shotClock ?? DEFAULT_SHOT_CLOCK_SECONDS;
-  const gameClock = Math.floor(projectedTimerState?.gameClock ?? 720);
+  const isRunning = projectedTimerState?.isRunning ?? false;
+  const gameClock = getDisplayGameClock(projectedTimerState?.gameClock ?? 720, isRunning);
   const homeScore = projectedTimerState?.homeScore ?? 0;
   const awayScore = projectedTimerState?.awayScore ?? 0;
   const homeTimeouts = projectedTimerState?.homeTimeouts ?? 0;
   const awayTimeouts = projectedTimerState?.awayTimeouts ?? 0;
   const period = projectedTimerState?.period ?? 1;
-  const isRunning = projectedTimerState?.isRunning ?? false;
-
   const formatGameClock = (seconds: number): string => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
@@ -234,4 +233,9 @@ function normalizeScoreboardLabel(value: string | undefined, fallback: string): 
 
 function isHexColor(value: string | undefined): value is string {
   return Boolean(value && /^#[0-9a-fA-F]{6}$/.test(value));
+}
+
+function getDisplayGameClock(value: number, isRunning: boolean): number {
+  const clampedValue = Math.max(0, value);
+  return isRunning ? Math.ceil(clampedValue) : Math.floor(clampedValue);
 }

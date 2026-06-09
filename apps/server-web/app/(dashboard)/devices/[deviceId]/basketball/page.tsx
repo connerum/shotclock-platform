@@ -167,7 +167,7 @@ export default function BasketballPage({ params }: { params: { deviceId: string 
 
   const projectedTimerState = projectPreciseTimerState(buildCurrentTimerState(), timerNow);
   const displayedShotClock = projectedTimerState.shotClock;
-  const displayedGameClock = Math.floor(projectedTimerState.gameClock);
+  const displayedGameClock = getDisplayGameClock(projectedTimerState.gameClock, projectedTimerState.isRunning);
   const displayedShotClockText = formatShotClockDisplay(displayedShotClock);
   const shotClockStatus = timerRunning ? 'Running' : 'Stopped';
   const shotClockTone = displayedShotClock === 0
@@ -996,6 +996,11 @@ function formatGameClock(seconds: number): string {
   const mins = Math.floor(seconds / 60);
   const secs = seconds % 60;
   return `${mins}:${secs.toString().padStart(2, '0')}`;
+}
+
+function getDisplayGameClock(value: number, isRunning: boolean): number {
+  const clampedValue = Math.max(0, value);
+  return isRunning ? Math.ceil(clampedValue) : Math.floor(clampedValue);
 }
 
 function getPreviewModeFromDeviceMode(mode?: DeviceMode): BasketballPreviewMode {
