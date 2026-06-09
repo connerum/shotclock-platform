@@ -9,7 +9,6 @@ import {
   createDefaultTimerState,
   DEFAULT_SHOT_CLOCK_SECONDS,
   formatShotClockDisplay,
-  pausePreciseTimerState,
   projectPreciseTimerState,
   startTimerState,
   stopTimerState,
@@ -231,7 +230,17 @@ export default function BasketballPage({ params }: { params: { deviceId: string 
   };
 
   const pauseTimer = async () => {
-    const timerState = pausePreciseTimerState(buildCurrentTimerState());
+    const now = Date.now();
+    const projectedState = projectPreciseTimerState(buildCurrentTimerState(), now);
+    const timerState: TimerState = {
+      ...projectedState,
+      shotClock: Number(formatShotClockDisplay(projectedState.shotClock)),
+      gameClock: getDisplayGameClock(projectedState.gameClock, projectedState.isRunning),
+      mode: 'pause',
+      isRunning: false,
+      isPaused: true,
+      lastUpdated: now,
+    };
     const success = await sendCommand('set_timer', { timerState, mode: buildBasketballMode() });
     if (success) {
       applyTimerState(timerState);
