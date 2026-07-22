@@ -41,6 +41,7 @@ export default function PracticeBoardPage({ params }: { params: { deviceId: stri
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [weatherLoading, setWeatherLoading] = useState(false);
+  const [uploadingLogo, setUploadingLogo] = useState(false);
   const [dirty, setDirty] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -291,6 +292,36 @@ export default function PracticeBoardPage({ params }: { params: { deviceId: stri
     }
   };
 
+  const uploadSchoolLogo = async (file: File | null) => {
+    if (!file) return;
+
+    setUploadingLogo(true);
+    setError(null);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('slot', 'practice-school-logo');
+
+      const response = await fetch(`/api/devices/${deviceId}/media`, {
+        method: 'POST',
+        body: formData,
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data?.error || `Upload failed with HTTP ${response.status}`);
+
+      const schoolLogoUrl = getPublicMediaUrl(data.mediaAsset.url);
+      await dispatchBoard(boardWithCurrentDrills({ schoolLogoUrl }), 'School logo updated.');
+    } catch (uploadError) {
+      setError(uploadError instanceof Error ? uploadError.message : 'School logo upload failed.');
+    } finally {
+      setUploadingLogo(false);
+    }
+  };
+
+  const removeSchoolLogo = () => {
+    void dispatchBoard(boardWithCurrentDrills({ schoolLogoUrl: undefined }), 'School logo removed.');
+  };
+
   if (loading) {
     return <div className="flex h-64 items-center justify-center text-gray-400">Loading practice board...</div>;
   }
@@ -350,6 +381,47 @@ export default function PracticeBoardPage({ params }: { params: { deviceId: stri
               <div className="mt-1 text-cyan-300">Wet bulb {Math.round(board.weather.wetBulbF)}°F</div>
             </div>
           )}
+        </div>
+
+        <div className="mt-5 flex flex-col gap-4 border-t border-white/10 pt-5 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex min-w-0 items-center gap-4">
+            <div className="flex h-20 w-28 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-white/10 bg-black/25 p-2">
+              {board.schoolLogoUrl ? (
+                <img src={board.schoolLogoUrl} alt="School logo preview" className="max-h-full max-w-full object-contain" />
+              ) : (
+                <span className="text-center text-xs font-bold uppercase tracking-[0.12em] text-white/25">No logo</span>
+              )}
+            </div>
+            <div className="min-w-0">
+              <div className="text-xs font-bold uppercase tracking-[0.18em] text-gray-400">School logo</div>
+              <p className="mt-1 text-sm text-white/50">Displayed beside Today&apos;s Practice on the kiosk schedule preview.</p>
+            </div>
+          </div>
+          <div className="flex shrink-0 flex-wrap gap-2">
+            <label className={`cursor-pointer rounded-lg border border-cyan-500/35 bg-cyan-950/30 px-4 py-2.5 font-bold text-cyan-200 hover:bg-cyan-900/40 ${uploadingLogo || sending ? 'pointer-events-none opacity-50' : ''}`}>
+              {uploadingLogo ? 'Uploading...' : board.schoolLogoUrl ? 'Replace logo' : 'Upload logo'}
+              <input
+                type="file"
+                accept="image/png,image/jpeg,image/webp,image/gif,image/svg+xml"
+                disabled={uploadingLogo || sending}
+                onChange={(event) => {
+                  void uploadSchoolLogo(event.currentTarget.files?.[0] || null);
+                  event.currentTarget.value = '';
+                }}
+                className="sr-only"
+              />
+            </label>
+            {board.schoolLogoUrl && (
+              <button
+                type="button"
+                onClick={removeSchoolLogo}
+                disabled={uploadingLogo || sending}
+                className="rounded-lg border border-red-500/25 bg-red-950/20 px-4 py-2.5 font-bold text-red-200 hover:bg-red-900/30 disabled:opacity-50"
+              >
+                Remove
+              </button>
+            )}
+          </div>
         </div>
       </section>
 
@@ -599,6 +671,9 @@ function normalizeBoard(value: PracticeBoardState | undefined): PracticeBoardSta
     remainingSeconds: clampDuration(value.remainingSeconds),
     ...(typeof value.startedAt === 'number' ? { startedAt: value.startedAt } : {}),
     ...(typeof value.overviewUntil === 'number' ? { overviewUntil: value.overviewUntil } : {}),
+    ...(typeof value.schoolLogoUrl === 'string' && value.schoolLogoUrl.trim()
+      ? { schoolLogoUrl: value.schoolLogoUrl.trim().slice(0, 512) }
+      : {}),
     ...(value.weather ? { weather: value.weather } : {}),
   };
 }
@@ -688,6 +763,12 @@ function clampDuration(value: number): number {
 function formatDuration(totalSeconds: number): string {
   const safeSeconds = clampDuration(totalSeconds);
   return `${Math.floor(safeSeconds / 60)}:${(safeSeconds % 60).toString().padStart(2, '0')}`;
+}
+
+function getPublicMediaUrl(url: string) {
+  if (url.startsWith('http://') || url.startsWith('https://')) return url;
+  if (typeof window === 'undefined') return url;
+  return `${window.location.origin}${url}`;
 }
 
 function createId(): string {

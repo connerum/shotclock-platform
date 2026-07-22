@@ -42,6 +42,7 @@ export interface PracticeBoardState {
   remainingSeconds: number;
   startedAt?: number;
   overviewUntil?: number;
+  schoolLogoUrl?: string;
   weather?: PracticeBoardWeather;
 }
 

@@ -54,6 +54,7 @@ export default function PracticeBoardMode({ board }: { board?: PracticeBoardStat
             periods={periods}
             activeIndex={activeIndex}
             remainingSeconds={remainingSeconds}
+            schoolLogoUrl={board?.schoolLogoUrl}
             secondsUntilFullView={activePeriod && overviewUntil
               ? Math.max(0, Math.ceil((overviewUntil - now) / 1000))
               : null}
@@ -91,7 +92,7 @@ function StatusBar({
       </div>
 
       <div
-        className={`min-w-[16cqw] text-center text-[min(7.2cqh,5.2cqw)] font-black leading-none tracking-[-0.055em] tabular-nums ${
+        className={`min-w-[19cqw] text-center text-[min(10.2cqh,7cqw)] font-black leading-none tracking-[-0.06em] tabular-nums ${
           showPeriodTimer ? 'text-white' : 'invisible'
         }`}
         aria-hidden={!showPeriodTimer}
@@ -122,11 +123,13 @@ function ScheduleOverview({
   periods,
   activeIndex,
   remainingSeconds,
+  schoolLogoUrl,
   secondsUntilFullView,
 }: {
   periods: PracticeBoardDrill[];
   activeIndex: number;
   remainingSeconds: number;
+  schoolLogoUrl?: string;
   secondsUntilFullView: number | null;
 }) {
   if (periods.length === 0) {
@@ -145,10 +148,19 @@ function ScheduleOverview({
 
   return (
     <section className="grid min-h-0 grid-rows-[auto_1fr] gap-[1.5cqh] p-[2cqh_2cqw]">
-      <div className="flex items-end justify-between gap-[2cqw] px-[0.5cqw]">
+      <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-[2cqw] px-[0.5cqw]">
         <div>
           <div className="text-[min(2.5cqh,1.8cqw)] font-black uppercase tracking-[0.24em] text-cyan-300/65">Schedule preview</div>
           <div className="mt-[0.5cqh] text-[min(5cqh,3.6cqw)] font-black tracking-[-0.04em] text-white">Today&apos;s practice</div>
+        </div>
+        <div className="flex h-[9cqh] min-w-0 items-center justify-center">
+          {schoolLogoUrl && (
+            <img
+              src={schoolLogoUrl}
+              alt=""
+              className="max-h-full max-w-[28cqw] object-contain drop-shadow-[0_0_2cqw_rgba(255,255,255,0.10)]"
+            />
+          )}
         </div>
         {secondsUntilFullView !== null && (
           <div className="rounded-full border border-violet-300/15 bg-violet-300/[0.07] px-[2cqw] py-[1cqh] text-[min(2.5cqh,1.8cqw)] font-extrabold uppercase tracking-[0.12em] text-violet-200">
@@ -168,6 +180,7 @@ function ScheduleOverview({
           return (
             <div
               key={period.id}
+              style={{ containerType: 'size' }}
               className={`relative grid min-h-0 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-[1.8cqw] overflow-hidden rounded-[1.5cqw] border px-[1.6cqw] shadow-[inset_0_1px_0_rgba(255,255,255,0.045)] ${
                 isActive
                   ? 'border-cyan-300/35 bg-gradient-to-r from-cyan-400/[0.14] to-violet-500/[0.09]'
@@ -176,7 +189,7 @@ function ScheduleOverview({
                     : 'border-white/[0.08] bg-white/[0.045]'
               }`}
             >
-              <div className={`flex h-[min(7cqh,4.6cqw)] w-[min(7cqh,4.6cqw)] items-center justify-center rounded-[1.2cqw] text-[min(3.5cqh,2.5cqw)] font-black ${
+              <div className={`flex h-[78cqh] w-[min(78cqh,5cqw)] items-center justify-center rounded-[1.2cqw] text-[min(42cqh,2.9cqw)] font-black leading-none ${
                 isActive
                   ? 'bg-gradient-to-br from-cyan-300 to-violet-400 text-[#07101d] shadow-[0_0_22px_rgba(34,211,238,0.25)]'
                   : isComplete
@@ -186,14 +199,14 @@ function ScheduleOverview({
                 {isComplete ? '✓' : String(index + 1).padStart(2, '0')}
               </div>
               <div className="min-w-0">
-                <div className={`truncate text-[min(5.5cqh,4cqw)] font-black tracking-[-0.035em] ${isActive ? 'text-white' : ''}`}>
+                <div className={`truncate text-[min(50cqh,5cqw)] font-black leading-none tracking-[-0.04em] ${isActive ? 'text-white' : ''}`}>
                   {period.title || `Period ${index + 1}`}
                 </div>
-                <div className={`mt-[0.6cqh] text-[min(2.2cqh,1.6cqw)] font-bold uppercase tracking-[0.14em] ${isActive ? 'text-cyan-200/70' : 'text-white/25'}`}>
+                <div className={`mt-[6cqh] text-[min(19cqh,1.7cqw)] font-bold uppercase leading-none tracking-[0.12em] ${isActive ? 'text-cyan-200/70' : 'text-white/25'}`}>
                   {assignmentCount} position assignment{assignmentCount === 1 ? '' : 's'}
                 </div>
               </div>
-              <div className={`text-[min(6.2cqh,4.6cqw)] font-black tracking-[-0.04em] tabular-nums ${isActive ? 'text-cyan-100' : isComplete ? 'text-white/20' : 'text-white/85'}`}>
+              <div className={`text-[min(57cqh,5.3cqw)] font-black leading-none tracking-[-0.045em] tabular-nums ${isActive ? 'text-cyan-100' : isComplete ? 'text-white/20' : 'text-white/85'}`}>
                 {formatDuration(isActive ? remainingSeconds : period.durationSeconds)}
               </div>
             </div>
@@ -279,10 +292,13 @@ function AssignmentCard({ assignment, index }: { assignment: PracticeBoardAssign
       : 'border-sky-300/15 bg-sky-300/[0.055] text-sky-100';
 
   return (
-    <div className={`grid min-h-0 grid-cols-[18%_1px_minmax(0,1fr)] items-center gap-[2cqw] overflow-hidden rounded-[1.6cqw] border px-[2cqw] shadow-[inset_0_1px_0_rgba(255,255,255,0.045)] ${accentClasses}`}>
-      <div className="truncate text-center text-[min(5cqh,3.7cqw)] font-black tracking-[-0.04em]">{position}</div>
+    <div
+      className={`grid min-h-0 grid-cols-[18%_1px_minmax(0,1fr)] items-center gap-[2cqw] overflow-hidden rounded-[1.6cqw] border px-[2cqw] shadow-[inset_0_1px_0_rgba(255,255,255,0.045)] ${accentClasses}`}
+      style={{ containerType: 'size' }}
+    >
+      <div className="truncate text-center text-[min(74cqh,4.8cqw)] font-black leading-none tracking-[-0.045em]">{position}</div>
       <div className="h-[52%] w-px bg-white/[0.10]" />
-      <div className="truncate text-[min(4.8cqh,3.6cqw)] font-extrabold tracking-[-0.025em] text-white/90">
+      <div className="truncate text-[min(74cqh,4.6cqw)] font-black leading-none tracking-[-0.035em] text-white/95">
         {assignment.drillName || 'Assignment not entered'}
       </div>
     </div>

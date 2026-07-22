@@ -6,7 +6,7 @@ import { join } from 'path';
 import { prisma } from '@/lib/prisma';
 import { canAccessDevice, requireApiUser } from '@/lib/auth';
 
-const MEDIA_SLOTS = ['ads', 'logo', 'sponsor', 'team-intro', 'music', 'scoreboard-home-logo', 'scoreboard-away-logo'] as const;
+const MEDIA_SLOTS = ['ads', 'logo', 'sponsor', 'team-intro', 'music', 'scoreboard-home-logo', 'scoreboard-away-logo', 'practice-school-logo'] as const;
 const IMAGE_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/svg+xml'];
 const VIDEO_MIME_TYPES = ['video/mp4', 'video/webm', 'video/quicktime'];
 const AUDIO_MIME_TYPES = ['audio/mpeg', 'audio/mp3', 'audio/wav', 'audio/ogg', 'audio/mp4', 'audio/aac'];
@@ -129,7 +129,9 @@ function isMediaSlot(slot: string): slot is MediaSlot {
 }
 
 function isAllowedMimeType(slot: MediaSlot, mimeType: string) {
-  if (slot === 'scoreboard-home-logo' || slot === 'scoreboard-away-logo') return IMAGE_MIME_TYPES.includes(mimeType);
+  if (slot === 'scoreboard-home-logo' || slot === 'scoreboard-away-logo' || slot === 'practice-school-logo') {
+    return IMAGE_MIME_TYPES.includes(mimeType);
+  }
   if (slot === 'music') return AUDIO_MIME_TYPES.includes(mimeType);
   if (slot === 'team-intro') return [...VIDEO_MIME_TYPES, ...AUDIO_MIME_TYPES].includes(mimeType);
   return [...IMAGE_MIME_TYPES, ...VIDEO_MIME_TYPES].includes(mimeType);
@@ -143,6 +145,7 @@ function getSafeExtension(filename: string, mimeType: string) {
   const extension = filename.includes('.') ? filename.slice(filename.lastIndexOf('.')).toLowerCase() : '';
   if (/^\.[a-z0-9]{1,8}$/.test(extension)) return extension;
 
+  if (mimeType === 'image/jpeg') return '.jpg';
   if (mimeType === 'image/png') return '.png';
   if (mimeType === 'image/webp') return '.webp';
   if (mimeType === 'image/gif') return '.gif';
