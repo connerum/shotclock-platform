@@ -19,7 +19,7 @@ import {
 } from '@/lib/device-command';
 
 const GAME_COMMAND_TYPES = new Set<GameCommandType>(['set_mode', 'set_timer', 'presentation']);
-const SYNC_MODE_TYPES = new Set(['basketball', 'wrestling', 'volleyball', 'shot-clock']);
+const SYNC_MODE_TYPES = new Set(['basketball', 'wrestling', 'volleyball', 'practice-board', 'shot-clock']);
 
 export async function POST(request: NextRequest) {
   try {

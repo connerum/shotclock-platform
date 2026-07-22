@@ -1,7 +1,7 @@
 // Device socket event handlers with Prisma integration
 
 import type { TypedSocket, TypedServer } from '../server.js';
-import type { HelloPayload, HeartbeatPayload, UpdateStatusPayload } from '@shotclock/shared/types';
+import type { DeviceMode, HelloPayload, HeartbeatPayload, UpdateStatusPayload } from '@shotclock/shared/types';
 import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
@@ -21,6 +21,8 @@ export function setupDeviceHandlers(socket: TypedSocket, io: TypedServer): void 
       const isPaired = isDevicePaired(existingDevice) && !shouldAcceptPairingCode;
       const storedDisplayProfile = parseJsonField(existingDevice?.displayProfile);
       const storedCalibrationData = parseJsonField(existingDevice?.calibrationData);
+      const storedDisplayState = parseJsonField(existingDevice?.displayState);
+      const storedDeviceMode = getStoredDeviceMode(storedDisplayState);
       const displayProfile = withDefaultColorCorrection(storedDisplayProfile || data.displayProfile);
       const pairingCodeExp = data.pairingCodeExpiresAt
         ? new Date(data.pairingCodeExpiresAt)
@@ -86,7 +88,7 @@ export function setupDeviceHandlers(socket: TypedSocket, io: TypedServer): void 
           serverUrl,
         };
         (socket as any).emit('pairing:complete', payload);
-        (socket as any).emit('mode:set', { type: 'shot-clock' });
+        (socket as any).emit('mode:set', storedDeviceMode || { type: 'shot-clock' });
       }
     } catch (error) {
       console.error('Error handling device hello:', error);
@@ -231,6 +233,13 @@ function parseJsonField(value: string | null | undefined): any | null {
   } catch {
     return null;
   }
+}
+
+function getStoredDeviceMode(displayState: any): DeviceMode | null {
+  const mode = displayState?.deviceMode;
+  return mode && typeof mode === 'object' && typeof mode.type === 'string'
+    ? mode as DeviceMode
+    : null;
 }
 
 function withDefaultColorCorrection<T extends Record<string, any> | null>(displayProfile: T): T {

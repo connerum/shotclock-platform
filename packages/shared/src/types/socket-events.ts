@@ -7,6 +7,33 @@ export type TimerMode = 'stop' | 'run' | 'pause';
 
 export type SportType = 'basketball' | 'wrestling' | 'volleyball';
 
+export interface PracticeBoardDrill {
+  id: string;
+  title: string;
+  durationSeconds: number;
+}
+
+export type PracticeBoardTimerStatus = 'idle' | 'running' | 'paused' | 'complete';
+
+export interface PracticeBoardWeather {
+  locationLabel: string;
+  timezone: string;
+  temperatureF: number;
+  wetBulbF: number;
+  description: string;
+  weatherCode: number;
+  observedAt: string;
+}
+
+export interface PracticeBoardState {
+  drills: PracticeBoardDrill[];
+  activeDrillId?: string;
+  timerStatus: PracticeBoardTimerStatus;
+  remainingSeconds: number;
+  startedAt?: number;
+  weather?: PracticeBoardWeather;
+}
+
 export interface TimerState {
   mode: TimerMode;
   homeScore: number;
@@ -99,6 +126,7 @@ export type ModeType =
   | 'basketball'
   | 'wrestling'
   | 'volleyball'
+  | 'practice-board'
   | 'shot-clock' 
   | 'media' 
   | 'calibration' 
@@ -108,6 +136,7 @@ export interface DeviceMode {
   type: ModeType;
   subMode?: string;
   scoreboardBranding?: ScoreboardBranding;
+  practiceBoard?: PracticeBoardState;
 }
 
 export interface ScoreboardBranding {

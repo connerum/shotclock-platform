@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import type { PresentationOverlay as PresentationOverlayState, ScoreboardBranding } from '@shotclock/shared/types';
+import type { DeviceMode, PresentationOverlay as PresentationOverlayState } from '@shotclock/shared/types';
 import { useLocalApi } from './hooks/useLocalApi';
 import { useDisplayProfile } from './hooks/useDisplayProfile';
 import SetupMode from './modes/SetupMode';
@@ -11,13 +11,14 @@ import WrestlingMode from './modes/WrestlingMode';
 import MediaMode from './modes/MediaMode';
 import CalibrationMode from './modes/CalibrationMode';
 import BlankMode from './modes/BlankMode';
+import PracticeBoardMode from './modes/PracticeBoardMode';
 import ViewportCanvas from './components/ViewportCanvas';
 import PresentationOverlay from './components/PresentationOverlay';
 
-type KioskMode = 'setup' | 'pairing' | 'offline' | 'basketball' | 'wrestling' | 'volleyball' | 'shot-clock' | 'media' | 'calibration' | 'blank';
+type KioskMode = 'setup' | 'pairing' | 'offline' | 'basketball' | 'wrestling' | 'volleyball' | 'practice-board' | 'shot-clock' | 'media' | 'calibration' | 'blank';
 
 interface ShotClockState {
-  mode?: { type: string; subMode?: string; scoreboardBranding?: ScoreboardBranding };
+  mode?: DeviceMode;
   timerState?: {
     shotClock: number;
     gameClock: number;
@@ -71,6 +72,8 @@ export default function App() {
         return <WrestlingMode state={state as ShotClockState | undefined} />;
       case 'volleyball':
         return <VolleyballMode state={state as ShotClockState | undefined} />;
+      case 'practice-board':
+        return <PracticeBoardMode board={state?.mode?.practiceBoard} />;
       case 'shot-clock':
         return <ShotClockMode state={state as ShotClockState | undefined} />;
       case 'media':

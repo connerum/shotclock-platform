@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import type { DeviceMode, SportType } from '@shotclock/shared/types';
+import type { DeviceMode, ModeType, SportType } from '@shotclock/shared/types';
 import { SyncTargetBanner, useDeviceCommandDispatcher } from '../../SelectedDevicesProvider';
 
 interface Device {
@@ -15,12 +15,12 @@ interface Device {
 }
 
 const SPORTS: Array<{
-  id: SportType | 'settings';
+  id: SportType | 'practice-board' | 'settings';
   title: string;
   description: string;
   href: string;
   imageSrc: string;
-  mode?: SportType;
+  mode?: ModeType;
 }> = [
   {
     id: 'basketball',
@@ -44,6 +44,13 @@ const SPORTS: Array<{
     imageSrc: '/images/sports/volleyball.png',
   },
   {
+    id: 'practice-board',
+    title: 'Practice Board',
+    description: 'Build, time, and run a football practice plan.',
+    href: 'practice-board',
+    imageSrc: '/images/sports/practice-board.png',
+  },
+  {
     id: 'settings',
     title: 'Device Details/Settings',
     description: 'Mode, connection, calibration, firmware, and factory reset.',
@@ -59,7 +66,7 @@ export default function DeviceSportPage({ params }: { params: { deviceId: string
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [commandError, setCommandError] = useState<string | null>(null);
-  const [selectingSport, setSelectingSport] = useState<SportType | null>(null);
+  const [selectingSport, setSelectingSport] = useState<ModeType | null>(null);
   const { sendCommand } = useDeviceCommandDispatcher(deviceId);
 
   useEffect(() => {
@@ -79,7 +86,7 @@ export default function DeviceSportPage({ params }: { params: { deviceId: string
     void fetchDevice();
   }, [deviceId]);
 
-  const openSport = async (sport: SportType | 'settings', href: string, mode?: SportType) => {
+  const openSport = async (sport: SportType | 'practice-board' | 'settings', href: string, mode?: ModeType) => {
     setSelectingSport(sport === 'settings' ? null : sport);
     setCommandError(null);
 
@@ -151,7 +158,7 @@ export default function DeviceSportPage({ params }: { params: { deviceId: string
 
       <SyncTargetBanner deviceId={deviceId} />
 
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-5">
         {SPORTS.map((sport) => (
           <button
             key={sport.id}
