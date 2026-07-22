@@ -4,7 +4,9 @@ import Link from 'next/link';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type {
   DeviceMode,
+  PracticeBoardAssignment,
   PracticeBoardDrill,
+  PracticeBoardPosition,
   PracticeBoardState,
   PracticeBoardWeather,
 } from '@shotclock/shared/types';
@@ -14,6 +16,7 @@ type EditableDrill = {
   id: string;
   title: string;
   durationText: string;
+  assignments: PracticeBoardAssignment[];
 };
 
 type DeviceResponse = {
@@ -24,6 +27,9 @@ type DeviceResponse = {
 };
 
 const MAX_DRILLS = 12;
+const MAX_ASSIGNMENTS = 12;
+const OVERVIEW_DURATION_MS = 5000;
+const POSITION_OPTIONS: PracticeBoardPosition[] = ['ALL', 'QB', 'WR', 'RB', 'TE', 'OL', 'Other'];
 
 export default function PracticeBoardPage({ params }: { params: { deviceId: string } }) {
   const { deviceId } = params;
@@ -137,7 +143,12 @@ export default function PracticeBoardPage({ params }: { params: { deviceId: stri
 
   const addDrill = () => {
     if (drills.length >= MAX_DRILLS) return;
-    setDrills((current) => [...current, { id: createId(), title: '', durationText: '05:00' }]);
+    setDrills((current) => [...current, {
+      id: createId(),
+      title: '',
+      durationText: '05:00',
+      assignments: [createAssignment('ALL')],
+    }]);
     setDirty(true);
   };
 
@@ -148,6 +159,36 @@ export default function PracticeBoardPage({ params }: { params: { deviceId: stri
 
   const removeDrill = (id: string) => {
     setDrills((current) => current.filter((drill) => drill.id !== id));
+    setDirty(true);
+  };
+
+  const addAssignment = (drillId: string) => {
+    setDrills((current) => current.map((drill) => drill.id === drillId && drill.assignments.length < MAX_ASSIGNMENTS
+      ? { ...drill, assignments: [...drill.assignments, createAssignment()] }
+      : drill));
+    setDirty(true);
+  };
+
+  const updateAssignment = (
+    drillId: string,
+    assignmentId: string,
+    updates: Partial<PracticeBoardAssignment>
+  ) => {
+    setDrills((current) => current.map((drill) => drill.id === drillId
+      ? {
+          ...drill,
+          assignments: drill.assignments.map((assignment) => assignment.id === assignmentId
+            ? { ...assignment, ...updates }
+            : assignment),
+        }
+      : drill));
+    setDirty(true);
+  };
+
+  const removeAssignment = (drillId: string, assignmentId: string) => {
+    setDrills((current) => current.map((drill) => drill.id === drillId
+      ? { ...drill, assignments: drill.assignments.filter((assignment) => assignment.id !== assignmentId) }
+      : drill));
     setDirty(true);
   };
 
@@ -162,18 +203,20 @@ export default function PracticeBoardPage({ params }: { params: { deviceId: stri
     setDirty(true);
   };
 
-  const startDrill = (id: string) => {
+  const startDrill = (id: string, showOverview = true) => {
     const drill = serializeDrills(drills).find((item) => item.id === id);
     if (!drill || drill.durationSeconds <= 0) {
-      setError('Give the drill a duration greater than 0:00 before starting it.');
+      setError('Give the period a duration greater than 0:00 before starting it.');
       return;
     }
+    const transitionEndsAt = Date.now() + (showOverview ? OVERVIEW_DURATION_MS : 0);
     void dispatchBoard(boardWithCurrentDrills({
       activeDrillId: id,
       timerStatus: 'running',
       remainingSeconds: drill.durationSeconds,
-      startedAt: Date.now(),
-    }), `Started ${drill.title || 'drill'}.`);
+      startedAt: transitionEndsAt,
+      overviewUntil: showOverview ? transitionEndsAt : undefined,
+    }), `Started ${drill.title || 'period'}.`);
   };
 
   const resumeDrill = () => {
@@ -182,7 +225,8 @@ export default function PracticeBoardPage({ params }: { params: { deviceId: stri
       timerStatus: 'running',
       remainingSeconds,
       startedAt: Date.now(),
-    }), 'Drill resumed.');
+      overviewUntil: undefined,
+    }), 'Period resumed.');
   };
 
   const stopDrill = () => {
@@ -191,12 +235,19 @@ export default function PracticeBoardPage({ params }: { params: { deviceId: stri
       timerStatus: 'paused',
       remainingSeconds,
       startedAt: undefined,
-    }), 'Drill stopped.');
+      overviewUntil: undefined,
+    }), 'Period stopped.');
   };
 
   const restartDrill = () => {
     if (!activeDrill) return;
-    startDrill(activeDrill.id);
+    startDrill(activeDrill.id, false);
+  };
+
+  const previewSchedule = () => {
+    void dispatchBoard(boardWithCurrentDrills({
+      overviewUntil: Date.now() + OVERVIEW_DURATION_MS,
+    }), 'Showing the five-second schedule preview.');
   };
 
   const advanceDrill = (direction: 1 | -1) => {
@@ -211,6 +262,7 @@ export default function PracticeBoardPage({ params }: { params: { deviceId: stri
         timerStatus: 'complete',
         remainingSeconds: 0,
         startedAt: undefined,
+        overviewUntil: Date.now() + OVERVIEW_DURATION_MS,
       }), 'Practice plan complete.');
       return;
     }
@@ -257,7 +309,7 @@ export default function PracticeBoardPage({ params }: { params: { deviceId: stri
         </div>
         <div className="flex items-center gap-3 text-sm">
           <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-white/60">
-            {drills.length} drill{drills.length === 1 ? '' : 's'} · {formatDuration(totalPracticeSeconds)} total
+            {drills.length} period{drills.length === 1 ? '' : 's'} · {formatDuration(totalPracticeSeconds)} total
           </span>
           {dirty && <span className="font-semibold text-amber-300">Unsaved changes</span>}
         </div>
@@ -305,98 +357,183 @@ export default function PracticeBoardPage({ params }: { params: { deviceId: stri
         <div className="flex flex-col gap-3 border-b border-white/10 p-5 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h2 className="text-xl font-bold">Practice plan</h2>
-            <p className="mt-1 text-sm text-white/50">Drag the grip to reorder. Times use MM:SS.</p>
+            <p className="mt-1 text-sm text-white/50">Add position assignments inside each period, then drag the grip to reorder periods.</p>
           </div>
-          <button
-            type="button"
-            onClick={addDrill}
-            disabled={drills.length >= MAX_DRILLS}
-            className="rounded-lg border border-green-500/40 bg-green-950/50 px-4 py-2.5 font-bold text-green-300 hover:bg-green-900/60 disabled:opacity-40"
-          >
-            + Add drill
-          </button>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={previewSchedule}
+              disabled={sending || drills.length === 0}
+              className="rounded-lg border border-cyan-500/35 bg-cyan-950/30 px-4 py-2.5 font-bold text-cyan-200 hover:bg-cyan-900/40 disabled:opacity-40"
+            >
+              Preview schedule · 5 sec
+            </button>
+            <button
+              type="button"
+              onClick={addDrill}
+              disabled={drills.length >= MAX_DRILLS}
+              className="rounded-lg border border-green-500/40 bg-green-950/50 px-4 py-2.5 font-bold text-green-300 hover:bg-green-900/60 disabled:opacity-40"
+            >
+              + Add period
+            </button>
+          </div>
         </div>
 
         <div className="space-y-2 p-3 sm:p-5">
           {drills.length === 0 && (
             <button type="button" onClick={addDrill} className="w-full rounded-xl border border-dashed border-white/15 px-6 py-10 text-center text-white/50 hover:border-green-500/40 hover:text-green-300">
-              No drills yet. Add the first period.
+              No periods yet. Add the first period.
             </button>
           )}
 
           {drills.map((drill, index) => {
             const isActive = board.activeDrillId === drill.id;
             return (
-              <div
+              <article
                 key={drill.id}
                 onDragOver={(event) => event.preventDefault()}
                 onDrop={() => {
                   if (draggedIndex !== null) moveDrill(draggedIndex, index);
                   setDraggedIndex(null);
                 }}
-                className={`grid grid-cols-[auto_1fr_auto] gap-2 rounded-xl border p-2 sm:grid-cols-[auto_minmax(0,1fr)_8rem_auto_auto] ${
-                  isActive ? 'border-green-500/60 bg-green-950/30' : 'border-white/10 bg-black/15'
+                className={`overflow-hidden rounded-2xl border ${
+                  isActive ? 'border-cyan-400/55 bg-cyan-950/20' : 'border-white/10 bg-black/15'
                 }`}
               >
-                <button
-                  type="button"
-                  draggable
-                  onDragStart={() => setDraggedIndex(index)}
-                  onDragEnd={() => setDraggedIndex(null)}
-                  onKeyDown={(event) => {
-                    if (event.altKey && event.key === 'ArrowUp') moveDrill(index, index - 1);
-                    if (event.altKey && event.key === 'ArrowDown') moveDrill(index, index + 1);
-                  }}
-                  title="Drag to reorder. Alt+Up/Down also moves this row."
-                  aria-label={`Reorder drill ${index + 1}`}
-                  className="row-span-2 flex w-10 cursor-grab touch-none items-center justify-center rounded-lg border border-white/10 bg-white/5 text-lg font-black tracking-[-0.35em] text-white/40 hover:text-white active:cursor-grabbing sm:row-span-1"
-                >
-                  ⋮⋮
-                </button>
-                <input
-                  value={drill.title}
-                  maxLength={48}
-                  onChange={(event) => updateDrill(drill.id, { title: event.target.value })}
-                  placeholder={`Drill or period ${index + 1}`}
-                  aria-label={`Drill ${index + 1} title`}
-                  className="min-w-0 rounded-lg px-3 py-2.5 font-semibold"
-                />
-                <input
-                  value={drill.durationText}
-                  inputMode="numeric"
-                  onChange={(event) => updateDrill(drill.id, { durationText: cleanDurationInput(event.target.value) })}
-                  onBlur={() => updateDrill(drill.id, { durationText: formatDuration(parseDuration(drill.durationText)) })}
-                  placeholder="MM:SS"
-                  aria-label={`Drill ${index + 1} duration in minutes and seconds`}
-                  className="w-24 rounded-lg px-3 py-2.5 text-center font-mono font-bold tabular-nums sm:w-auto"
-                />
-                <button
-                  type="button"
-                  onClick={() => startDrill(drill.id)}
-                  disabled={sending}
-                  className="col-start-2 rounded-lg border border-white/10 px-3 py-2 text-sm font-bold text-white/70 hover:border-green-500/40 hover:text-green-300 sm:col-start-auto"
-                >
-                  {isActive ? 'Start over' : 'Run'}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => removeDrill(drill.id)}
-                  disabled={sending}
-                  aria-label={`Delete drill ${index + 1}`}
-                  className="rounded-lg px-3 py-2 text-xl font-bold text-white/30 hover:bg-red-950/50 hover:text-red-300"
-                >
-                  ×
-                </button>
-              </div>
+                <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] gap-2 p-3 sm:grid-cols-[auto_minmax(0,1fr)_8rem_auto_auto]">
+                  <button
+                    type="button"
+                    draggable
+                    onDragStart={() => setDraggedIndex(index)}
+                    onDragEnd={() => setDraggedIndex(null)}
+                    onKeyDown={(event) => {
+                      if (event.altKey && event.key === 'ArrowUp') moveDrill(index, index - 1);
+                      if (event.altKey && event.key === 'ArrowDown') moveDrill(index, index + 1);
+                    }}
+                    title="Drag to reorder. Alt+Up/Down also moves this period."
+                    aria-label={`Reorder period ${index + 1}`}
+                    className="row-span-2 flex w-10 cursor-grab touch-none items-center justify-center rounded-xl border border-white/10 bg-white/5 text-lg font-black tracking-[-0.35em] text-white/40 hover:text-white active:cursor-grabbing sm:row-span-1"
+                  >
+                    ⋮⋮
+                  </button>
+                  <div className="min-w-0">
+                    <div className="mb-1 text-[10px] font-black uppercase tracking-[0.2em] text-cyan-300/70">Period {index + 1}</div>
+                    <input
+                      value={drill.title}
+                      maxLength={48}
+                      onChange={(event) => updateDrill(drill.id, { title: event.target.value })}
+                      placeholder={`Period ${index + 1} title`}
+                      aria-label={`Period ${index + 1} title`}
+                      className="min-w-0 w-full rounded-lg px-3 py-2.5 font-semibold"
+                    />
+                  </div>
+                  <input
+                    value={drill.durationText}
+                    inputMode="numeric"
+                    onChange={(event) => updateDrill(drill.id, { durationText: cleanDurationInput(event.target.value) })}
+                    onBlur={() => updateDrill(drill.id, { durationText: formatDuration(parseDuration(drill.durationText)) })}
+                    placeholder="MM:SS"
+                    aria-label={`Period ${index + 1} duration in minutes and seconds`}
+                    className="w-24 self-end rounded-lg px-3 py-2.5 text-center font-mono font-bold tabular-nums sm:w-auto"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => startDrill(drill.id)}
+                    disabled={sending}
+                    className="col-start-2 self-end rounded-lg border border-white/10 px-3 py-2.5 text-sm font-bold text-white/70 hover:border-cyan-500/40 hover:text-cyan-200 sm:col-start-auto"
+                  >
+                    {isActive ? 'Start over' : 'Run period'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => removeDrill(drill.id)}
+                    disabled={sending}
+                    aria-label={`Delete period ${index + 1}`}
+                    className="self-end rounded-lg px-3 py-2 text-xl font-bold text-white/30 hover:bg-red-950/50 hover:text-red-300"
+                  >
+                    ×
+                  </button>
+                </div>
+
+                <div className="border-t border-white/[0.08] bg-black/20 px-3 py-3 sm:pl-[4.25rem]">
+                  <div className="mb-2 flex items-center justify-between gap-3">
+                    <div>
+                      <div className="text-xs font-black uppercase tracking-[0.16em] text-white/65">Position assignments</div>
+                      <div className="mt-0.5 text-xs text-white/35">Select a group and enter what they are doing in this period.</div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => addAssignment(drill.id)}
+                      disabled={drill.assignments.length >= MAX_ASSIGNMENTS}
+                      className="shrink-0 rounded-lg border border-cyan-500/25 bg-cyan-950/25 px-3 py-2 text-xs font-bold text-cyan-200 hover:bg-cyan-900/35 disabled:opacity-40"
+                    >
+                      + Position / drill
+                    </button>
+                  </div>
+
+                  <div className="space-y-2">
+                    {drill.assignments.length === 0 && (
+                      <button
+                        type="button"
+                        onClick={() => addAssignment(drill.id)}
+                        className="w-full rounded-lg border border-dashed border-white/10 px-4 py-3 text-sm text-white/35 hover:border-cyan-500/30 hover:text-cyan-200"
+                      >
+                        Add the first position assignment
+                      </button>
+                    )}
+                    {drill.assignments.map((assignment, assignmentIndex) => (
+                      <div key={assignment.id} className="flex flex-col gap-2 rounded-xl border border-white/[0.08] bg-white/[0.025] p-2 md:flex-row">
+                        <select
+                          value={assignment.position}
+                          onChange={(event) => updateAssignment(drill.id, assignment.id, {
+                            position: event.target.value as PracticeBoardPosition,
+                            ...(event.target.value !== 'Other' ? { customPosition: undefined } : {}),
+                          })}
+                          aria-label={`Period ${index + 1} assignment ${assignmentIndex + 1} position`}
+                          className="rounded-lg px-3 py-2.5 font-bold md:w-32"
+                        >
+                          {POSITION_OPTIONS.map((position) => <option key={position} value={position}>{position}</option>)}
+                        </select>
+                        {assignment.position === 'Other' && (
+                          <input
+                            value={assignment.customPosition || ''}
+                            maxLength={16}
+                            onChange={(event) => updateAssignment(drill.id, assignment.id, { customPosition: event.target.value })}
+                            placeholder="Position name"
+                            aria-label={`Period ${index + 1} assignment ${assignmentIndex + 1} custom position`}
+                            className="rounded-lg px-3 py-2.5 font-semibold md:w-44"
+                          />
+                        )}
+                        <input
+                          value={assignment.drillName}
+                          maxLength={64}
+                          onChange={(event) => updateAssignment(drill.id, assignment.id, { drillName: event.target.value })}
+                          placeholder="Drill or responsibility"
+                          aria-label={`Period ${index + 1} assignment ${assignmentIndex + 1} drill name`}
+                          className="min-w-0 flex-1 rounded-lg px-3 py-2.5"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => removeAssignment(drill.id, assignment.id)}
+                          aria-label={`Delete period ${index + 1} assignment ${assignmentIndex + 1}`}
+                          className="rounded-lg px-3 py-2 text-lg font-bold text-white/25 hover:bg-red-950/40 hover:text-red-300"
+                        >
+                          ×
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </article>
             );
           })}
         </div>
 
         <div className="flex flex-col gap-3 border-t border-white/10 bg-black/20 p-5 lg:flex-row lg:items-center lg:justify-between">
           <div className="min-w-0">
-            <div className="text-xs font-bold uppercase tracking-[0.18em] text-gray-500">On the clock</div>
+            <div className="text-xs font-bold uppercase tracking-[0.18em] text-gray-500">Current period</div>
             <div className="mt-1 flex items-baseline gap-3">
-              <span className="truncate text-xl font-bold text-white">{activeDrill?.title || 'No drill selected'}</span>
+              <span className="truncate text-xl font-bold text-white">{activeDrill?.title || 'No period selected'}</span>
               <span className={`font-mono text-2xl font-black tabular-nums ${remainingSeconds === 0 && activeDrill ? 'text-red-400' : 'text-green-400'}`}>
                 {activeDrill ? formatDuration(remainingSeconds) : '--:--'}
               </span>
@@ -416,11 +553,11 @@ export default function PracticeBoardPage({ params }: { params: { deviceId: stri
                 {activeDrill && remainingSeconds > 0
                   ? 'Start / Resume'
                   : activeDrill
-                    ? 'Start next drill'
-                    : 'Start first drill'}
+                    ? 'Start next period'
+                    : 'Start first period'}
               </button>
             )}
-            <button type="button" onClick={restartDrill} disabled={sending || !activeDrill} className="rounded-lg border border-blue-500/35 bg-blue-950/30 px-4 py-2.5 font-bold text-blue-200 hover:bg-blue-900/40 disabled:opacity-30">Restart</button>
+            <button type="button" onClick={restartDrill} disabled={sending || !activeDrill} className="rounded-lg border border-blue-500/35 bg-blue-950/30 px-4 py-2.5 font-bold text-blue-200 hover:bg-blue-900/40 disabled:opacity-30">Restart period</button>
             <button type="button" onClick={() => advanceDrill(1)} disabled={sending || drills.length === 0} className="rounded-lg border border-white/10 px-4 py-2.5 font-bold text-white/70 hover:bg-white/5 disabled:opacity-30">Complete & next</button>
           </div>
         </div>
@@ -450,6 +587,7 @@ function normalizeBoard(value: PracticeBoardState | undefined): PracticeBoardSta
     id: typeof drill.id === 'string' && drill.id ? drill.id : `drill-${index + 1}`,
     title: typeof drill.title === 'string' ? drill.title.slice(0, 48) : '',
     durationSeconds: clampDuration(drill.durationSeconds),
+    assignments: normalizeAssignments(drill.assignments),
   }));
   const timerStatus = ['idle', 'running', 'paused', 'complete'].includes(value.timerStatus)
     ? value.timerStatus
@@ -460,6 +598,7 @@ function normalizeBoard(value: PracticeBoardState | undefined): PracticeBoardSta
     timerStatus,
     remainingSeconds: clampDuration(value.remainingSeconds),
     ...(typeof value.startedAt === 'number' ? { startedAt: value.startedAt } : {}),
+    ...(typeof value.overviewUntil === 'number' ? { overviewUntil: value.overviewUntil } : {}),
     ...(value.weather ? { weather: value.weather } : {}),
   };
 }
@@ -469,11 +608,24 @@ function serializeDrills(drills: EditableDrill[]): PracticeBoardDrill[] {
     id: drill.id,
     title: drill.title.trim().slice(0, 48),
     durationSeconds: parseDuration(drill.durationText),
+    assignments: drill.assignments.slice(0, MAX_ASSIGNMENTS).map((assignment) => ({
+      id: assignment.id,
+      position: assignment.position,
+      ...(assignment.position === 'Other' && assignment.customPosition?.trim()
+        ? { customPosition: assignment.customPosition.trim().slice(0, 16) }
+        : {}),
+      drillName: assignment.drillName.trim().slice(0, 64),
+    })),
   }));
 }
 
 function toEditableDrill(drill: PracticeBoardDrill): EditableDrill {
-  return { id: drill.id, title: drill.title, durationText: formatDuration(drill.durationSeconds) };
+  return {
+    id: drill.id,
+    title: drill.title,
+    durationText: formatDuration(drill.durationSeconds),
+    assignments: normalizeAssignments(drill.assignments),
+  };
 }
 
 function snapshotBoard(board: PracticeBoardState, now = Date.now()): PracticeBoardState {
@@ -481,7 +633,9 @@ function snapshotBoard(board: PracticeBoardState, now = Date.now()): PracticeBoa
   return {
     ...board,
     remainingSeconds,
-    ...(board.timerStatus === 'running' && remainingSeconds > 0 ? { startedAt: now } : { startedAt: undefined }),
+    ...(board.timerStatus === 'running' && remainingSeconds > 0
+      ? { startedAt: typeof board.startedAt === 'number' && board.startedAt > now ? board.startedAt : now }
+      : { startedAt: undefined }),
   };
 }
 
@@ -489,7 +643,30 @@ function projectRemainingSeconds(board: PracticeBoardState, now = Date.now()): n
   if (board.timerStatus !== 'running' || typeof board.startedAt !== 'number') {
     return clampDuration(board.remainingSeconds);
   }
-  return Math.max(0, Math.ceil(board.remainingSeconds - (now - board.startedAt) / 1000));
+  const elapsedSeconds = Math.max(0, (now - board.startedAt) / 1000);
+  return Math.max(0, Math.ceil(board.remainingSeconds - elapsedSeconds));
+}
+
+function normalizeAssignments(value: unknown): PracticeBoardAssignment[] {
+  if (!Array.isArray(value)) return [];
+  return value.slice(0, MAX_ASSIGNMENTS).map((assignment, index) => {
+    const raw = assignment as Partial<PracticeBoardAssignment>;
+    const position = POSITION_OPTIONS.includes(raw.position as PracticeBoardPosition)
+      ? raw.position as PracticeBoardPosition
+      : 'ALL';
+    return {
+      id: typeof raw.id === 'string' && raw.id ? raw.id : `assignment-${index + 1}`,
+      position,
+      ...(position === 'Other' && typeof raw.customPosition === 'string'
+        ? { customPosition: raw.customPosition.slice(0, 16) }
+        : {}),
+      drillName: typeof raw.drillName === 'string' ? raw.drillName.slice(0, 64) : '',
+    };
+  });
+}
+
+function createAssignment(position: PracticeBoardPosition = 'QB'): PracticeBoardAssignment {
+  return { id: createId(), position, drillName: '' };
 }
 
 function cleanDurationInput(value: string): string {

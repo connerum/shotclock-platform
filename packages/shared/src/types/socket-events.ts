@@ -7,10 +7,20 @@ export type TimerMode = 'stop' | 'run' | 'pause';
 
 export type SportType = 'basketball' | 'wrestling' | 'volleyball';
 
+export type PracticeBoardPosition = 'ALL' | 'QB' | 'WR' | 'RB' | 'TE' | 'OL' | 'Other';
+
+export interface PracticeBoardAssignment {
+  id: string;
+  position: PracticeBoardPosition;
+  customPosition?: string;
+  drillName: string;
+}
+
 export interface PracticeBoardDrill {
   id: string;
   title: string;
   durationSeconds: number;
+  assignments: PracticeBoardAssignment[];
 }
 
 export type PracticeBoardTimerStatus = 'idle' | 'running' | 'paused' | 'complete';
@@ -31,6 +41,7 @@ export interface PracticeBoardState {
   timerStatus: PracticeBoardTimerStatus;
   remainingSeconds: number;
   startedAt?: number;
+  overviewUntil?: number;
   weather?: PracticeBoardWeather;
 }
 
