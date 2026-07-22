@@ -5,6 +5,9 @@ import type {
   PracticeBoardState,
 } from '@shotclock/shared/types';
 
+const SCHEDULE_PREVIEW_DURATION_MS = 5000;
+const SCHEDULE_PREVIEW_INTERVAL_MS = 20000;
+
 export default function PracticeBoardMode({ board }: { board?: PracticeBoardState }) {
   const [now, setNow] = useState(Date.now());
 
@@ -23,7 +26,14 @@ export default function PracticeBoardMode({ board }: { board?: PracticeBoardStat
   const remainingSeconds = projectRemainingSeconds(board, now);
   const timezone = board?.weather?.timezone;
   const clock = useMemo(() => formatLocationTime(now, timezone), [now, timezone]);
-  const showOverview = !activePeriod || Boolean(board?.overviewUntil && now < board.overviewUntil);
+  const manualOverviewUntil = board?.overviewUntil && board.overviewUntil > now
+    ? board.overviewUntil
+    : undefined;
+  const automaticOverviewUntil = activePeriod
+    ? getAutomaticOverviewUntil(board, activePeriod, now)
+    : undefined;
+  const overviewUntil = Math.max(manualOverviewUntil || 0, automaticOverviewUntil || 0) || undefined;
+  const showOverview = !activePeriod || Boolean(overviewUntil);
 
   return (
     <div
@@ -44,8 +54,8 @@ export default function PracticeBoardMode({ board }: { board?: PracticeBoardStat
             periods={periods}
             activeIndex={activeIndex}
             remainingSeconds={remainingSeconds}
-            secondsUntilFullView={activePeriod && board?.overviewUntil
-              ? Math.max(0, Math.ceil((board.overviewUntil - now) / 1000))
+            secondsUntilFullView={activePeriod && overviewUntil
+              ? Math.max(0, Math.ceil((overviewUntil - now) / 1000))
               : null}
           />
         ) : (
@@ -286,6 +296,27 @@ function projectRemainingSeconds(board: PracticeBoardState | undefined, now: num
   }
   const elapsedSeconds = Math.max(0, (now - board.startedAt) / 1000);
   return Math.max(0, Math.ceil(board.remainingSeconds - elapsedSeconds));
+}
+
+function getAutomaticOverviewUntil(
+  board: PracticeBoardState | undefined,
+  period: PracticeBoardDrill,
+  now: number
+): number | undefined {
+  if (board?.timerStatus !== 'running' || typeof board.startedAt !== 'number') return undefined;
+
+  const remainingAtSnapshotMs = Math.max(0, board.remainingSeconds) * 1000;
+  const elapsedSinceSnapshotMs = Math.max(0, now - board.startedAt);
+  const projectedRemainingMs = remainingAtSnapshotMs - elapsedSinceSnapshotMs;
+  if (projectedRemainingMs <= 0) return undefined;
+
+  const elapsedPeriodMs = Math.max(0, period.durationSeconds * 1000 - projectedRemainingMs);
+  if (elapsedPeriodMs < SCHEDULE_PREVIEW_INTERVAL_MS) return undefined;
+
+  const intervalPositionMs = elapsedPeriodMs % SCHEDULE_PREVIEW_INTERVAL_MS;
+  if (intervalPositionMs >= SCHEDULE_PREVIEW_DURATION_MS) return undefined;
+
+  return now + SCHEDULE_PREVIEW_DURATION_MS - intervalPositionMs;
 }
 
 function formatDuration(totalSeconds: number): string {
