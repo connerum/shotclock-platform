@@ -834,7 +834,9 @@ function formatDuration(totalSeconds: number): string {
 function getPreviewPageCount(drills: Pick<PracticeBoardDrill, 'unit'>[]): number {
   const offenseCount = drills.filter((drill) => drill.unit !== 'defense').length;
   const defenseCount = drills.filter((drill) => drill.unit === 'defense').length;
-  return Math.max(1, Math.ceil(offenseCount / PREVIEW_PAGE_SIZE), Math.ceil(defenseCount / PREVIEW_PAGE_SIZE));
+  const offensePages = Math.ceil(offenseCount / PREVIEW_PAGE_SIZE);
+  const defensePages = Math.ceil(defenseCount / PREVIEW_PAGE_SIZE);
+  return Math.max(1, offensePages + defensePages);
 }
 
 function getPreviewDurationMs(drills: Pick<PracticeBoardDrill, 'unit'>[]): number {

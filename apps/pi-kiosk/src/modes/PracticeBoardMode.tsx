@@ -166,11 +166,16 @@ function ScheduleOverview({
 
   const offensePeriods = periods.filter((period) => getPeriodUnit(period) === 'offense');
   const defensePeriods = periods.filter((period) => getPeriodUnit(period) === 'defense');
-  const showSplitSchedule = offensePeriods.length > 0 && defensePeriods.length > 0;
+  const offensePageCount = Math.ceil(offensePeriods.length / SCHEDULE_PREVIEW_PAGE_SIZE);
+  const showingOffense = pageIndex < offensePageCount;
+  const visibleUnitPeriods = showingOffense ? offensePeriods : defensePeriods;
+  const unitPageIndex = showingOffense ? pageIndex : pageIndex - offensePageCount;
+  const showUnitLabel = offensePeriods.length > 0 && defensePeriods.length > 0;
+  const visibleUnitLabel = showingOffense ? 'Offense' : 'Defense';
 
   return (
     <section className="grid min-h-0 grid-rows-[auto_1fr] gap-[1.5cqh] p-[2cqh_2cqw]">
-      <div className="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-[2cqw] px-[0.5cqw]">
+      <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-[2cqw] px-[0.5cqw]">
         <div>
           <div className="text-[min(2.5cqh,1.8cqw)] font-black uppercase tracking-[0.24em] text-cyan-300/65">Schedule preview</div>
           <div className="mt-[0.5cqh] text-[min(5cqh,3.6cqw)] font-black tracking-[-0.04em] text-white">Today&apos;s practice</div>
@@ -184,70 +189,22 @@ function ScheduleOverview({
             />
           )}
         </div>
+        {showUnitLabel && (
+          <div className={`text-[min(3.2cqh,2.4cqw)] font-black uppercase tracking-[0.22em] ${
+            showingOffense ? 'text-cyan-200/80' : 'text-violet-200/85'
+          }`}>
+            {visibleUnitLabel}
+          </div>
+        )}
       </div>
 
-      {showSplitSchedule ? (
-        <div className="grid min-h-0 grid-cols-[minmax(0,1fr)_1px_minmax(0,1fr)] gap-[1.5cqw] overflow-hidden">
-          <ScheduleUnitColumn
-            label="Offense"
-            periods={offensePeriods}
-            activePeriodId={activePeriodId}
-            remainingSeconds={remainingSeconds}
-            pageIndex={pageIndex}
-            accent="cyan"
-          />
-          <div className="h-full w-px bg-gradient-to-b from-transparent via-white/20 to-transparent" />
-          <ScheduleUnitColumn
-            label="Defense"
-            periods={defensePeriods}
-            activePeriodId={activePeriodId}
-            remainingSeconds={remainingSeconds}
-            pageIndex={pageIndex}
-            accent="violet"
-          />
-        </div>
-      ) : (
-        <ScheduleCardGrid
-          periods={offensePeriods.length > 0 ? offensePeriods : defensePeriods}
-          activePeriodId={activePeriodId}
-          remainingSeconds={remainingSeconds}
-          pageIndex={pageIndex}
-        />
-      )}
-    </section>
-  );
-}
-
-function ScheduleUnitColumn({
-  label,
-  periods,
-  activePeriodId,
-  remainingSeconds,
-  pageIndex,
-  accent,
-}: {
-  label: 'Offense' | 'Defense';
-  periods: PracticeBoardDrill[];
-  activePeriodId?: string;
-  remainingSeconds: number;
-  pageIndex: number;
-  accent: 'cyan' | 'violet';
-}) {
-  return (
-    <div className="grid min-h-0 grid-rows-[auto_1fr] gap-[1cqh] overflow-hidden">
-      <div className={`px-[0.6cqw] text-[min(3cqh,2.2cqw)] font-black uppercase tracking-[0.22em] ${
-        accent === 'cyan' ? 'text-cyan-200/75' : 'text-violet-200/80'
-      }`}>
-        {label}
-      </div>
       <ScheduleCardGrid
-        periods={periods}
+        periods={visibleUnitPeriods}
         activePeriodId={activePeriodId}
         remainingSeconds={remainingSeconds}
-        pageIndex={pageIndex}
-        compact
+        pageIndex={unitPageIndex}
       />
-    </div>
+    </section>
   );
 }
 
@@ -256,13 +213,11 @@ function ScheduleCardGrid({
   activePeriodId,
   remainingSeconds,
   pageIndex,
-  compact = false,
 }: {
   periods: PracticeBoardDrill[];
   activePeriodId?: string;
   remainingSeconds: number;
   pageIndex: number;
-  compact?: boolean;
 }) {
   const pageStart = pageIndex * SCHEDULE_PREVIEW_PAGE_SIZE;
   const visiblePeriods = periods.slice(pageStart, pageStart + SCHEDULE_PREVIEW_PAGE_SIZE);
@@ -290,9 +245,7 @@ function ScheduleCardGrid({
           <div
             key={period.id}
             style={{ containerType: 'size' }}
-            className={`relative grid min-h-0 grid-cols-[auto_minmax(0,1fr)_auto] items-center overflow-hidden rounded-[1.5cqw] border shadow-[inset_0_1px_0_rgba(255,255,255,0.045)] ${
-              compact ? 'gap-[1cqw] px-[1cqw]' : 'gap-[1.8cqw] px-[1.6cqw]'
-            } ${
+            className={`relative grid min-h-0 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-[1.8cqw] overflow-hidden rounded-[1.5cqw] border px-[1.6cqw] shadow-[inset_0_1px_0_rgba(255,255,255,0.045)] ${
               isActive
                 ? 'border-cyan-300/35 bg-gradient-to-r from-cyan-400/[0.14] to-violet-500/[0.09]'
                 : isComplete
@@ -300,11 +253,7 @@ function ScheduleCardGrid({
                   : 'border-white/[0.08] bg-white/[0.045]'
             }`}
           >
-            <div className={`flex items-center justify-center rounded-[1.2cqw] font-black leading-none ${
-              compact
-                ? 'h-[min(78cqh,13cqw)] w-[min(78cqh,13cqw)] text-[min(52cqh,8cqw)]'
-                : 'h-[min(82cqh,8cqw)] w-[min(82cqh,8cqw)] text-[min(54cqh,5cqw)]'
-            } ${
+            <div className={`flex h-[min(82cqh,8cqw)] w-[min(82cqh,8cqw)] items-center justify-center rounded-[1.2cqw] text-[min(54cqh,5cqw)] font-black leading-none ${
               isActive
                 ? 'bg-gradient-to-br from-cyan-300 to-violet-400 text-[#07101d] shadow-[0_0_22px_rgba(34,211,238,0.25)]'
                 : isComplete
@@ -314,20 +263,14 @@ function ScheduleCardGrid({
               {isComplete ? '✓' : String(index + 1).padStart(2, '0')}
             </div>
             <div className="min-w-0">
-              <div className={`truncate font-black leading-none tracking-[-0.045em] ${
-                compact ? 'text-[min(50cqh,10cqw)]' : 'text-[min(56cqh,7cqw)]'
-              } ${isActive ? 'text-white' : ''}`}>
+              <div className={`truncate text-[min(56cqh,7cqw)] font-black leading-none tracking-[-0.045em] ${isActive ? 'text-white' : ''}`}>
                 {period.title || `Period ${index + 1}`}
               </div>
-              <div className={`mt-[5cqh] truncate font-bold uppercase leading-none tracking-[0.08em] ${
-                compact ? 'text-[min(19cqh,3.4cqw)]' : 'text-[min(22cqh,2.4cqw)]'
-              } ${isActive ? 'text-cyan-200/70' : 'text-white/25'}`}>
+              <div className={`mt-[5cqh] truncate text-[min(22cqh,2.4cqw)] font-bold uppercase leading-none tracking-[0.08em] ${isActive ? 'text-cyan-200/70' : 'text-white/25'}`}>
                 {assignmentCount} assignment{assignmentCount === 1 ? '' : 's'}
               </div>
             </div>
-            <div className={`font-black leading-none tracking-[-0.05em] tabular-nums ${
-              compact ? 'text-[min(60cqh,11cqw)]' : 'text-[min(68cqh,7.2cqw)]'
-            } ${isActive ? 'text-cyan-100' : isComplete ? 'text-white/20' : 'text-white/85'}`}>
+            <div className={`text-[min(68cqh,7.2cqw)] font-black leading-none tracking-[-0.05em] tabular-nums ${isActive ? 'text-cyan-100' : isComplete ? 'text-white/20' : 'text-white/85'}`}>
               {formatDuration(isActive ? remainingSeconds : period.durationSeconds)}
             </div>
           </div>
@@ -413,7 +356,7 @@ function AssignmentCard({ assignment, index }: { assignment: PracticeBoardAssign
 
   return (
     <div
-      className={`grid min-h-0 grid-cols-[18%_1px_minmax(0,1fr)] items-center gap-[2cqw] overflow-hidden rounded-[1.6cqw] border px-[2cqw] shadow-[inset_0_1px_0_rgba(255,255,255,0.045)] ${accentClasses}`}
+      className={`grid min-h-0 grid-cols-[minmax(18%,max-content)_1px_minmax(0,1fr)] items-center gap-[2cqw] overflow-hidden rounded-[1.6cqw] border px-[2cqw] shadow-[inset_0_1px_0_rgba(255,255,255,0.045)] ${accentClasses}`}
       style={{ containerType: 'size' }}
     >
       <div className="truncate text-center text-[min(88cqh,8cqw)] font-black leading-none tracking-[-0.05em]">{position}</div>
@@ -466,7 +409,11 @@ function getAutomaticPreviewState(
   const elapsedPeriodMs = Math.max(0, period.durationSeconds * 1000 - projectedRemainingMs);
   if (elapsedPeriodMs < SCHEDULE_PREVIEW_INTERVAL_MS) return undefined;
 
-  const intervalPositionMs = elapsedPeriodMs % SCHEDULE_PREVIEW_INTERVAL_MS;
+  const previewCycleMs = Math.max(
+    SCHEDULE_PREVIEW_INTERVAL_MS,
+    previewDurationMs + SCHEDULE_PREVIEW_DURATION_MS
+  );
+  const intervalPositionMs = (elapsedPeriodMs - SCHEDULE_PREVIEW_INTERVAL_MS) % previewCycleMs;
   if (intervalPositionMs >= previewDurationMs) return undefined;
 
   return {
@@ -478,11 +425,9 @@ function getAutomaticPreviewState(
 function getPreviewPageCount(periods: PracticeBoardDrill[]): number {
   const offenseCount = periods.filter((period) => getPeriodUnit(period) === 'offense').length;
   const defenseCount = periods.filter((period) => getPeriodUnit(period) === 'defense').length;
-  return Math.max(
-    1,
-    Math.ceil(offenseCount / SCHEDULE_PREVIEW_PAGE_SIZE),
-    Math.ceil(defenseCount / SCHEDULE_PREVIEW_PAGE_SIZE)
-  );
+  const offensePages = Math.ceil(offenseCount / SCHEDULE_PREVIEW_PAGE_SIZE);
+  const defensePages = Math.ceil(defenseCount / SCHEDULE_PREVIEW_PAGE_SIZE);
+  return Math.max(1, offensePages + defensePages);
 }
 
 function getPeriodUnit(period: PracticeBoardDrill): 'offense' | 'defense' {
