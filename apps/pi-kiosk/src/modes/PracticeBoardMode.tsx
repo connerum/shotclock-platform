@@ -55,9 +55,6 @@ export default function PracticeBoardMode({ board }: { board?: PracticeBoardStat
             activeIndex={activeIndex}
             remainingSeconds={remainingSeconds}
             schoolLogoUrl={board?.schoolLogoUrl}
-            secondsUntilFullView={activePeriod && overviewUntil
-              ? Math.max(0, Math.ceil((overviewUntil - now) / 1000))
-              : null}
           />
         ) : (
           <ActivePeriod
@@ -124,13 +121,11 @@ function ScheduleOverview({
   activeIndex,
   remainingSeconds,
   schoolLogoUrl,
-  secondsUntilFullView,
 }: {
   periods: PracticeBoardDrill[];
   activeIndex: number;
   remainingSeconds: number;
   schoolLogoUrl?: string;
-  secondsUntilFullView: number | null;
 }) {
   if (periods.length === 0) {
     return (
@@ -148,7 +143,7 @@ function ScheduleOverview({
 
   return (
     <section className="grid min-h-0 grid-rows-[auto_1fr] gap-[1.5cqh] p-[2cqh_2cqw]">
-      <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-[2cqw] px-[0.5cqw]">
+      <div className="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-[2cqw] px-[0.5cqw]">
         <div>
           <div className="text-[min(2.5cqh,1.8cqw)] font-black uppercase tracking-[0.24em] text-cyan-300/65">Schedule preview</div>
           <div className="mt-[0.5cqh] text-[min(5cqh,3.6cqw)] font-black tracking-[-0.04em] text-white">Today&apos;s practice</div>
@@ -162,11 +157,6 @@ function ScheduleOverview({
             />
           )}
         </div>
-        {secondsUntilFullView !== null && (
-          <div className="rounded-full border border-violet-300/15 bg-violet-300/[0.07] px-[2cqw] py-[1cqh] text-[min(2.5cqh,1.8cqw)] font-extrabold uppercase tracking-[0.12em] text-violet-200">
-            Full period view in {secondsUntilFullView}
-          </div>
-        )}
       </div>
 
       <div
@@ -189,7 +179,7 @@ function ScheduleOverview({
                     : 'border-white/[0.08] bg-white/[0.045]'
               }`}
             >
-              <div className={`flex h-[78cqh] w-[min(78cqh,5cqw)] items-center justify-center rounded-[1.2cqw] text-[min(42cqh,2.9cqw)] font-black leading-none ${
+              <div className={`flex h-[min(78cqh,5cqw)] w-[min(78cqh,5cqw)] items-center justify-center rounded-[1.2cqw] text-[min(42cqh,2.9cqw)] font-black leading-none ${
                 isActive
                   ? 'bg-gradient-to-br from-cyan-300 to-violet-400 text-[#07101d] shadow-[0_0_22px_rgba(34,211,238,0.25)]'
                   : isComplete
@@ -296,9 +286,9 @@ function AssignmentCard({ assignment, index }: { assignment: PracticeBoardAssign
       className={`grid min-h-0 grid-cols-[18%_1px_minmax(0,1fr)] items-center gap-[2cqw] overflow-hidden rounded-[1.6cqw] border px-[2cqw] shadow-[inset_0_1px_0_rgba(255,255,255,0.045)] ${accentClasses}`}
       style={{ containerType: 'size' }}
     >
-      <div className="truncate text-center text-[min(74cqh,4.8cqw)] font-black leading-none tracking-[-0.045em]">{position}</div>
+      <div className="truncate text-center text-[min(88cqh,8cqw)] font-black leading-none tracking-[-0.05em]">{position}</div>
       <div className="h-[52%] w-px bg-white/[0.10]" />
-      <div className="truncate text-[min(74cqh,4.6cqw)] font-black leading-none tracking-[-0.035em] text-white/95">
+      <div className="truncate text-[min(88cqh,6.4cqw)] font-black leading-none tracking-[-0.04em] text-white/95">
         {assignment.drillName || 'Assignment not entered'}
       </div>
     </div>
