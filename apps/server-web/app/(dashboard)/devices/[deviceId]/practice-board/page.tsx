@@ -1,19 +1,21 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type {
   DeviceMode,
   PracticeBoardAssignment,
   PracticeBoardDrill,
   PracticeBoardPosition,
   PracticeBoardState,
+  PracticeBoardUnit,
   PracticeBoardWeather,
 } from '@shotclock/shared/types';
 import { SyncTargetBanner, useDeviceCommandDispatcher } from '../../../SelectedDevicesProvider';
 
 type EditableDrill = {
   id: string;
+  unit: PracticeBoardUnit;
   title: string;
   durationText: string;
   assignments: PracticeBoardAssignment[];
@@ -26,16 +28,20 @@ type DeviceResponse = {
   };
 };
 
-const MAX_DRILLS = 12;
+const MAX_DRILLS_PER_UNIT = 12;
 const MAX_ASSIGNMENTS = 12;
-const OVERVIEW_DURATION_MS = 5000;
-const POSITION_OPTIONS: PracticeBoardPosition[] = ['ALL', 'QB', 'WR', 'RB', 'TE', 'OL', 'Other'];
+const PREVIEW_PAGE_SIZE = 4;
+const PREVIEW_PAGE_DURATION_MS = 5000;
+const OFFENSE_POSITION_OPTIONS: PracticeBoardPosition[] = ['ALL', 'QB', 'WR', 'RB', 'TE', 'OL', 'Other'];
+const DEFENSE_POSITION_OPTIONS: PracticeBoardPosition[] = ['ALL', 'DL', 'LB', 'Safety', 'Nickel', 'Corner', 'Other'];
+const ALL_POSITION_OPTIONS = [...new Set([...OFFENSE_POSITION_OPTIONS, ...DEFENSE_POSITION_OPTIONS])];
 
 export default function PracticeBoardPage({ params }: { params: { deviceId: string } }) {
   const { deviceId } = params;
   const { sendCommand } = useDeviceCommandDispatcher(deviceId);
   const [deviceName, setDeviceName] = useState('Practice Board');
   const [drills, setDrills] = useState<EditableDrill[]>([]);
+  const [activeUnit, setActiveUnit] = useState<PracticeBoardUnit>('offense');
   const [board, setBoard] = useState<PracticeBoardState>(emptyBoard());
   const [location, setLocation] = useState('');
   const [loading, setLoading] = useState(true);
@@ -60,6 +66,9 @@ export default function PracticeBoardPage({ params }: { params: { deviceId: stri
         setDeviceName(data.device.name);
         setBoard(nextBoard);
         setDrills(nextBoard.drills.map(toEditableDrill));
+        if (nextBoard.drills.length > 0 && nextBoard.drills.every((drill) => drill.unit === 'defense')) {
+          setActiveUnit('defense');
+        }
         setLocation(nextBoard.weather?.locationLabel || '');
       } catch (loadError) {
         setError(loadError instanceof Error ? loadError.message : 'Unable to load this display.');
@@ -83,10 +92,18 @@ export default function PracticeBoardPage({ params }: { params: { deviceId: stri
   const remainingSeconds = projectRemainingSeconds(board, now);
   const activeIndex = drills.findIndex((drill) => drill.id === board.activeDrillId);
   const activeDrill = activeIndex >= 0 ? drills[activeIndex] : null;
+  const unitDrills = drills.filter((drill) => drill.unit === activeUnit);
+  const activeUnitDrills = activeDrill
+    ? drills.filter((drill) => drill.unit === activeDrill.unit)
+    : unitDrills;
+  const activeUnitIndex = activeDrill
+    ? activeUnitDrills.findIndex((drill) => drill.id === activeDrill.id)
+    : -1;
+  const controlDrills = activeDrill ? activeUnitDrills : unitDrills;
   const isActivelyRunning = board.timerStatus === 'running' && remainingSeconds > 0;
-  const totalPracticeSeconds = useMemo(
-    () => drills.reduce((total, drill) => total + parseDuration(drill.durationText), 0),
-    [drills]
+  const totalPracticeSeconds = unitDrills.reduce(
+    (total, drill) => total + parseDuration(drill.durationText),
+    0
   );
 
   const showNotice = (message: string) => {
@@ -143,9 +160,10 @@ export default function PracticeBoardPage({ params }: { params: { deviceId: stri
   };
 
   const addDrill = () => {
-    if (drills.length >= MAX_DRILLS) return;
+    if (unitDrills.length >= MAX_DRILLS_PER_UNIT) return;
     setDrills((current) => [...current, {
       id: createId(),
+      unit: activeUnit,
       title: '',
       durationText: '05:00',
       assignments: [createAssignment('ALL')],
@@ -165,7 +183,10 @@ export default function PracticeBoardPage({ params }: { params: { deviceId: stri
 
   const addAssignment = (drillId: string) => {
     setDrills((current) => current.map((drill) => drill.id === drillId && drill.assignments.length < MAX_ASSIGNMENTS
-      ? { ...drill, assignments: [...drill.assignments, createAssignment()] }
+      ? {
+          ...drill,
+          assignments: [...drill.assignments, createAssignment(drill.unit === 'defense' ? 'DL' : 'QB')],
+        }
       : drill));
     setDirty(true);
   };
@@ -193,12 +214,21 @@ export default function PracticeBoardPage({ params }: { params: { deviceId: stri
     setDirty(true);
   };
 
-  const moveDrill = (fromIndex: number, toIndex: number) => {
-    if (fromIndex === toIndex || fromIndex < 0 || toIndex < 0 || toIndex >= drills.length) return;
+  const moveDrill = (fromIndex: number, toIndex: number, unit: PracticeBoardUnit) => {
+    const unitCount = drills.filter((drill) => drill.unit === unit).length;
+    if (fromIndex === toIndex || fromIndex < 0 || toIndex < 0 || toIndex >= unitCount) return;
     setDrills((current) => {
+      const unitIndexes = current.reduce<number[]>((indexes, drill, index) => {
+        if (drill.unit === unit) indexes.push(index);
+        return indexes;
+      }, []);
+      const reordered = unitIndexes.map((index) => current[index]);
+      const [moved] = reordered.splice(fromIndex, 1);
+      reordered.splice(toIndex, 0, moved);
       const next = [...current];
-      const [moved] = next.splice(fromIndex, 1);
-      next.splice(toIndex, 0, moved);
+      unitIndexes.forEach((index, unitIndex) => {
+        next[index] = reordered[unitIndex];
+      });
       return next;
     });
     setDirty(true);
@@ -210,7 +240,8 @@ export default function PracticeBoardPage({ params }: { params: { deviceId: stri
       setError('Give the period a duration greater than 0:00 before starting it.');
       return;
     }
-    const transitionEndsAt = Date.now() + (showOverview ? OVERVIEW_DURATION_MS : 0);
+    const previewDurationMs = getPreviewDurationMs(serializeDrills(drills));
+    const transitionEndsAt = Date.now() + (showOverview ? previewDurationMs : 0);
     void dispatchBoard(boardWithCurrentDrills({
       activeDrillId: id,
       timerStatus: 'running',
@@ -246,28 +277,31 @@ export default function PracticeBoardPage({ params }: { params: { deviceId: stri
   };
 
   const previewSchedule = () => {
+    const previewDurationMs = getPreviewDurationMs(serializeDrills(drills));
     void dispatchBoard(boardWithCurrentDrills({
-      overviewUntil: Date.now() + OVERVIEW_DURATION_MS,
-    }), 'Showing the five-second schedule preview.');
+      overviewUntil: Date.now() + previewDurationMs,
+    }), `Showing ${formatPreviewDuration(previewDurationMs)} of schedule previews.`);
   };
 
   const advanceDrill = (direction: 1 | -1) => {
-    if (drills.length === 0) return;
-    const targetIndex = activeIndex < 0
-      ? (direction === 1 ? 0 : drills.length - 1)
-      : activeIndex + direction;
+    const sequence = activeDrill ? activeUnitDrills : unitDrills;
+    if (sequence.length === 0) return;
+    const targetIndex = activeUnitIndex < 0
+      ? (direction === 1 ? 0 : sequence.length - 1)
+      : activeUnitIndex + direction;
 
     if (targetIndex < 0) return;
-    if (targetIndex >= drills.length) {
+    if (targetIndex >= sequence.length) {
+      const previewDurationMs = getPreviewDurationMs(serializeDrills(drills));
       void dispatchBoard(boardWithCurrentDrills({
         timerStatus: 'complete',
         remainingSeconds: 0,
         startedAt: undefined,
-        overviewUntil: Date.now() + OVERVIEW_DURATION_MS,
+        overviewUntil: Date.now() + previewDurationMs,
       }), 'Practice plan complete.');
       return;
     }
-    startDrill(drills[targetIndex].id);
+    startDrill(sequence[targetIndex].id);
   };
 
   const refreshWeather = async () => {
@@ -340,7 +374,7 @@ export default function PracticeBoardPage({ params }: { params: { deviceId: stri
         </div>
         <div className="flex items-center gap-3 text-sm">
           <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-white/60">
-            {drills.length} period{drills.length === 1 ? '' : 's'} · {formatDuration(totalPracticeSeconds)} total
+            {unitDrills.length} {activeUnit} period{unitDrills.length === 1 ? '' : 's'} · {formatDuration(totalPracticeSeconds)} total
           </span>
           {dirty && <span className="font-semibold text-amber-300">Unsaved changes</span>}
         </div>
@@ -426,46 +460,69 @@ export default function PracticeBoardPage({ params }: { params: { deviceId: stri
       </section>
 
       <section className="cc-card overflow-hidden">
-        <div className="flex flex-col gap-3 border-b border-white/10 p-5 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-col gap-4 border-b border-white/10 p-5 lg:flex-row lg:items-center lg:justify-between">
           <div>
             <h2 className="text-xl font-bold">Practice plan</h2>
-            <p className="mt-1 text-sm text-white/50">Add position assignments inside each period, then drag the grip to reorder periods.</p>
+            <p className="mt-1 text-sm text-white/50">Build separate offensive and defensive period schedules, then drag the grip to reorder each unit.</p>
           </div>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="flex rounded-xl border border-white/10 bg-black/25 p-1" role="tablist" aria-label="Practice unit">
+              {(['offense', 'defense'] as PracticeBoardUnit[]).map((unit) => (
+                <button
+                  key={unit}
+                  type="button"
+                  role="tab"
+                  aria-selected={activeUnit === unit}
+                  onClick={() => {
+                    setActiveUnit(unit);
+                    setDraggedIndex(null);
+                  }}
+                  className={`rounded-lg px-4 py-2 text-sm font-black uppercase tracking-[0.12em] transition ${
+                    activeUnit === unit
+                      ? unit === 'offense'
+                        ? 'bg-cyan-400 text-slate-950 shadow-lg shadow-cyan-950/40'
+                        : 'bg-violet-400 text-slate-950 shadow-lg shadow-violet-950/40'
+                      : 'text-white/45 hover:bg-white/5 hover:text-white'
+                  }`}
+                >
+                  {unit}
+                </button>
+              ))}
+            </div>
             <button
               type="button"
               onClick={previewSchedule}
               disabled={sending || drills.length === 0}
               className="rounded-lg border border-cyan-500/35 bg-cyan-950/30 px-4 py-2.5 font-bold text-cyan-200 hover:bg-cyan-900/40 disabled:opacity-40"
             >
-              Preview schedule · 5 sec
+              Preview schedule
             </button>
             <button
               type="button"
               onClick={addDrill}
-              disabled={drills.length >= MAX_DRILLS}
+              disabled={unitDrills.length >= MAX_DRILLS_PER_UNIT}
               className="rounded-lg border border-green-500/40 bg-green-950/50 px-4 py-2.5 font-bold text-green-300 hover:bg-green-900/60 disabled:opacity-40"
             >
-              + Add period
+              + Add {activeUnit} period
             </button>
           </div>
         </div>
 
         <div className="space-y-2 p-3 sm:p-5">
-          {drills.length === 0 && (
+          {unitDrills.length === 0 && (
             <button type="button" onClick={addDrill} className="w-full rounded-xl border border-dashed border-white/15 px-6 py-10 text-center text-white/50 hover:border-green-500/40 hover:text-green-300">
-              No periods yet. Add the first period.
+              No {activeUnit} periods yet. Add the first one.
             </button>
           )}
 
-          {drills.map((drill, index) => {
+          {unitDrills.map((drill, index) => {
             const isActive = board.activeDrillId === drill.id;
             return (
               <article
                 key={drill.id}
                 onDragOver={(event) => event.preventDefault()}
                 onDrop={() => {
-                  if (draggedIndex !== null) moveDrill(draggedIndex, index);
+                  if (draggedIndex !== null) moveDrill(draggedIndex, index, activeUnit);
                   setDraggedIndex(null);
                 }}
                 className={`overflow-hidden rounded-2xl border ${
@@ -479,8 +536,8 @@ export default function PracticeBoardPage({ params }: { params: { deviceId: stri
                     onDragStart={() => setDraggedIndex(index)}
                     onDragEnd={() => setDraggedIndex(null)}
                     onKeyDown={(event) => {
-                      if (event.altKey && event.key === 'ArrowUp') moveDrill(index, index - 1);
-                      if (event.altKey && event.key === 'ArrowDown') moveDrill(index, index + 1);
+                      if (event.altKey && event.key === 'ArrowUp') moveDrill(index, index - 1, activeUnit);
+                      if (event.altKey && event.key === 'ArrowDown') moveDrill(index, index + 1, activeUnit);
                     }}
                     title="Drag to reorder. Alt+Up/Down also moves this period."
                     aria-label={`Reorder period ${index + 1}`}
@@ -564,7 +621,8 @@ export default function PracticeBoardPage({ params }: { params: { deviceId: stri
                           aria-label={`Period ${index + 1} assignment ${assignmentIndex + 1} position`}
                           className="rounded-lg px-3 py-2.5 font-bold md:w-32"
                         >
-                          {POSITION_OPTIONS.map((position) => <option key={position} value={position}>{position}</option>)}
+                          {(drill.unit === 'defense' ? DEFENSE_POSITION_OPTIONS : OFFENSE_POSITION_OPTIONS)
+                            .map((position) => <option key={position} value={position}>{position}</option>)}
                         </select>
                         {assignment.position === 'Other' && (
                           <input
@@ -612,14 +670,14 @@ export default function PracticeBoardPage({ params }: { params: { deviceId: stri
             </div>
           </div>
           <div className="flex flex-wrap gap-2">
-            <button type="button" onClick={() => advanceDrill(-1)} disabled={sending || activeIndex <= 0} className="rounded-lg border border-white/10 px-4 py-2.5 font-bold text-white/70 hover:bg-white/5 disabled:opacity-30">Previous</button>
+            <button type="button" onClick={() => advanceDrill(-1)} disabled={sending || activeUnitIndex <= 0} className="rounded-lg border border-white/10 px-4 py-2.5 font-bold text-white/70 hover:bg-white/5 disabled:opacity-30">Previous</button>
             {isActivelyRunning ? (
               <button type="button" onClick={stopDrill} disabled={sending} className="rounded-lg bg-amber-500 px-5 py-2.5 font-black text-black hover:bg-amber-400 disabled:opacity-50">Stop</button>
             ) : (
               <button
                 type="button"
                 onClick={() => activeDrill && remainingSeconds > 0 ? resumeDrill() : advanceDrill(1)}
-                disabled={sending || drills.length === 0 || (Boolean(activeDrill) && remainingSeconds === 0 && activeIndex === drills.length - 1)}
+                disabled={sending || controlDrills.length === 0 || (Boolean(activeDrill) && remainingSeconds === 0 && activeUnitIndex === activeUnitDrills.length - 1)}
                 className="rounded-lg bg-green-500 px-5 py-2.5 font-black text-black hover:bg-green-400 disabled:opacity-50"
               >
                 {activeDrill && remainingSeconds > 0
@@ -630,7 +688,7 @@ export default function PracticeBoardPage({ params }: { params: { deviceId: stri
               </button>
             )}
             <button type="button" onClick={restartDrill} disabled={sending || !activeDrill} className="rounded-lg border border-blue-500/35 bg-blue-950/30 px-4 py-2.5 font-bold text-blue-200 hover:bg-blue-900/40 disabled:opacity-30">Restart period</button>
-            <button type="button" onClick={() => advanceDrill(1)} disabled={sending || drills.length === 0} className="rounded-lg border border-white/10 px-4 py-2.5 font-bold text-white/70 hover:bg-white/5 disabled:opacity-30">Complete & next</button>
+            <button type="button" onClick={() => advanceDrill(1)} disabled={sending || (activeDrill ? activeUnitDrills.length === 0 : unitDrills.length === 0)} className="rounded-lg border border-white/10 px-4 py-2.5 font-bold text-white/70 hover:bg-white/5 disabled:opacity-30">Complete & next</button>
           </div>
         </div>
       </section>
@@ -655,12 +713,16 @@ function emptyBoard(): PracticeBoardState {
 
 function normalizeBoard(value: PracticeBoardState | undefined): PracticeBoardState {
   if (!value || !Array.isArray(value.drills)) return emptyBoard();
-  const drills = value.drills.slice(0, MAX_DRILLS).map((drill, index) => ({
+  const normalizedDrills = value.drills.map((drill, index) => ({
     id: typeof drill.id === 'string' && drill.id ? drill.id : `drill-${index + 1}`,
+    unit: drill.unit === 'defense' ? 'defense' as const : 'offense' as const,
     title: typeof drill.title === 'string' ? drill.title.slice(0, 48) : '',
     durationSeconds: clampDuration(drill.durationSeconds),
     assignments: normalizeAssignments(drill.assignments),
   }));
+  const drills = (['offense', 'defense'] as PracticeBoardUnit[]).flatMap((unit) =>
+    normalizedDrills.filter((drill) => drill.unit === unit).slice(0, MAX_DRILLS_PER_UNIT)
+  );
   const timerStatus = ['idle', 'running', 'paused', 'complete'].includes(value.timerStatus)
     ? value.timerStatus
     : 'idle';
@@ -679,8 +741,11 @@ function normalizeBoard(value: PracticeBoardState | undefined): PracticeBoardSta
 }
 
 function serializeDrills(drills: EditableDrill[]): PracticeBoardDrill[] {
-  return drills.slice(0, MAX_DRILLS).map((drill) => ({
+  return (['offense', 'defense'] as PracticeBoardUnit[]).flatMap((unit) =>
+    drills.filter((drill) => drill.unit === unit).slice(0, MAX_DRILLS_PER_UNIT)
+  ).map((drill) => ({
     id: drill.id,
+    unit: drill.unit,
     title: drill.title.trim().slice(0, 48),
     durationSeconds: parseDuration(drill.durationText),
     assignments: drill.assignments.slice(0, MAX_ASSIGNMENTS).map((assignment) => ({
@@ -697,6 +762,7 @@ function serializeDrills(drills: EditableDrill[]): PracticeBoardDrill[] {
 function toEditableDrill(drill: PracticeBoardDrill): EditableDrill {
   return {
     id: drill.id,
+    unit: drill.unit === 'defense' ? 'defense' : 'offense',
     title: drill.title,
     durationText: formatDuration(drill.durationSeconds),
     assignments: normalizeAssignments(drill.assignments),
@@ -726,7 +792,7 @@ function normalizeAssignments(value: unknown): PracticeBoardAssignment[] {
   if (!Array.isArray(value)) return [];
   return value.slice(0, MAX_ASSIGNMENTS).map((assignment, index) => {
     const raw = assignment as Partial<PracticeBoardAssignment>;
-    const position = POSITION_OPTIONS.includes(raw.position as PracticeBoardPosition)
+    const position = ALL_POSITION_OPTIONS.includes(raw.position as PracticeBoardPosition)
       ? raw.position as PracticeBoardPosition
       : 'ALL';
     return {
@@ -763,6 +829,21 @@ function clampDuration(value: number): number {
 function formatDuration(totalSeconds: number): string {
   const safeSeconds = clampDuration(totalSeconds);
   return `${Math.floor(safeSeconds / 60)}:${(safeSeconds % 60).toString().padStart(2, '0')}`;
+}
+
+function getPreviewPageCount(drills: Pick<PracticeBoardDrill, 'unit'>[]): number {
+  const offenseCount = drills.filter((drill) => drill.unit !== 'defense').length;
+  const defenseCount = drills.filter((drill) => drill.unit === 'defense').length;
+  return Math.max(1, Math.ceil(offenseCount / PREVIEW_PAGE_SIZE), Math.ceil(defenseCount / PREVIEW_PAGE_SIZE));
+}
+
+function getPreviewDurationMs(drills: Pick<PracticeBoardDrill, 'unit'>[]): number {
+  return getPreviewPageCount(drills) * PREVIEW_PAGE_DURATION_MS;
+}
+
+function formatPreviewDuration(durationMs: number): string {
+  const seconds = Math.max(1, Math.round(durationMs / 1000));
+  return `${seconds} second${seconds === 1 ? '' : 's'}`;
 }
 
 function getPublicMediaUrl(url: string) {

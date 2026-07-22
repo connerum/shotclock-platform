@@ -7,7 +7,21 @@ export type TimerMode = 'stop' | 'run' | 'pause';
 
 export type SportType = 'basketball' | 'wrestling' | 'volleyball';
 
-export type PracticeBoardPosition = 'ALL' | 'QB' | 'WR' | 'RB' | 'TE' | 'OL' | 'Other';
+export type PracticeBoardUnit = 'offense' | 'defense';
+
+export type PracticeBoardPosition =
+  | 'ALL'
+  | 'QB'
+  | 'WR'
+  | 'RB'
+  | 'TE'
+  | 'OL'
+  | 'DL'
+  | 'LB'
+  | 'Safety'
+  | 'Nickel'
+  | 'Corner'
+  | 'Other';
 
 export interface PracticeBoardAssignment {
   id: string;
@@ -18,6 +32,7 @@ export interface PracticeBoardAssignment {
 
 export interface PracticeBoardDrill {
   id: string;
+  unit?: PracticeBoardUnit;
   title: string;
   durationSeconds: number;
   assignments: PracticeBoardAssignment[];

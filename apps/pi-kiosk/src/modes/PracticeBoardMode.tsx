@@ -7,6 +7,12 @@ import type {
 
 const SCHEDULE_PREVIEW_DURATION_MS = 5000;
 const SCHEDULE_PREVIEW_INTERVAL_MS = 20000;
+const SCHEDULE_PREVIEW_PAGE_SIZE = 4;
+
+type SchedulePreviewState = {
+  until: number;
+  pageIndex: number;
+};
 
 export default function PracticeBoardMode({ board }: { board?: PracticeBoardState }) {
   const [now, setNow] = useState(Date.now());
@@ -20,20 +26,34 @@ export default function PracticeBoardMode({ board }: { board?: PracticeBoardStat
     return () => clearInterval(interval);
   }, [board?.overviewUntil, board?.timerStatus]);
 
-  const periods = board?.drills?.slice(0, 12) || [];
+  const periods = board?.drills?.slice(0, 24) || [];
   const activeIndex = periods.findIndex((period) => period.id === board?.activeDrillId);
   const activePeriod = activeIndex >= 0 ? periods[activeIndex] : undefined;
+  const activeUnitPeriods = activePeriod
+    ? periods.filter((period) => getPeriodUnit(period) === getPeriodUnit(activePeriod))
+    : [];
+  const activeUnitIndex = activePeriod
+    ? activeUnitPeriods.findIndex((period) => period.id === activePeriod.id)
+    : -1;
+  const previewPageCount = getPreviewPageCount(periods);
+  const previewDurationMs = previewPageCount * SCHEDULE_PREVIEW_DURATION_MS;
   const remainingSeconds = projectRemainingSeconds(board, now);
   const timezone = board?.weather?.timezone;
   const clock = useMemo(() => formatLocationTime(now, timezone), [now, timezone]);
-  const manualOverviewUntil = board?.overviewUntil && board.overviewUntil > now
-    ? board.overviewUntil
+  const manualPreview = getManualPreviewState(board?.overviewUntil, now, previewDurationMs, previewPageCount);
+  const automaticPreview = activePeriod
+    ? getAutomaticPreviewState(board, activePeriod, now, previewDurationMs, previewPageCount)
     : undefined;
-  const automaticOverviewUntil = activePeriod
-    ? getAutomaticOverviewUntil(board, activePeriod, now)
-    : undefined;
-  const overviewUntil = Math.max(manualOverviewUntil || 0, automaticOverviewUntil || 0) || undefined;
-  const showOverview = !activePeriod || Boolean(overviewUntil);
+  const previewState = !manualPreview
+    ? automaticPreview
+    : !automaticPreview || manualPreview.until >= automaticPreview.until
+      ? manualPreview
+      : automaticPreview;
+  const previewPageIndex = previewState?.pageIndex
+    ?? (!activePeriod && previewPageCount > 1
+      ? Math.floor(now / SCHEDULE_PREVIEW_DURATION_MS) % previewPageCount
+      : 0);
+  const showOverview = !activePeriod || Boolean(previewState);
 
   return (
     <div
@@ -52,14 +72,15 @@ export default function PracticeBoardMode({ board }: { board?: PracticeBoardStat
         {showOverview ? (
           <ScheduleOverview
             periods={periods}
-            activeIndex={activeIndex}
+            activePeriodId={activePeriod?.id}
             remainingSeconds={remainingSeconds}
             schoolLogoUrl={board?.schoolLogoUrl}
+            pageIndex={previewPageIndex}
           />
         ) : (
           <ActivePeriod
             period={activePeriod}
-            periodNumber={activeIndex + 1}
+            periodNumber={activeUnitIndex + 1}
             remainingSeconds={remainingSeconds}
             timerStatus={board?.timerStatus}
           />
@@ -118,14 +139,16 @@ function StatusBar({
 
 function ScheduleOverview({
   periods,
-  activeIndex,
+  activePeriodId,
   remainingSeconds,
   schoolLogoUrl,
+  pageIndex,
 }: {
   periods: PracticeBoardDrill[];
-  activeIndex: number;
+  activePeriodId?: string;
   remainingSeconds: number;
   schoolLogoUrl?: string;
+  pageIndex: number;
 }) {
   if (periods.length === 0) {
     return (
@@ -140,6 +163,10 @@ function ScheduleOverview({
       </div>
     );
   }
+
+  const offensePeriods = periods.filter((period) => getPeriodUnit(period) === 'offense');
+  const defensePeriods = periods.filter((period) => getPeriodUnit(period) === 'defense');
+  const showSplitSchedule = offensePeriods.length > 0 && defensePeriods.length > 0;
 
   return (
     <section className="grid min-h-0 grid-rows-[auto_1fr] gap-[1.5cqh] p-[2cqh_2cqw]">
@@ -159,51 +186,154 @@ function ScheduleOverview({
         </div>
       </div>
 
-      <div
-        className="grid min-h-0 gap-[0.8cqh] overflow-hidden"
-        style={{ gridTemplateRows: `repeat(${periods.length}, minmax(0, 1fr))` }}
-      >
-        {periods.map((period, index) => {
-          const isActive = index === activeIndex;
-          const isComplete = activeIndex >= 0 && index < activeIndex;
-          const assignmentCount = period.assignments?.length || 0;
-          return (
-            <div
-              key={period.id}
-              style={{ containerType: 'size' }}
-              className={`relative grid min-h-0 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-[1.8cqw] overflow-hidden rounded-[1.5cqw] border px-[1.6cqw] shadow-[inset_0_1px_0_rgba(255,255,255,0.045)] ${
-                isActive
-                  ? 'border-cyan-300/35 bg-gradient-to-r from-cyan-400/[0.14] to-violet-500/[0.09]'
-                  : isComplete
-                    ? 'border-white/[0.05] bg-white/[0.025] text-white/30'
-                    : 'border-white/[0.08] bg-white/[0.045]'
-              }`}
-            >
-              <div className={`flex h-[min(82cqh,8cqw)] w-[min(82cqh,8cqw)] items-center justify-center rounded-[1.2cqw] text-[min(54cqh,5cqw)] font-black leading-none ${
-                isActive
-                  ? 'bg-gradient-to-br from-cyan-300 to-violet-400 text-[#07101d] shadow-[0_0_22px_rgba(34,211,238,0.25)]'
-                  : isComplete
-                    ? 'bg-white/[0.04] text-cyan-300/45'
-                    : 'bg-white/[0.07] text-white/50'
-              }`}>
-                {isComplete ? '✓' : String(index + 1).padStart(2, '0')}
+      {showSplitSchedule ? (
+        <div className="grid min-h-0 grid-cols-[minmax(0,1fr)_1px_minmax(0,1fr)] gap-[1.5cqw] overflow-hidden">
+          <ScheduleUnitColumn
+            label="Offense"
+            periods={offensePeriods}
+            activePeriodId={activePeriodId}
+            remainingSeconds={remainingSeconds}
+            pageIndex={pageIndex}
+            accent="cyan"
+          />
+          <div className="h-full w-px bg-gradient-to-b from-transparent via-white/20 to-transparent" />
+          <ScheduleUnitColumn
+            label="Defense"
+            periods={defensePeriods}
+            activePeriodId={activePeriodId}
+            remainingSeconds={remainingSeconds}
+            pageIndex={pageIndex}
+            accent="violet"
+          />
+        </div>
+      ) : (
+        <ScheduleCardGrid
+          periods={offensePeriods.length > 0 ? offensePeriods : defensePeriods}
+          activePeriodId={activePeriodId}
+          remainingSeconds={remainingSeconds}
+          pageIndex={pageIndex}
+        />
+      )}
+    </section>
+  );
+}
+
+function ScheduleUnitColumn({
+  label,
+  periods,
+  activePeriodId,
+  remainingSeconds,
+  pageIndex,
+  accent,
+}: {
+  label: 'Offense' | 'Defense';
+  periods: PracticeBoardDrill[];
+  activePeriodId?: string;
+  remainingSeconds: number;
+  pageIndex: number;
+  accent: 'cyan' | 'violet';
+}) {
+  return (
+    <div className="grid min-h-0 grid-rows-[auto_1fr] gap-[1cqh] overflow-hidden">
+      <div className={`px-[0.6cqw] text-[min(3cqh,2.2cqw)] font-black uppercase tracking-[0.22em] ${
+        accent === 'cyan' ? 'text-cyan-200/75' : 'text-violet-200/80'
+      }`}>
+        {label}
+      </div>
+      <ScheduleCardGrid
+        periods={periods}
+        activePeriodId={activePeriodId}
+        remainingSeconds={remainingSeconds}
+        pageIndex={pageIndex}
+        compact
+      />
+    </div>
+  );
+}
+
+function ScheduleCardGrid({
+  periods,
+  activePeriodId,
+  remainingSeconds,
+  pageIndex,
+  compact = false,
+}: {
+  periods: PracticeBoardDrill[];
+  activePeriodId?: string;
+  remainingSeconds: number;
+  pageIndex: number;
+  compact?: boolean;
+}) {
+  const pageStart = pageIndex * SCHEDULE_PREVIEW_PAGE_SIZE;
+  const visiblePeriods = periods.slice(pageStart, pageStart + SCHEDULE_PREVIEW_PAGE_SIZE);
+  const activeIndex = periods.findIndex((period) => period.id === activePeriodId);
+
+  if (visiblePeriods.length === 0) {
+    return (
+      <div className="flex min-h-0 items-center justify-center rounded-[1.8cqw] border border-dashed border-white/[0.08] bg-white/[0.02] text-[min(3.2cqh,2.2cqw)] font-black uppercase tracking-[0.15em] text-white/20">
+        Schedule complete
+      </div>
+    );
+  }
+
+  return (
+    <div
+      className="grid min-h-0 gap-[0.8cqh] overflow-hidden"
+      style={{ gridTemplateRows: `repeat(${visiblePeriods.length}, minmax(0, 1fr))` }}
+    >
+      {visiblePeriods.map((period, visibleIndex) => {
+        const index = pageStart + visibleIndex;
+        const isActive = period.id === activePeriodId;
+        const isComplete = activeIndex >= 0 && index < activeIndex;
+        const assignmentCount = period.assignments?.length || 0;
+        return (
+          <div
+            key={period.id}
+            style={{ containerType: 'size' }}
+            className={`relative grid min-h-0 grid-cols-[auto_minmax(0,1fr)_auto] items-center overflow-hidden rounded-[1.5cqw] border shadow-[inset_0_1px_0_rgba(255,255,255,0.045)] ${
+              compact ? 'gap-[1cqw] px-[1cqw]' : 'gap-[1.8cqw] px-[1.6cqw]'
+            } ${
+              isActive
+                ? 'border-cyan-300/35 bg-gradient-to-r from-cyan-400/[0.14] to-violet-500/[0.09]'
+                : isComplete
+                  ? 'border-white/[0.05] bg-white/[0.025] text-white/30'
+                  : 'border-white/[0.08] bg-white/[0.045]'
+            }`}
+          >
+            <div className={`flex items-center justify-center rounded-[1.2cqw] font-black leading-none ${
+              compact
+                ? 'h-[min(78cqh,13cqw)] w-[min(78cqh,13cqw)] text-[min(52cqh,8cqw)]'
+                : 'h-[min(82cqh,8cqw)] w-[min(82cqh,8cqw)] text-[min(54cqh,5cqw)]'
+            } ${
+              isActive
+                ? 'bg-gradient-to-br from-cyan-300 to-violet-400 text-[#07101d] shadow-[0_0_22px_rgba(34,211,238,0.25)]'
+                : isComplete
+                  ? 'bg-white/[0.04] text-cyan-300/45'
+                  : 'bg-white/[0.07] text-white/50'
+            }`}>
+              {isComplete ? '✓' : String(index + 1).padStart(2, '0')}
+            </div>
+            <div className="min-w-0">
+              <div className={`truncate font-black leading-none tracking-[-0.045em] ${
+                compact ? 'text-[min(50cqh,10cqw)]' : 'text-[min(56cqh,7cqw)]'
+              } ${isActive ? 'text-white' : ''}`}>
+                {period.title || `Period ${index + 1}`}
               </div>
-              <div className="min-w-0">
-                <div className={`truncate text-[min(56cqh,7cqw)] font-black leading-none tracking-[-0.045em] ${isActive ? 'text-white' : ''}`}>
-                  {period.title || `Period ${index + 1}`}
-                </div>
-                <div className={`mt-[5cqh] text-[min(22cqh,2.4cqw)] font-bold uppercase leading-none tracking-[0.1em] ${isActive ? 'text-cyan-200/70' : 'text-white/25'}`}>
-                  {assignmentCount} position assignment{assignmentCount === 1 ? '' : 's'}
-                </div>
-              </div>
-              <div className={`text-[min(68cqh,7.2cqw)] font-black leading-none tracking-[-0.05em] tabular-nums ${isActive ? 'text-cyan-100' : isComplete ? 'text-white/20' : 'text-white/85'}`}>
-                {formatDuration(isActive ? remainingSeconds : period.durationSeconds)}
+              <div className={`mt-[5cqh] truncate font-bold uppercase leading-none tracking-[0.08em] ${
+                compact ? 'text-[min(19cqh,3.4cqw)]' : 'text-[min(22cqh,2.4cqw)]'
+              } ${isActive ? 'text-cyan-200/70' : 'text-white/25'}`}>
+                {assignmentCount} assignment{assignmentCount === 1 ? '' : 's'}
               </div>
             </div>
-          );
-        })}
-      </div>
-    </section>
+            <div className={`font-black leading-none tracking-[-0.05em] tabular-nums ${
+              compact ? 'text-[min(60cqh,11cqw)]' : 'text-[min(68cqh,7.2cqw)]'
+            } ${isActive ? 'text-cyan-100' : isComplete ? 'text-white/20' : 'text-white/85'}`}>
+              {formatDuration(isActive ? remainingSeconds : period.durationSeconds)}
+            </div>
+          </div>
+        );
+      })}
+    </div>
   );
 }
 
@@ -304,11 +434,28 @@ function projectRemainingSeconds(board: PracticeBoardState | undefined, now: num
   return Math.max(0, Math.ceil(board.remainingSeconds - elapsedSeconds));
 }
 
-function getAutomaticOverviewUntil(
+function getManualPreviewState(
+  overviewUntil: number | undefined,
+  now: number,
+  previewDurationMs: number,
+  pageCount: number
+): SchedulePreviewState | undefined {
+  if (typeof overviewUntil !== 'number' || overviewUntil <= now) return undefined;
+  const previewStartedAt = overviewUntil - previewDurationMs;
+  const elapsedMs = Math.max(0, now - previewStartedAt);
+  return {
+    until: overviewUntil,
+    pageIndex: Math.min(pageCount - 1, Math.floor(elapsedMs / SCHEDULE_PREVIEW_DURATION_MS)),
+  };
+}
+
+function getAutomaticPreviewState(
   board: PracticeBoardState | undefined,
   period: PracticeBoardDrill,
-  now: number
-): number | undefined {
+  now: number,
+  previewDurationMs: number,
+  pageCount: number
+): SchedulePreviewState | undefined {
   if (board?.timerStatus !== 'running' || typeof board.startedAt !== 'number') return undefined;
 
   const remainingAtSnapshotMs = Math.max(0, board.remainingSeconds) * 1000;
@@ -320,9 +467,26 @@ function getAutomaticOverviewUntil(
   if (elapsedPeriodMs < SCHEDULE_PREVIEW_INTERVAL_MS) return undefined;
 
   const intervalPositionMs = elapsedPeriodMs % SCHEDULE_PREVIEW_INTERVAL_MS;
-  if (intervalPositionMs >= SCHEDULE_PREVIEW_DURATION_MS) return undefined;
+  if (intervalPositionMs >= previewDurationMs) return undefined;
 
-  return now + SCHEDULE_PREVIEW_DURATION_MS - intervalPositionMs;
+  return {
+    until: now + previewDurationMs - intervalPositionMs,
+    pageIndex: Math.min(pageCount - 1, Math.floor(intervalPositionMs / SCHEDULE_PREVIEW_DURATION_MS)),
+  };
+}
+
+function getPreviewPageCount(periods: PracticeBoardDrill[]): number {
+  const offenseCount = periods.filter((period) => getPeriodUnit(period) === 'offense').length;
+  const defenseCount = periods.filter((period) => getPeriodUnit(period) === 'defense').length;
+  return Math.max(
+    1,
+    Math.ceil(offenseCount / SCHEDULE_PREVIEW_PAGE_SIZE),
+    Math.ceil(defenseCount / SCHEDULE_PREVIEW_PAGE_SIZE)
+  );
+}
+
+function getPeriodUnit(period: PracticeBoardDrill): 'offense' | 'defense' {
+  return period.unit === 'defense' ? 'defense' : 'offense';
 }
 
 function formatDuration(totalSeconds: number): string {
