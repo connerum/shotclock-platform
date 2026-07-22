@@ -179,7 +179,7 @@ function ScheduleOverview({
                     : 'border-white/[0.08] bg-white/[0.045]'
               }`}
             >
-              <div className={`flex h-[min(78cqh,5cqw)] w-[min(78cqh,5cqw)] items-center justify-center rounded-[1.2cqw] text-[min(42cqh,2.9cqw)] font-black leading-none ${
+              <div className={`flex h-[min(82cqh,8cqw)] w-[min(82cqh,8cqw)] items-center justify-center rounded-[1.2cqw] text-[min(54cqh,5cqw)] font-black leading-none ${
                 isActive
                   ? 'bg-gradient-to-br from-cyan-300 to-violet-400 text-[#07101d] shadow-[0_0_22px_rgba(34,211,238,0.25)]'
                   : isComplete
@@ -189,14 +189,14 @@ function ScheduleOverview({
                 {isComplete ? '✓' : String(index + 1).padStart(2, '0')}
               </div>
               <div className="min-w-0">
-                <div className={`truncate text-[min(50cqh,5cqw)] font-black leading-none tracking-[-0.04em] ${isActive ? 'text-white' : ''}`}>
+                <div className={`truncate text-[min(56cqh,7cqw)] font-black leading-none tracking-[-0.045em] ${isActive ? 'text-white' : ''}`}>
                   {period.title || `Period ${index + 1}`}
                 </div>
-                <div className={`mt-[6cqh] text-[min(19cqh,1.7cqw)] font-bold uppercase leading-none tracking-[0.12em] ${isActive ? 'text-cyan-200/70' : 'text-white/25'}`}>
+                <div className={`mt-[5cqh] text-[min(22cqh,2.4cqw)] font-bold uppercase leading-none tracking-[0.1em] ${isActive ? 'text-cyan-200/70' : 'text-white/25'}`}>
                   {assignmentCount} position assignment{assignmentCount === 1 ? '' : 's'}
                 </div>
               </div>
-              <div className={`text-[min(57cqh,5.3cqw)] font-black leading-none tracking-[-0.045em] tabular-nums ${isActive ? 'text-cyan-100' : isComplete ? 'text-white/20' : 'text-white/85'}`}>
+              <div className={`text-[min(68cqh,7.2cqw)] font-black leading-none tracking-[-0.05em] tabular-nums ${isActive ? 'text-cyan-100' : isComplete ? 'text-white/20' : 'text-white/85'}`}>
                 {formatDuration(isActive ? remainingSeconds : period.durationSeconds)}
               </div>
             </div>
