@@ -33,7 +33,12 @@ export default function PracticeBoardMode({ board }: { board?: PracticeBoardStat
       <div className="pointer-events-none absolute -left-[18cqw] -top-[22cqh] h-[60cqw] w-[60cqw] rounded-full bg-cyan-500/[0.10] blur-[9cqw]" />
       <div className="pointer-events-none absolute -bottom-[34cqh] right-[-12cqw] h-[70cqw] w-[70cqw] rounded-full bg-violet-500/[0.13] blur-[10cqw]" />
       <div className="relative grid h-full w-full grid-rows-[15%_85%]">
-        <StatusBar board={board} clock={clock} />
+        <StatusBar
+          board={board}
+          clock={clock}
+          remainingSeconds={remainingSeconds}
+          showPeriodTimer={Boolean(activePeriod)}
+        />
         {showOverview ? (
           <ScheduleOverview
             periods={periods}
@@ -59,33 +64,44 @@ export default function PracticeBoardMode({ board }: { board?: PracticeBoardStat
 function StatusBar({
   board,
   clock,
+  remainingSeconds,
+  showPeriodTimer,
 }: {
   board?: PracticeBoardState;
   clock: { dayAndDate: string };
+  remainingSeconds: number;
+  showPeriodTimer: boolean;
 }) {
   return (
-    <header className="grid min-h-0 grid-cols-[1fr_auto_auto] items-center gap-[1.5cqw] border-b border-white/[0.08] bg-[#070b1a]/80 px-[2.5cqw] backdrop-blur-xl">
-      <div className="flex min-w-0 items-center gap-[1.5cqw]">
-        <div className="flex h-[min(7cqh,5cqw)] w-[min(7cqh,5cqw)] items-center justify-center rounded-[1.4cqw] bg-gradient-to-br from-cyan-300 to-violet-500 shadow-[0_0_26px_rgba(34,211,238,0.28)]">
-          <span className="text-[min(3.8cqh,2.8cqw)] font-black text-[#07101d]">P</span>
-        </div>
-        <div className="min-w-0 leading-none">
-          <div className="text-[min(2.5cqh,1.8cqw)] font-black uppercase tracking-[0.24em] text-cyan-300">Practice</div>
-          <div className="mt-[1cqh] truncate text-[min(3.5cqh,2.6cqw)] font-bold tracking-[-0.02em] text-white/85">{clock.dayAndDate}</div>
+    <header className="grid min-h-0 grid-cols-[1fr_auto_1fr] items-center gap-[1.6cqw] border-b border-white/[0.08] bg-[#070b1a]/80 px-[2.5cqw] backdrop-blur-xl">
+      <div className="min-w-0">
+        <div className="truncate text-[min(4.3cqh,3.1cqw)] font-black tracking-[-0.035em] text-white/90">
+          {clock.dayAndDate}
         </div>
       </div>
 
-      <div className="min-w-[20cqw] rounded-[1.3cqw] border border-white/[0.08] bg-white/[0.045] px-[2cqw] py-[1.3cqh] leading-none shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
-        <div className="text-[min(2.2cqh,1.6cqw)] font-bold uppercase tracking-[0.18em] text-white/35">Conditions</div>
-        <div className="mt-[1cqh] truncate text-[min(3.5cqh,2.5cqw)] font-extrabold text-white/90">
-          {board?.weather ? `${board.weather.description} · ${Math.round(board.weather.temperatureF)}°` : 'Weather not set'}
-        </div>
+      <div
+        className={`min-w-[16cqw] text-center text-[min(7.2cqh,5.2cqw)] font-black leading-none tracking-[-0.055em] tabular-nums ${
+          showPeriodTimer ? 'text-white' : 'invisible'
+        }`}
+        aria-hidden={!showPeriodTimer}
+      >
+        {formatDuration(remainingSeconds)}
       </div>
 
-      <div className="min-w-[14cqw] rounded-[1.3cqw] border border-cyan-300/20 bg-gradient-to-br from-cyan-400/[0.12] to-violet-500/[0.10] px-[2cqw] py-[1.3cqh] text-right leading-none shadow-[inset_0_1px_0_rgba(255,255,255,0.07)]">
-        <div className="text-[min(2cqh,1.45cqw)] font-bold uppercase tracking-[0.12em] text-cyan-200/60">Wet bulb</div>
-        <div className="mt-[0.8cqh] text-[min(4.6cqh,3.3cqw)] font-black tabular-nums text-white">
-          {board?.weather ? `${Math.round(board.weather.wetBulbF)}°` : '--'}
+      <div className="flex min-w-0 items-stretch justify-end gap-[1cqw]">
+        <div className="min-w-0 flex-1 rounded-[1.3cqw] border border-white/[0.08] bg-white/[0.045] px-[1.5cqw] py-[1.1cqh] leading-none shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
+          <div className="text-[min(1.9cqh,1.35cqw)] font-bold uppercase tracking-[0.16em] text-white/35">Conditions</div>
+          <div className="mt-[0.8cqh] truncate text-[min(3.1cqh,2.2cqw)] font-extrabold text-white/90">
+            {board?.weather ? `${board.weather.description} · ${Math.round(board.weather.temperatureF)}°` : 'Weather not set'}
+          </div>
+        </div>
+
+        <div className="min-w-[11cqw] rounded-[1.3cqw] border border-cyan-300/20 bg-gradient-to-br from-cyan-400/[0.12] to-violet-500/[0.10] px-[1.5cqw] py-[1.1cqh] text-right leading-none shadow-[inset_0_1px_0_rgba(255,255,255,0.07)]">
+          <div className="text-[min(1.8cqh,1.3cqw)] font-bold uppercase tracking-[0.1em] text-cyan-200/60">Wet bulb</div>
+          <div className="mt-[0.65cqh] text-[min(4cqh,2.9cqw)] font-black tabular-nums text-white">
+            {board?.weather ? `${Math.round(board.weather.wetBulbF)}°` : '--'}
+          </div>
         </div>
       </div>
     </header>
@@ -106,7 +122,11 @@ function ScheduleOverview({
   if (periods.length === 0) {
     return (
       <div className="flex min-h-0 flex-col items-center justify-center px-[8cqw] text-center">
-        <div className="rounded-full border border-cyan-300/15 bg-cyan-300/[0.06] px-[2.5cqw] py-[1.2cqh] text-[min(2.8cqh,2cqw)] font-black uppercase tracking-[0.24em] text-cyan-200">Board ready</div>
+        <img
+          src="/images/legacy1-performance-logo.png"
+          alt="Legacy 1 Performance"
+          className="h-auto max-h-[20cqh] w-auto max-w-[48cqw] object-contain drop-shadow-[0_0_3cqw_rgba(239,68,68,0.16)]"
+        />
         <div className="mt-[3cqh] text-[min(10cqh,7cqw)] font-black tracking-[-0.06em] text-white">Build today&apos;s plan</div>
         <div className="mt-[2cqh] text-[min(4cqh,3cqw)] font-medium text-white/35">Add periods and position assignments from the WebUI.</div>
       </div>
@@ -192,16 +212,16 @@ function ActivePeriod({
   const expired = remainingSeconds === 0;
 
   return (
-    <main className="grid min-h-0 grid-rows-[36%_64%] gap-[1.5cqh] p-[2cqh_2cqw]">
-      <section className="relative grid min-h-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-[3cqw] overflow-hidden rounded-[2.2cqw] border border-white/[0.10] bg-gradient-to-br from-white/[0.075] via-white/[0.04] to-violet-500/[0.08] px-[3cqw] shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_2cqh_7cqw_rgba(0,0,0,0.28)]">
+    <main className="grid min-h-0 grid-rows-[36%_minmax(0,1fr)] gap-[1.5cqh] p-[2cqh_2cqw]">
+      <section className="relative flex min-h-0 items-center overflow-hidden rounded-[2.2cqw] border border-white/[0.10] bg-gradient-to-br from-white/[0.075] via-white/[0.04] to-violet-500/[0.08] px-[3cqw] shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_2cqh_7cqw_rgba(0,0,0,0.28)]">
         <div className="pointer-events-none absolute -left-[12cqw] -top-[20cqh] h-[45cqw] w-[45cqw] rounded-full bg-cyan-400/[0.12] blur-[7cqw]" />
-        <div className="relative min-w-0">
+        <div className="relative w-full min-w-0">
           <div className="flex items-center gap-[1cqw] text-[min(2.7cqh,2cqw)] font-black uppercase tracking-[0.2em] text-cyan-200/65">
             <span>Period {String(periodNumber).padStart(2, '0')}</span>
             <span className="h-[0.55cqh] w-[0.55cqh] rounded-full bg-cyan-300" />
             <span>{expired ? 'Time' : timerStatusLabel(timerStatus)}</span>
           </div>
-          <h1 className="mt-[1.2cqh] truncate text-[min(11.5cqh,8.5cqw)] font-black leading-[0.9] tracking-[-0.065em] text-white">
+          <h1 className="mt-[1.2cqh] truncate text-[min(13cqh,10cqw)] font-black leading-[0.9] tracking-[-0.065em] text-white">
             {period.title || `Period ${periodNumber}`}
           </h1>
           <div className="mt-[2.8cqh] h-[1cqh] overflow-hidden rounded-full bg-white/[0.07]">
@@ -211,19 +231,12 @@ function ActivePeriod({
             />
           </div>
         </div>
-        <div className={`relative rounded-[2cqw] border px-[3cqw] py-[2.2cqh] text-[min(11cqh,8cqw)] font-black leading-none tracking-[-0.06em] tabular-nums shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] ${
-          expired
-            ? 'border-rose-300/25 bg-rose-400/[0.10] text-rose-200'
-            : 'border-cyan-300/20 bg-[#070d20]/75 text-white'
-        }`}>
-          {formatDuration(remainingSeconds)}
-        </div>
       </section>
 
       <section className="grid min-h-0 grid-rows-[auto_1fr] gap-[1cqh] overflow-hidden">
         <div className="flex items-center justify-between px-[0.8cqw]">
-          <div className="text-[min(2.5cqh,1.8cqw)] font-black uppercase tracking-[0.2em] text-white/40">Position plan</div>
-          <div className="text-[min(2.3cqh,1.7cqw)] font-bold text-white/25">{assignments.length} assignment{assignments.length === 1 ? '' : 's'}</div>
+          <div className="text-[min(3.2cqh,2.35cqw)] font-black uppercase tracking-[0.16em] text-white/65">Position plan</div>
+          <div className="text-[min(3cqh,2.2cqw)] font-extrabold text-white/50">{assignments.length} assignment{assignments.length === 1 ? '' : 's'}</div>
         </div>
 
         {assignments.length === 0 ? (
