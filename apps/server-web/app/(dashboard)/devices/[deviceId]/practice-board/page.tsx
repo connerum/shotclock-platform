@@ -12,6 +12,7 @@ import type {
   PracticeBoardWeather,
 } from '@shotclock/shared/types';
 import { SyncTargetBanner, useDeviceCommandDispatcher } from '../../../SelectedDevicesProvider';
+import { PracticeBoardPreview } from './PracticeBoardPreview';
 
 type EditableDrill = {
   id: string;
@@ -105,6 +106,10 @@ export default function PracticeBoardPage({ params }: { params: { deviceId: stri
     (total, drill) => total + parseDuration(drill.durationText),
     0
   );
+  const livePreviewBoard: PracticeBoardState = {
+    ...board,
+    drills: serializeDrills(drills),
+  };
 
   const showNotice = (message: string) => {
     setNotice(message);
@@ -384,6 +389,8 @@ export default function PracticeBoardPage({ params }: { params: { deviceId: stri
 
       {error && <div className="mb-4 rounded-lg border border-red-700 bg-red-950/60 p-3 text-sm text-red-200">{error}</div>}
       {notice && <div className="mb-4 rounded-lg border border-green-600/50 bg-green-950/50 p-3 text-sm text-green-200">{notice}</div>}
+
+      <PracticeBoardPreview board={livePreviewBoard} />
 
       <section className="cc-card mb-5 p-5">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-end">
