@@ -82,6 +82,7 @@ const MEDIA_SLOT_CONFIG: Array<{
 const CALIBRATION_CANVAS_WIDTH = 1920;
 const CALIBRATION_CANVAS_HEIGHT = 1080;
 const MIN_CALIBRATION_SIZE = 24;
+const CALIBRATION_ROTATIONS = [0, 90, 180, 270] as const;
 
 type CalibrationBox = {
   x: number;
@@ -128,7 +129,8 @@ function clampCalibrationBox(box: CalibrationBox): CalibrationBox {
 }
 
 function normalizeCalibrationRotation(rotation: number | undefined): number {
-  return Math.abs(Number(rotation) || 0) === 180 ? 180 : 0;
+  const quarterTurns = Math.round((Number(rotation) || 0) / 90);
+  return ((quarterTurns * 90) % 360 + 360) % 360;
 }
 
 export default function DeviceDetailPage({ params }: { params: { deviceId: string } }) {
@@ -514,10 +516,10 @@ export default function DeviceDetailPage({ params }: { params: { deviceId: strin
     });
   };
 
-  const toggleDisplayRotation = () => {
+  const setDisplayRotation = (rotation: number) => {
     setCalibrationWithPreview({
       ...calibration,
-      rotation: calibration.rotation === 180 ? 0 : 180,
+      rotation: normalizeCalibrationRotation(rotation),
     });
   };
 
@@ -918,20 +920,26 @@ export default function DeviceDetailPage({ params }: { params: { deviceId: strin
                 <div>
                   <div className="font-medium text-gray-200">Display Rotation</div>
                   <p className="mt-1 text-sm text-gray-400">
-                    Flip the calibrated output 180° when the board is mounted upside down.
+                    Rotate the calibrated output in 90° steps to match how the display is mounted.
                   </p>
                 </div>
-                <button
-                  type="button"
-                  onClick={toggleDisplayRotation}
-                  className={`rounded px-4 py-2 text-sm font-semibold ${
-                    calibration.rotation === 180
-                      ? 'bg-green-600 text-white hover:bg-green-700'
-                      : 'bg-gray-800 text-gray-200 hover:bg-gray-700'
-                  }`}
-                >
-                  {calibration.rotation === 180 ? '180° Enabled' : 'Enable 180°'}
-                </button>
+                <div className="grid shrink-0 grid-cols-4 gap-1 rounded-lg border border-white/10 bg-black/30 p-1" role="group" aria-label="Display rotation">
+                  {CALIBRATION_ROTATIONS.map((rotation) => (
+                    <button
+                      key={rotation}
+                      type="button"
+                      onClick={() => setDisplayRotation(rotation)}
+                      aria-pressed={calibration.rotation === rotation}
+                      className={`min-w-12 rounded-md px-3 py-2 text-sm font-semibold tabular-nums ${
+                        calibration.rotation === rotation
+                          ? 'bg-green-600 text-white shadow-lg shadow-green-950/40 hover:bg-green-500'
+                          : 'text-gray-300 hover:bg-white/10 hover:text-white'
+                      }`}
+                    >
+                      {rotation}°
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
 
