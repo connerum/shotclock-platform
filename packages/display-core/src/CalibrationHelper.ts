@@ -145,7 +145,8 @@ export function validateCalibration(calibration: CalibrationData): CalibrationRe
   const isValidScale = calibration.scaleX > 0.01 && calibration.scaleX < 100 &&
                        calibration.scaleY > 0.01 && calibration.scaleY < 100;
   
-  const isValidRotation = calibration.rotation >= -180 && calibration.rotation <= 180;
+  const normalizedRotation = ((calibration.rotation % 360) + 360) % 360;
+  const isValidRotation = Number.isFinite(calibration.rotation) && normalizedRotation % 90 === 0;
   const isValidSize = calibration.width > 0 && calibration.height > 0;
   
   const isValidTimestamp = calibration.timestamp > 0 && calibration.timestamp <= Date.now();

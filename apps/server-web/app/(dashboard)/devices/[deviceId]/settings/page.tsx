@@ -941,6 +941,11 @@ export default function DeviceDetailPage({ params }: { params: { deviceId: strin
                   ))}
                 </div>
               </div>
+              {(calibration.rotation === 90 || calibration.rotation === 270) && (
+                <div className="mt-3 rounded-md border border-green-500/20 bg-green-500/10 px-3 py-2 text-sm text-green-100">
+                  Quarter-turn mode swaps the test pattern to a {calibration.height} × {calibration.width} logical canvas so the full grid stays inside the calibrated area.
+                </div>
+              )}
             </div>
 
             <div className="flex space-x-2 pt-2">
