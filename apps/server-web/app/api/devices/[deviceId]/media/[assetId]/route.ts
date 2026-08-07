@@ -6,15 +6,16 @@ import { prisma } from '@/lib/prisma';
 import { canAccessDevice, requireApiUser } from '@/lib/auth';
 
 interface RouteParams {
-  params: { deviceId: string; assetId: string };
+  params: Promise<{ deviceId: string; assetId: string }>;
 }
 
 export async function PATCH(request: NextRequest, { params }: RouteParams) {
   try {
+    const { deviceId, assetId } = await params;
     const auth = await requireApiUser();
     if (auth instanceof Response) return auth;
 
-    const mediaAsset = await getAccessibleMediaAsset(params.deviceId, params.assetId, auth);
+    const mediaAsset = await getAccessibleMediaAsset(deviceId, assetId, auth);
     if (!mediaAsset) {
       return NextResponse.json({ error: 'Media asset not found' }, { status: 404 });
     }
@@ -25,7 +26,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     if (mediaAsset.slot !== 'ads' && isActive) {
       await prisma.deviceMediaAsset.updateMany({
         where: {
-          deviceId: params.deviceId,
+          deviceId,
           slot: mediaAsset.slot,
           id: { not: mediaAsset.id },
         },
@@ -47,16 +48,17 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
 
 export async function DELETE(_request: NextRequest, { params }: RouteParams) {
   try {
+    const { deviceId, assetId } = await params;
     const auth = await requireApiUser();
     if (auth instanceof Response) return auth;
 
-    const mediaAsset = await getAccessibleMediaAsset(params.deviceId, params.assetId, auth);
+    const mediaAsset = await getAccessibleMediaAsset(deviceId, assetId, auth);
     if (!mediaAsset) {
       return NextResponse.json({ error: 'Media asset not found' }, { status: 404 });
     }
 
     await prisma.deviceMediaAsset.delete({ where: { id: mediaAsset.id } });
-    await unlink(join(getServerWebRoot(), 'public', 'media', 'devices', params.deviceId, mediaAsset.filename)).catch(() => {});
+    await unlink(join(getServerWebRoot(), 'public', 'media', 'devices', deviceId, mediaAsset.filename)).catch(() => {});
 
     return NextResponse.json({ success: true });
   } catch (error) {

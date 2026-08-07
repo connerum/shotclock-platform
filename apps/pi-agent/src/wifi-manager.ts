@@ -1,10 +1,9 @@
 // WiFi Manager - Network management wrapper using nmcli
 
-import { exec, execFile } from 'child_process';
+import { execFile } from 'child_process';
 import { promisify } from 'util';
 import type { WiFiNetwork, WiFiSecurity } from '@shotclock/shared/types';
 
-const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
 
 export class WiFiManager {
@@ -16,8 +15,8 @@ export class WiFiManager {
   async scan(): Promise<WiFiNetwork[]> {
     try {
       // Use nmcli to scan and get results
-      await execAsync(`nmcli dev wifi list --rescan yes`, { timeout: 10000 });
-      const { stdout } = await execAsync(`nmcli -t -f SSID,SIGNAL,SECURITY dev wifi list ifname ${this.iface}`);
+      await execFileAsync('nmcli', ['dev', 'wifi', 'list', '--rescan', 'yes'], { timeout: 10000 });
+      const { stdout } = await execFileAsync('nmcli', ['-t', '-f', 'SSID,SIGNAL,SECURITY', 'dev', 'wifi', 'list', 'ifname', this.iface]);
       
       const networks: WiFiNetwork[] = [];
       const lines = stdout.split('\n').filter(Boolean);
@@ -77,7 +76,7 @@ export class WiFiManager {
    */
   async disconnect(): Promise<boolean> {
     try {
-      await execAsync(`nmcli dev disconnect ${this.iface}`);
+      await execFileAsync('nmcli', ['dev', 'disconnect', this.iface]);
       return true;
     } catch (error) {
       console.error('Disconnect error:', error);
@@ -90,7 +89,7 @@ export class WiFiManager {
    */
   async forget(ssid: string): Promise<boolean> {
     try {
-      await execAsync(`nmcli connection delete "${ssid}"`);
+      await execFileAsync('nmcli', ['connection', 'delete', ssid]);
       return true;
     } catch (error) {
       console.error(`Failed to forget ${ssid}:`, error);
@@ -137,7 +136,7 @@ export class WiFiManager {
    */
   async isNetworkSaved(ssid: string): Promise<boolean> {
     try {
-      await execAsync(`nmcli connection show "${ssid}"`);
+      await execFileAsync('nmcli', ['connection', 'show', ssid]);
       return true;
     } catch {
       return false;
@@ -149,7 +148,7 @@ export class WiFiManager {
    */
   async getSavedNetworks(): Promise<string[]> {
     try {
-      const { stdout } = await execAsync(`nmcli -t -f NAME connection show`);
+      const { stdout } = await execFileAsync('nmcli', ['-t', '-f', 'NAME', 'connection', 'show']);
       return stdout.split('\n').filter(Boolean);
     } catch (error) {
       console.error('Get saved networks error:', error);

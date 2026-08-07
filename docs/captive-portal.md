@@ -50,7 +50,7 @@ The access point is configured with these defaults:
 | Setting       | Default Value       |
 |---------------|---------------------|
 | SSID          | Shotclock-Setup-xxxxxx |
-| Password      | shotclock123        |
+| Password      | unique per device   |
 | Channel       | 6                   |
 | IP Address    | 192.168.4.1         |
 | DHCP Range    | 192.168.4.10-100    |

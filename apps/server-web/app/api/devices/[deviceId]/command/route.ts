@@ -18,23 +18,34 @@ import {
   resetDeviceRecordAfterFactoryReset,
   resolveTimerCommandState,
 } from '@/lib/device-command';
+import { getRequestIp, writeAuditLog } from '@/lib/audit';
+import { enforceRateLimit, requireJson } from '@/lib/request-security';
+
+const ALLOWED_COMMANDS = new Set([
+  'set_mode', 'set_timer', 'presentation', 'update_config', 'reboot',
+  'check_update', 'install_update', 'factory_reset', 'ping',
+]);
 
 interface RouteParams {
-  params: { deviceId: string };
+  params: Promise<{ deviceId: string }>;
 }
 
 export async function POST(request: NextRequest, { params }: RouteParams) {
   try {
+    const limited = enforceRateLimit(request, 'device-command', 180, 60 * 1000);
+    if (limited) return limited;
+    const invalidContentType = requireJson(request);
+    if (invalidContentType) return invalidContentType;
     const auth = await requireApiUser();
     if (auth instanceof Response) return auth;
 
-    const { deviceId } = params;
+    const { deviceId } = await params;
     const body = await request.json();
     const { type, payload } = body;
 
-    if (!type) {
+    if (!type || !ALLOWED_COMMANDS.has(type)) {
       return NextResponse.json(
-        { error: 'Missing required field: type' },
+        { error: 'Missing or unsupported command type' },
         { status: 400 }
       );
     }
@@ -57,6 +68,15 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         { status: 404 }
       );
     }
+
+    await writeAuditLog({
+      actor: auth,
+      action: `device.command_${type}`,
+      targetType: 'Device',
+      targetId: deviceId,
+      details: { command: type },
+      ipAddress: getRequestIp(request),
+    });
 
     const io = getServerIO();
     if (!io) {
@@ -207,9 +227,9 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
       case 'install_update': {
         const version = payload?.version;
-        if (!version) {
+        if (!/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/.test(String(version || ''))) {
           return NextResponse.json(
-            { error: 'Missing version for install_update command' },
+            { error: 'A valid semantic version is required for install_update' },
             { status: 400 }
           );
         }

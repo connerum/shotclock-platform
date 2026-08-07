@@ -21,6 +21,7 @@ export async function registerPairingCodeWithServer(
       headers: {
         'Content-Type': 'application/json',
         Accept: 'application/json',
+        Authorization: `Bearer ${identity.authToken}`,
       },
       body: JSON.stringify({
         deviceName: identity.deviceName,

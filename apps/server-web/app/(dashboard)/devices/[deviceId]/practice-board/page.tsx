@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { useParams } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import type {
   DeviceMode,
@@ -37,8 +38,8 @@ const OFFENSE_POSITION_OPTIONS: PracticeBoardPosition[] = ['ALL', 'QB', 'WR', 'R
 const DEFENSE_POSITION_OPTIONS: PracticeBoardPosition[] = ['ALL', 'DL', 'LB', 'Safety', 'Nickel', 'Corner', 'Other'];
 const ALL_POSITION_OPTIONS = [...new Set([...OFFENSE_POSITION_OPTIONS, ...DEFENSE_POSITION_OPTIONS])];
 
-export default function PracticeBoardPage({ params }: { params: { deviceId: string } }) {
-  const { deviceId } = params;
+export default function PracticeBoardPage() {
+  const { deviceId } = useParams<{ deviceId: string }>();
   const { sendCommand } = useDeviceCommandDispatcher(deviceId);
   const [deviceName, setDeviceName] = useState('Practice Board');
   const [drills, setDrills] = useState<EditableDrill[]>([]);

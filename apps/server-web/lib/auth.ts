@@ -1,20 +1,26 @@
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
-import { createHmac, randomBytes, scrypt as scryptCallback, timingSafeEqual } from 'crypto';
+import { createHash, createHmac, randomBytes, scrypt as scryptCallback, timingSafeEqual } from 'crypto';
 import { promisify } from 'util';
 import { prisma } from './prisma';
 
 const scrypt = promisify(scryptCallback);
-const SESSION_COOKIE = 'courtcast_session';
-const SESSION_MAX_AGE_SECONDS = 60 * 60 * 24 * 14;
-const SUPER_EMAIL = 'conner@two-a-days.com';
-const SUPER_PASSWORD_HASH = 'scrypt$c08bb51ccf775ce870a35aa319ee64ab$2280386d0fec5f8a509f56ede73cb3886124483e35873a091c45aedab4774a1bf0f201b17165bf46fd59eb9194e58b41b55641a71b90688495af2e5bcdd5870b';
+export const SESSION_COOKIE = 'courtcast_session';
+const SESSION_MAX_AGE_SECONDS = 60 * 60 * 12;
+const DEVELOPMENT_SESSION_SECRET = 'courtcast-local-development-session-secret-change-me';
 
 export interface AuthUser {
   id: string;
   email: string;
   name: string | null;
   role: string;
+  mustChangePassword: boolean;
+}
+
+interface SessionClaims {
+  userId: string;
+  expiresAt: number;
+  sessionVersion: number;
 }
 
 export function isSuperUser(user: AuthUser | null | undefined): boolean {
@@ -31,7 +37,7 @@ export async function verifyPassword(password: string, passwordHash: string | nu
   if (!passwordHash) return false;
 
   const [scheme, salt, expectedHex] = passwordHash.split('$');
-  if (scheme !== 'scrypt' || !salt || !expectedHex) return false;
+  if (scheme !== 'scrypt' || !salt || !/^[a-f0-9]+$/i.test(expectedHex || '')) return false;
 
   const expected = Buffer.from(expectedHex, 'hex');
   const actual = await scrypt(password, salt, expected.length) as Buffer;
@@ -39,74 +45,80 @@ export async function verifyPassword(password: string, passwordHash: string | nu
   return expected.length === actual.length && timingSafeEqual(expected, actual);
 }
 
-export async function ensureSuperUser(): Promise<void> {
-  await prisma.user.upsert({
-    where: { email: SUPER_EMAIL },
-    update: {
-      passwordHash: SUPER_PASSWORD_HASH,
-      name: 'CourtCast Super Admin',
-      role: 'super',
-    },
-    create: {
-      email: SUPER_EMAIL,
-      passwordHash: SUPER_PASSWORD_HASH,
-      name: 'CourtCast Super Admin',
-      role: 'super',
-    },
-  });
-}
-
 export async function createSession(userId: string): Promise<void> {
-  const expiresAt = Math.floor(Date.now() / 1000) + SESSION_MAX_AGE_SECONDS;
-  const payload = `${userId}.${expiresAt}`;
-  const signature = sign(payload);
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { sessionVersion: true, isActive: true },
+  });
+  if (!user?.isActive) throw new Error('Cannot create a session for an inactive user');
 
-  cookies().set(SESSION_COOKIE, `${payload}.${signature}`, {
+  const expiresAt = Math.floor(Date.now() / 1000) + SESSION_MAX_AGE_SECONDS;
+  const payload = `${userId}.${expiresAt}.${user.sessionVersion}`;
+  const signature = sign(payload);
+  const cookieStore = await cookies();
+
+  cookieStore.set(SESSION_COOKIE, `${payload}.${signature}`, {
     httpOnly: true,
-    sameSite: 'lax',
+    sameSite: 'strict',
     secure: process.env.NODE_ENV === 'production',
     path: '/',
     maxAge: SESSION_MAX_AGE_SECONDS,
+    priority: 'high',
   });
 }
 
-export function clearSession(): void {
-  cookies().set(SESSION_COOKIE, '', {
+export async function clearSession(): Promise<void> {
+  const cookieStore = await cookies();
+  cookieStore.set(SESSION_COOKIE, '', {
     httpOnly: true,
-    sameSite: 'lax',
+    sameSite: 'strict',
     secure: process.env.NODE_ENV === 'production',
     path: '/',
     maxAge: 0,
+    priority: 'high',
   });
 }
 
-export async function getCurrentUser(): Promise<AuthUser | null> {
-  await ensureSuperUser();
-
-  const session = cookies().get(SESSION_COOKIE)?.value;
-  const userId = verifySession(session);
-  if (!userId) return null;
+export async function authenticateSessionValue(session: string | undefined): Promise<AuthUser | null> {
+  const claims = verifySession(session);
+  if (!claims) return null;
 
   const user = await prisma.user.findUnique({
-    where: { id: userId },
-    select: { id: true, email: true, name: true, role: true },
+    where: { id: claims.userId },
+    select: {
+      id: true,
+      email: true,
+      name: true,
+      role: true,
+      isActive: true,
+      mustChangePassword: true,
+      sessionVersion: true,
+    },
   });
 
-  return user;
+  if (!user?.isActive || user.sessionVersion !== claims.sessionVersion) return null;
+  const { isActive: _isActive, sessionVersion: _sessionVersion, ...authUser } = user;
+  return authUser;
+}
+
+export async function getCurrentUser(): Promise<AuthUser | null> {
+  const cookieStore = await cookies();
+  return authenticateSessionValue(cookieStore.get(SESSION_COOKIE)?.value);
 }
 
 export async function requireUser(): Promise<AuthUser> {
   const user = await getCurrentUser();
-  if (!user) {
-    redirect('/login');
-  }
+  if (!user) redirect('/login');
   return user;
 }
 
 export async function requireApiUser(): Promise<AuthUser | Response> {
   const user = await getCurrentUser();
   if (!user) {
-    return Response.json({ error: 'Authentication required' }, { status: 401 });
+    return Response.json({ error: 'Authentication required' }, {
+      status: 401,
+      headers: { 'Cache-Control': 'no-store' },
+    });
   }
   return user;
 }
@@ -119,22 +131,42 @@ export function scopedDeviceWhere(user: AuthUser) {
   return isSuperUser(user) ? {} : { ownerUserId: user.id };
 }
 
-function verifySession(session: string | undefined): string | null {
+export function hashDeviceToken(token: string): string {
+  return createHash('sha256').update(token, 'utf8').digest('hex');
+}
+
+export function verifyDeviceToken(token: string, expectedHash: string | null | undefined): boolean {
+  if (!token || !expectedHash) return false;
+  return safeEqual(hashDeviceToken(token), expectedHash);
+}
+
+export function readSessionCookie(cookieHeader: string | undefined): string | undefined {
+  if (!cookieHeader) return undefined;
+  for (const item of cookieHeader.split(';')) {
+    const separator = item.indexOf('=');
+    if (separator < 0) continue;
+    const name = item.slice(0, separator).trim();
+    if (name === SESSION_COOKIE) return decodeURIComponent(item.slice(separator + 1).trim());
+  }
+  return undefined;
+}
+
+function verifySession(session: string | undefined): SessionClaims | null {
   if (!session) return null;
 
   const parts = session.split('.');
-  if (parts.length !== 3) return null;
+  if (parts.length !== 4) return null;
 
-  const [userId, expiresAtRaw, signature] = parts;
-  const payload = `${userId}.${expiresAtRaw}`;
-  const expected = sign(payload);
-
-  if (!safeEqual(signature, expected)) return null;
+  const [userId, expiresAtRaw, sessionVersionRaw, signature] = parts;
+  const payload = `${userId}.${expiresAtRaw}.${sessionVersionRaw}`;
+  if (!safeEqual(signature, sign(payload))) return null;
 
   const expiresAt = Number(expiresAtRaw);
-  if (!Number.isFinite(expiresAt) || expiresAt < Math.floor(Date.now() / 1000)) return null;
+  const sessionVersion = Number(sessionVersionRaw);
+  if (!userId || !Number.isInteger(expiresAt) || expiresAt < Math.floor(Date.now() / 1000)) return null;
+  if (!Number.isInteger(sessionVersion) || sessionVersion < 1) return null;
 
-  return userId;
+  return { userId, expiresAt, sessionVersion };
 }
 
 function sign(payload: string): string {
@@ -148,5 +180,8 @@ function safeEqual(a: string, b: string): boolean {
 }
 
 function getSessionSecret(): string {
-  return process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET || process.env.SERVER_URL || 'courtcast-dev-session-secret';
+  const configured = process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET;
+  if (configured && configured.length >= 32) return configured;
+  if (process.env.NODE_ENV !== 'production') return DEVELOPMENT_SESSION_SECRET;
+  throw new Error('AUTH_SECRET must be set to at least 32 characters in production');
 }

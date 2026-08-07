@@ -109,7 +109,7 @@ export default function ReleasesClient() {
           onClick={() => setShowForm(!showForm)}
           className={`cc-btn px-4 py-2 text-sm ${showForm ? 'cc-btn-secondary' : 'cc-btn-primary'}`}
         >
-          {showForm ? 'Cancel' : 'Upload New Release'}
+          {showForm ? 'Cancel' : 'Register Release'}
         </button>
       </div>
 
@@ -122,7 +122,7 @@ export default function ReleasesClient() {
       {/* Create Release Form */}
       {showForm && (
         <div className="cc-card p-6 mb-8">
-          <h2 className="text-xl font-semibold mb-4">Create New Release</h2>
+          <h2 className="text-xl font-semibold mb-4">Register Verified Release</h2>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <div>

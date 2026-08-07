@@ -1,0 +1,21 @@
+# CourtCast public endpoint. Merge this block into the host's managed Caddyfile.
+courtcast.safety-linq.com {
+    header {
+        Strict-Transport-Security "max-age=31536000; includeSubDomains"
+        X-Content-Type-Options "nosniff"
+        X-Frame-Options "DENY"
+        Referrer-Policy "strict-origin-when-cross-origin"
+        Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=(), usb=()"
+        Content-Security-Policy "default-src 'self'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; object-src 'none'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self' wss:"
+    }
+
+    reverse_proxy 172.18.0.1:3000 {
+        header_up Host {host}
+        header_up X-Real-IP {remote_addr}
+        header_up X-Forwarded-For {proxy_add_x_forwarded_for}
+        header_up X-Forwarded-Proto {scheme}
+    }
+
+    tls admin@stream.safety-linq.com
+    encode zstd gzip
+}

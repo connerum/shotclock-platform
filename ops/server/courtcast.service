@@ -1,0 +1,33 @@
+[Unit]
+Description=CourtCast Shotclock Platform
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+User=courtcast
+Group=courtcast
+WorkingDirectory=/opt/courtcast/current
+EnvironmentFile=/opt/courtcast/shared/.env
+ExecStart=/usr/bin/pnpm --filter @shotclock/server-web start
+Restart=always
+RestartSec=5
+TimeoutStopSec=30
+KillSignal=SIGTERM
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=courtcast
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+UMask=0027
+ReadWritePaths=/opt/courtcast/data /opt/courtcast/shared /opt/courtcast/current/apps/server-web/.next/cache
+
+[Install]
+WantedBy=multi-user.target

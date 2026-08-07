@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import type { DeviceMode, ModeType, SportType } from '@shotclock/shared/types';
 import { SyncTargetBanner, useDeviceCommandDispatcher } from '../../SelectedDevicesProvider';
 
@@ -59,8 +59,8 @@ const SPORTS: Array<{
   },
 ];
 
-export default function DeviceSportPage({ params }: { params: { deviceId: string } }) {
-  const { deviceId } = params;
+export default function DeviceSportPage() {
+  const { deviceId } = useParams<{ deviceId: string }>();
   const router = useRouter();
   const [device, setDevice] = useState<Device | null>(null);
   const [loading, setLoading] = useState(true);

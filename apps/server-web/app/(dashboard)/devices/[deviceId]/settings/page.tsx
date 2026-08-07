@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { PointerEvent as ReactPointerEvent } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import { DeviceMode, DisplayProfile, CalibrationData } from '@shotclock/shared/types';
 
 interface Device {
@@ -133,8 +133,8 @@ function normalizeCalibrationRotation(rotation: number | undefined): number {
   return ((quarterTurns * 90) % 360 + 360) % 360;
 }
 
-export default function DeviceDetailPage({ params }: { params: { deviceId: string } }) {
-  const deviceId = params.deviceId;
+export default function DeviceDetailPage() {
+  const { deviceId } = useParams<{ deviceId: string }>();
   const router = useRouter();
   
   const [device, setDevice] = useState<Device | null>(null);

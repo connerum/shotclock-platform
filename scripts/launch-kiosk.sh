@@ -103,12 +103,35 @@ apply_display_mode() {
     return
   fi
 
+  local output="$KIOSK_DISPLAY_OUTPUT"
+  local wayland_display="${WAYLAND_DISPLAY:-wayland-0}"
+
+  # Raspberry Pi OS uses labwc/Wayland by default. XRandR only sees the
+  # Xwayland compatibility modes there, while wlr-randr controls the real HDMI
+  # output (including the required 1024x768 NovaStar mode).
+  if command -v wlr-randr >/dev/null 2>&1 && [ -S "$XDG_RUNTIME_DIR/$wayland_display" ]; then
+    if [ -z "$output" ] || [ "$output" = "auto" ]; then
+      output="$(runuser -u "$KIOSK_RUN_USER" -- env \
+        XDG_RUNTIME_DIR="$XDG_RUNTIME_DIR" WAYLAND_DISPLAY="$wayland_display" \
+        wlr-randr 2>/dev/null | awk '/^[^[:space:]]/ { print $1; exit }' || true)"
+    fi
+
+    if [ -n "$output" ]; then
+      echo "Setting Wayland kiosk display output ${output} to ${KIOSK_DISPLAY_MODE}"
+      if runuser -u "$KIOSK_RUN_USER" -- env \
+        XDG_RUNTIME_DIR="$XDG_RUNTIME_DIR" WAYLAND_DISPLAY="$wayland_display" \
+        wlr-randr --output "$output" --mode "$KIOSK_DISPLAY_MODE" >/dev/null 2>&1; then
+        return
+      fi
+      echo "Warning: Wayland failed to set ${output} to ${KIOSK_DISPLAY_MODE}; trying XRandR"
+    fi
+  fi
+
   if ! command -v xrandr >/dev/null 2>&1; then
-    echo "xrandr not available; cannot set kiosk display mode"
+    echo "No supported display mode utility is available"
     return
   fi
 
-  local output="$KIOSK_DISPLAY_OUTPUT"
   if [ -z "$output" ] || [ "$output" = "auto" ]; then
     output="$(runuser -u "$KIOSK_RUN_USER" -- env DISPLAY="$DISPLAY" XAUTHORITY="$XAUTHORITY" xrandr --query 2>/dev/null | awk '/ connected/ { print $1; exit }' || true)"
   fi
@@ -158,7 +181,6 @@ wait_for_kiosk_url
 
 CHROMIUM_ARGS=(
   --kiosk
-  --no-sandbox
   --disable-dev-shm-usage
   --disable-gpu
   --disable-software-rasterizer

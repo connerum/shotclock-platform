@@ -1,0 +1,7 @@
+[Unit]
+Description=Verify CourtCast application health
+After=courtcast.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/courtcast-healthcheck

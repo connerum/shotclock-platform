@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
 import Link from 'next/link';
+import { useParams } from 'next/navigation';
 import { DeviceMode, ScoreboardBranding, TimerState } from '@shotclock/shared/types';
 import {
   clampSeconds,
@@ -37,8 +38,8 @@ interface Device {
   } | null;
 }
 
-export default function BasketballPage({ params }: { params: { deviceId: string } }) {
-  const deviceId = params.deviceId;
+export default function BasketballPage() {
+  const { deviceId } = useParams<{ deviceId: string }>();
 
   const [device, setDevice] = useState<Device | null>(null);
   const [loading, setLoading] = useState(true);

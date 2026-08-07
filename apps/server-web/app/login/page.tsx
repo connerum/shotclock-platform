@@ -1,6 +1,5 @@
 'use client';
 
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { FormEvent, useState } from 'react';
 
@@ -29,7 +28,7 @@ export default function LoginPage() {
         return;
       }
 
-      router.push('/devices');
+      router.push(data.user?.mustChangePassword ? '/account?required=1' : '/devices');
       router.refresh();
     } catch {
       setError('Failed to log in');
@@ -85,10 +84,7 @@ export default function LoginPage() {
         </form>
 
         <p className="mt-6 text-center text-sm text-white/50">
-          Need an account?{' '}
-          <Link href="/register" className="text-blue-400 hover:text-blue-300">
-            Create one
-          </Link>
+          Accounts are issued by your CourtCast administrator.
         </p>
       </div>
     </main>

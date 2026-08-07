@@ -7,7 +7,7 @@ import { prisma } from '@/lib/prisma';
 import { canAccessDevice, requireApiUser } from '@/lib/auth';
 
 const MEDIA_SLOTS = ['ads', 'logo', 'sponsor', 'team-intro', 'music', 'scoreboard-home-logo', 'scoreboard-away-logo', 'practice-school-logo'] as const;
-const IMAGE_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/svg+xml'];
+const IMAGE_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
 const VIDEO_MIME_TYPES = ['video/mp4', 'video/webm', 'video/quicktime'];
 const AUDIO_MIME_TYPES = ['audio/mpeg', 'audio/mp3', 'audio/wav', 'audio/ogg', 'audio/mp4', 'audio/aac'];
 const MAX_FILE_SIZE_BYTES = 100 * 1024 * 1024;
@@ -15,25 +15,26 @@ const MAX_FILE_SIZE_BYTES = 100 * 1024 * 1024;
 type MediaSlot = typeof MEDIA_SLOTS[number];
 
 interface RouteParams {
-  params: { deviceId: string };
+  params: Promise<{ deviceId: string }>;
 }
 
 export async function GET(_request: NextRequest, { params }: RouteParams) {
   try {
+    const { deviceId } = await params;
     const auth = await requireApiUser();
     if (auth instanceof Response) return auth;
 
     const device = await prisma.device.findUnique({
-      where: { deviceId: params.deviceId },
+      where: { deviceId },
       select: { deviceId: true, ownerUserId: true },
     });
 
     if (!device || !canAccessDevice(auth, device)) {
-      return NextResponse.json({ error: `Device not found: ${params.deviceId}` }, { status: 404 });
+      return NextResponse.json({ error: `Device not found: ${deviceId}` }, { status: 404 });
     }
 
     const mediaAssets = await prisma.deviceMediaAsset.findMany({
-      where: { deviceId: params.deviceId },
+      where: { deviceId },
       orderBy: [{ slot: 'asc' }, { isActive: 'desc' }, { sortOrder: 'asc' }, { createdAt: 'desc' }],
     });
 
@@ -48,16 +49,17 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
   let filepath: string | null = null;
 
   try {
+    const { deviceId } = await params;
     const auth = await requireApiUser();
     if (auth instanceof Response) return auth;
 
     const device = await prisma.device.findUnique({
-      where: { deviceId: params.deviceId },
+      where: { deviceId },
       select: { deviceId: true, ownerUserId: true },
     });
 
     if (!device || !canAccessDevice(auth, device)) {
-      return NextResponse.json({ error: `Device not found: ${params.deviceId}` }, { status: 404 });
+      return NextResponse.json({ error: `Device not found: ${deviceId}` }, { status: 404 });
     }
 
     const formData = await request.formData();
@@ -82,9 +84,9 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     }
 
     const originalFilename = sanitizeFilename(file.name || 'media');
-    const extension = getSafeExtension(originalFilename, file.type);
+    const extension = getSafeExtension(file.type);
     const filename = `${Date.now()}-${randomUUID()}${extension}`;
-    const mediaDir = join(getServerWebRoot(), 'public', 'media', 'devices', params.deviceId);
+    const mediaDir = join(getServerWebRoot(), 'public', 'media', 'devices', deviceId);
     filepath = join(mediaDir, filename);
 
     await mkdir(mediaDir, { recursive: true });
@@ -92,20 +94,20 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
     if (slot !== 'ads') {
       await prisma.deviceMediaAsset.updateMany({
-        where: { deviceId: params.deviceId, slot },
+        where: { deviceId, slot },
         data: { isActive: false },
       });
     }
 
-    const sortOrder = await getNextSortOrder(params.deviceId, slot);
+    const sortOrder = await getNextSortOrder(deviceId, slot);
 
     const mediaAsset = await prisma.deviceMediaAsset.create({
       data: {
-        deviceId: params.deviceId,
+        deviceId,
         slot,
         filename,
         originalFilename,
-        url: `/media/devices/${params.deviceId}/${filename}`,
+        url: `/media/devices/${deviceId}/${filename}`,
         mimeType: file.type || 'application/octet-stream',
         size: file.size,
         isActive: true,
@@ -141,18 +143,14 @@ function sanitizeFilename(filename: string) {
   return filename.replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 120);
 }
 
-function getSafeExtension(filename: string, mimeType: string) {
-  const extension = filename.includes('.') ? filename.slice(filename.lastIndexOf('.')).toLowerCase() : '';
-  if (/^\.[a-z0-9]{1,8}$/.test(extension)) return extension;
-
+function getSafeExtension(mimeType: string) {
   if (mimeType === 'image/jpeg') return '.jpg';
   if (mimeType === 'image/png') return '.png';
   if (mimeType === 'image/webp') return '.webp';
   if (mimeType === 'image/gif') return '.gif';
-  if (mimeType === 'image/svg+xml') return '.svg';
   if (mimeType.startsWith('video/')) return '.mp4';
   if (mimeType.startsWith('audio/')) return '.mp3';
-  return '.bin';
+  throw new Error(`No safe extension is configured for MIME type ${mimeType}`);
 }
 
 function getServerWebRoot() {

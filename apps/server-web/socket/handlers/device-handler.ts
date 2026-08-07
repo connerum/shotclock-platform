@@ -9,6 +9,10 @@ const prisma = new PrismaClient();
 export function setupDeviceHandlers(socket: TypedSocket, io: TypedServer): void {
   // Handle device hello
   socket.on('device:hello', async (data: HelloPayload) => {
+    if (data.deviceId !== socket.data.authenticatedDeviceId) {
+      socket.disconnect(true);
+      return;
+    }
     console.log('Device hello:', data.deviceId, data.deviceName);
     
     try {
@@ -48,6 +52,8 @@ export function setupDeviceHandlers(socket: TypedSocket, io: TypedServer): void 
           } : {}),
           isOnline: true,
           lastSeen: new Date(),
+          lastIpAddress: socket.handshake.address,
+          lastError: null,
           ...(isPaired ? { status: 'paired' } : {}),
         },
         create: {
@@ -63,6 +69,7 @@ export function setupDeviceHandlers(socket: TypedSocket, io: TypedServer): void 
           isOnline: true,
           lastSeen: new Date(),
           status: data.pairingCode ? 'unpaired' : 'online',
+          lastIpAddress: socket.handshake.address,
         },
       });
       
@@ -97,11 +104,16 @@ export function setupDeviceHandlers(socket: TypedSocket, io: TypedServer): void 
 
   // Handle device heartbeat
   socket.on('device:heartbeat', async (data: HeartbeatPayload) => {
+    const authenticatedDeviceId = socket.data.authenticatedDeviceId;
+    if (!authenticatedDeviceId || data.deviceId !== authenticatedDeviceId) {
+      socket.disconnect(true);
+      return;
+    }
     console.log('Device heartbeat:', data.deviceId, data.mode);
     
     try {
       const existingDevice = await prisma.device.findUnique({
-        where: { deviceId: data.deviceId },
+        where: { deviceId: authenticatedDeviceId },
       });
       const isPaired = isDevicePaired(existingDevice);
       const existingPairedMode = existingDevice?.mode && !['setup', 'pairing'].includes(existingDevice.mode)
@@ -118,19 +130,20 @@ export function setupDeviceHandlers(socket: TypedSocket, io: TypedServer): void 
 
       // Update last seen and mode
       await prisma.device.update({
-        where: { deviceId: data.deviceId },
+        where: { deviceId: authenticatedDeviceId },
         data: {
           lastSeen: new Date(),
           mode: nextMode,
           isOnline: true,
           status: nextStatus,
+          lastIpAddress: data.networkStatus?.ipAddress || socket.handshake.address,
         },
       }).catch(() => {}); // Ignore if device doesn't exist
       
       // Broadcast to admins
       const adminNamespace = io.of('/admin') as any;
       adminNamespace.emit('admin:device-status', {
-        deviceId: data.deviceId,
+        deviceId: authenticatedDeviceId,
         mode: data.mode,
         status: data,
         timestamp: Date.now(),
@@ -156,12 +169,17 @@ export function setupDeviceHandlers(socket: TypedSocket, io: TypedServer): void 
 
   // Handle update status
   socket.on('device:update:status', async (data: UpdateStatusPayload) => {
+    const authenticatedDeviceId = socket.data.authenticatedDeviceId;
+    if (!authenticatedDeviceId || data.deviceId !== authenticatedDeviceId) {
+      socket.disconnect(true);
+      return;
+    }
     console.log('Device update status:', data.deviceId, data.status, data.progress);
     
     try {
       // Find or create device update record
       const existingUpdate = await prisma.deviceUpdate.findFirst({
-        where: { deviceId: data.deviceId },
+        where: { deviceId: authenticatedDeviceId },
         orderBy: { createdAt: 'desc' },
       });
 
@@ -179,7 +197,7 @@ export function setupDeviceHandlers(socket: TypedSocket, io: TypedServer): void 
       // Broadcast to admins
       const adminNamespace = io.of('/admin') as any;
       adminNamespace.emit('admin:update-status', {
-        deviceId: data.deviceId,
+        deviceId: authenticatedDeviceId,
         status: data,
         timestamp: Date.now(),
       });
@@ -194,16 +212,17 @@ export function setupDeviceHandlers(socket: TypedSocket, io: TypedServer): void 
     
     const deviceId = socket.data.deviceId;
     
+    let wentOffline = false;
     if (deviceId) {
       try {
-        // Mark device as offline
-        await prisma.device.update({
-          where: { deviceId },
-          data: {
-            isOnline: false,
-            status: 'offline',
-          },
-        }).catch(() => {});
+        const remainingSockets = await io.of('/device').in(`device:${deviceId}`).fetchSockets();
+        if (remainingSockets.length === 0) {
+          await prisma.device.update({
+            where: { deviceId },
+            data: { isOnline: false, status: 'offline' },
+          }).catch(() => {});
+          wentOffline = true;
+        }
       } catch (error) {
         console.error('Error marking device offline:', error);
       }
@@ -211,7 +230,7 @@ export function setupDeviceHandlers(socket: TypedSocket, io: TypedServer): void 
     
     // Broadcast to admins
     const adminNamespace = io.of('/admin') as any;
-    if (deviceId) {
+    if (deviceId && wentOffline) {
       adminNamespace.emit('admin:device-offline', {
         deviceId,
         timestamp: Date.now(),
@@ -220,9 +239,9 @@ export function setupDeviceHandlers(socket: TypedSocket, io: TypedServer): void 
   });
 }
 
-function isDevicePaired(device: { status: string; mode: string; pairingCode: string | null } | null | undefined): boolean {
+function isDevicePaired(device: { ownerUserId?: string | null } | null | undefined): boolean {
   if (!device) return false;
-  return device.status === 'paired';
+  return Boolean(device.ownerUserId);
 }
 
 function parseJsonField(value: string | null | undefined): any | null {

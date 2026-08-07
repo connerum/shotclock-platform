@@ -5,18 +5,23 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getServerIO } from '@/lib/socket';
-import { canAccessDevice, requireApiUser } from '@/lib/auth';
+import { canAccessDevice, isSuperUser, requireApiUser } from '@/lib/auth';
+import { enforceRateLimit } from '@/lib/request-security';
+import { getRequestIp, writeAuditLog } from '@/lib/audit';
 
 interface RouteParams {
-  params: { pairingCode: string };
+  params: Promise<{ pairingCode: string }>;
 }
 
 export async function GET(_request: NextRequest, { params }: RouteParams) {
   try {
+    const limited = enforceRateLimit(_request, 'pairing-code-check', 60, 15 * 60 * 1000);
+    if (limited) return limited;
     const auth = await requireApiUser();
     if (auth instanceof Response) return auth;
 
-    const { pairingCode } = params;
+    const { pairingCode } = await params;
+    if (!/^\d{6}$/.test(pairingCode)) return NextResponse.json({ valid: false, error: 'Invalid pairing code' });
 
     // Find device with this pairing code
     const device = await prisma.device.findFirst({
@@ -33,7 +38,7 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
       });
     }
 
-    if (device.status === 'paired' && device.ownerUserId && !canAccessDevice(auth, device)) {
+    if (device.ownerUserId && !canAccessDevice(auth, device)) {
       return NextResponse.json({
         valid: false,
         error: 'Invalid or expired pairing code',
@@ -65,10 +70,13 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
 
 export async function POST(_request: NextRequest, { params }: RouteParams) {
   try {
+    const limited = enforceRateLimit(_request, 'pairing-code-confirm', 20, 15 * 60 * 1000);
+    if (limited) return limited;
     const auth = await requireApiUser();
     if (auth instanceof Response) return auth;
 
-    const { pairingCode } = params;
+    const { pairingCode } = await params;
+    if (!/^\d{6}$/.test(pairingCode)) return NextResponse.json({ success: false, error: 'Invalid pairing code' }, { status: 400 });
 
     const device = await prisma.device.findFirst({
       where: {
@@ -84,7 +92,7 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
       }, { status: 404 });
     }
 
-    if (device.status === 'paired' && device.ownerUserId && !canAccessDevice(auth, device)) {
+    if (device.ownerUserId && !canAccessDevice(auth, device)) {
       return NextResponse.json({
         success: false,
         error: 'Invalid pairing code',
@@ -98,8 +106,13 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
       }, { status: 410 });
     }
 
-    const pairedDevice = await prisma.device.update({
-      where: { deviceId: device.deviceId },
+    const updateResult = await prisma.device.updateMany({
+      where: {
+        id: device.id,
+        pairingCode,
+        status: { not: 'paired' },
+        ...(isSuperUser(auth) ? {} : { OR: [{ ownerUserId: null }, { ownerUserId: auth.id }] }),
+      },
       data: {
         status: 'paired',
         mode: 'shot-clock',
@@ -107,6 +120,18 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
         pairingCodeExp: null,
         ownerUserId: device.ownerUserId || auth.id,
       },
+    });
+    if (updateResult.count !== 1) {
+      return NextResponse.json({ success: false, error: 'Pairing code was already used' }, { status: 409 });
+    }
+    const pairedDevice = await prisma.device.findUniqueOrThrow({ where: { deviceId: device.deviceId } });
+
+    await writeAuditLog({
+      actor: auth,
+      action: 'device.paired',
+      targetType: 'Device',
+      targetId: pairedDevice.deviceId,
+      ipAddress: getRequestIp(_request),
     });
 
     const serverUrl = process.env.NEXT_PUBLIC_SERVER_URL || process.env.SERVER_URL || 'http://localhost:3000';

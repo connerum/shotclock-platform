@@ -1,10 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createSession, ensureSuperUser, hashPassword } from '@/lib/auth';
+import { createSession, hashPassword } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { enforceRateLimit, requireJson } from '@/lib/request-security';
 
 export async function POST(request: NextRequest) {
   try {
-    await ensureSuperUser();
+    if (process.env.ALLOW_PUBLIC_REGISTRATION !== 'true') {
+      return NextResponse.json({ error: 'Public registration is disabled. Contact an administrator.' }, { status: 403 });
+    }
+    const limited = enforceRateLimit(request, 'register', 3, 60 * 60 * 1000);
+    if (limited) return limited;
+    const invalidContentType = requireJson(request);
+    if (invalidContentType) return invalidContentType;
 
     const body = await request.json();
     const email = String(body.email || '').trim().toLowerCase();
@@ -15,8 +22,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Email and password are required' }, { status: 400 });
     }
 
-    if (password.length < 8) {
-      return NextResponse.json({ error: 'Password must be at least 8 characters' }, { status: 400 });
+    if (password.length < 12) {
+      return NextResponse.json({ error: 'Password must be at least 12 characters' }, { status: 400 });
     }
 
     const passwordHash = await hashPassword(password);

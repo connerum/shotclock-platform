@@ -1,7 +1,8 @@
 [Unit]
 Description=Shotclock Pi Agent Service
 Documentation=https://docs.shotclock.local
-After=network.target
+Wants=network-online.target
+After=network-online.target
 
 [Service]
 Type=simple
@@ -13,9 +14,9 @@ WorkingDirectory=/opt/shotclock/current
 Environment=NODE_ENV=production
 Environment=HOME=/home/shotclock
 EnvironmentFile=/opt/shotclock/shared/.env
-ExecStartPre=/bin/sleep 5
+ExecStartPre=/bin/bash /opt/shotclock/current/scripts/wait-for-network.sh
 ExecStart=/usr/bin/node /opt/shotclock/current/apps/pi-agent/dist/index.js
-Restart=on-failure
+Restart=always
 RestartSec=10
 StandardOutput=journal
 StandardError=journal
@@ -27,6 +28,7 @@ ProtectSystem=false
 ProtectHome=false
 ReadWritePaths=/opt/shotclock /home/shotclock/.shotclock
 PrivateTmp=true
+UMask=0077
 
 [Install]
 WantedBy=multi-user.target

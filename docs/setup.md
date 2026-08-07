@@ -4,7 +4,7 @@ Quick start guide for setting up the Shotclock Platform.
 
 ## Prerequisites
 
-- Node.js 20 LTS, 22 LTS, or 24 LTS. Node 23 is not supported.
+- Node.js 20 LTS or 22 LTS. Production uses Node 22; newer majors are not enabled until the Prisma runtime is upgraded and revalidated.
 - pnpm 10+
 - SQLite via Prisma. Production currently uses a SQLite file on the server.
 - Raspberry Pi OS or similar (for Pi deployment)
@@ -101,7 +101,7 @@ sudo ./scripts/install-pi.sh
 ### 3. Configure WiFi
 
 1. The Pi will create a setup AP named like "Shotclock-Setup-1e4b35" while it is unpaired
-2. Connect to it with password "shotclock123"
+2. Connect with the unique maintenance password from the device handoff record.
 3. Open http://sportsboard.local in a browser
 4. Select your WiFi network and enter credentials
 5. Click "Complete Setup"
@@ -123,7 +123,7 @@ SERVER_URL=https://courtcast.safety-linq.com
 AGENT_LOCAL_API_PORT=3001
 DEVICE_NAME=Shotclock Display 01
 SETUP_AP_SSID=Shotclock-Setup
-SETUP_AP_PASSWORD=shotclock123
+SETUP_AP_PASSWORD=<unique-device-password>
 SETUP_PORTAL_HOST=sportsboard.local
 KIOSK_USER=admin
 KIOSK_DISPLAY_OUTPUT=auto
@@ -195,7 +195,7 @@ sudo systemctl restart shotclock-agent shotclock-kiosk
 ## Pairing a Device
 
 1. Open the dashboard at http://your-server:3000
-2. Log in. The production super account is `conner@two-a-days.com` / `PatchWork22!!`.
+2. Log in with a company-managed administrator account. No shared default account exists.
 3. Go to the "Pair" page
 4. Enter the pairing code shown on the Pi display
 5. The device will appear in the device list

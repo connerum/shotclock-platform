@@ -1,7 +1,8 @@
 {
   "name": "@shotclock/display-core",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "private": true,
+  "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
@@ -16,6 +17,6 @@
     "@shotclock/shared": "workspace:*"
   },
   "devDependencies": {
-    "typescript": "5.3.3"
+    "typescript": "^5.9.3"
   }
 }

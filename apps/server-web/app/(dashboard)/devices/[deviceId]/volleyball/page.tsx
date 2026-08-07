@@ -1,9 +1,10 @@
 import SportControlPage from '../SportControlPage';
 
-export default function VolleyballPage({ params }: { params: { deviceId: string } }) {
+export default async function VolleyballPage({ params }: { params: Promise<{ deviceId: string }> }) {
+  const { deviceId } = await params;
   return (
     <SportControlPage
-      deviceId={params.deviceId}
+      deviceId={deviceId}
       config={{
         sport: 'volleyball',
         title: 'Volleyball Controls',

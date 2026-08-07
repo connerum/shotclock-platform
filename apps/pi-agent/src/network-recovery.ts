@@ -2,7 +2,8 @@ import { isPaired } from './identity.js';
 import { loadConfig, saveConfig } from './config-store.js';
 import { saveState } from './state-store.js';
 import { wifiManager } from './wifi-manager.js';
-import { rebootSystem } from './factory-reset.js';
+import { loadIdentity } from './identity.js';
+import { enterWifiSetupMode } from './setup-mode.js';
 
 const RECOVERY_TIMEOUT_MS = parseInt(process.env.NETWORK_RECOVERY_TIMEOUT_MS || '60000', 10);
 
@@ -51,11 +52,12 @@ async function recoverToWifiSetup(): Promise<void> {
       return;
     }
 
-    console.warn('WiFi is disconnected or missing an IP; clearing saved WiFi and rebooting into setup AP');
+    console.warn('WiFi is disconnected or missing an IP; preserving saved profiles and starting the maintenance AP');
     saveConfig({ mode: 'setup' });
     saveState({ mode: { type: 'setup' } });
-    await wifiManager.forgetSavedWifiNetworks();
-    await rebootSystem();
+    const identity = loadIdentity();
+    if (!identity) throw new Error('Device identity is unavailable');
+    await enterWifiSetupMode(identity, config, 'automatic network recovery');
   } catch (error) {
     recoveryInProgress = false;
     console.error('Network recovery failed:', error);

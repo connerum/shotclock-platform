@@ -9,7 +9,7 @@ import { DEFAULT_GAME_CLOCK_SECONDS, DEFAULT_SHOT_CLOCK_SECONDS } from '@shotclo
 import { canAccessDevice, requireApiUser } from '@/lib/auth';
 
 interface RouteParams {
-  params: { deviceId: string };
+  params: Promise<{ deviceId: string }>;
 }
 
 export const dynamic = 'force-dynamic';
@@ -41,7 +41,7 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
     const auth = await requireApiUser();
     if (auth instanceof Response) return auth;
 
-    const { deviceId } = params;
+    const { deviceId } = await params;
 
     const device = await prisma.device.findUnique({
       where: { deviceId },
@@ -118,7 +118,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     const auth = await requireApiUser();
     if (auth instanceof Response) return auth;
 
-    const { deviceId } = params;
+    const { deviceId } = await params;
     const body = await request.json();
     const { mode, timerState, mediaAssetId } = body;
     const timerStatePayload: TimerState | null = timerState

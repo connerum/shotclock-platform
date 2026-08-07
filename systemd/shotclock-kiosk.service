@@ -14,7 +14,7 @@ Group=root
 WorkingDirectory=/opt/shotclock/current
 EnvironmentFile=-/opt/shotclock/shared/.env
 ExecStart=/bin/bash /opt/shotclock/current/scripts/launch-kiosk.sh
-Restart=on-failure
+Restart=always
 RestartSec=10
 StandardOutput=journal
 StandardError=journal
@@ -29,6 +29,7 @@ ProtectSystem=false
 ProtectHome=false
 ReadWritePaths=/opt/shotclock /home/shotclock/.shotclock
 PrivateTmp=true
+UMask=0077
 
 [Install]
 WantedBy=multi-user.target

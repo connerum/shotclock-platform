@@ -31,9 +31,16 @@ export function startLocalApi(
 ): void {
   const app = express();
   const port = config.localApiPort || 3001;
+  const host = config.localApiHost || '127.0.0.1';
   const kioskDistDir = resolveKioskDistDir();
   
-  app.use(express.json());
+  app.disable('x-powered-by');
+  app.use(express.json({ limit: '256kb' }));
+
+  app.get('/local/health', (_req: Request, res: Response) => {
+    res.setHeader('Cache-Control', 'no-store');
+    res.json({ status: 'ok', deviceId: identity.deviceId, version: identity.firmwareVersion, uptime: process.uptime() });
+  });
   
   // GET /local/status - Get device status
   app.get('/local/status', async (_req: Request, res: Response) => {
@@ -78,8 +85,9 @@ export function startLocalApi(
     const configData = loadAgentConfig();
     const state = loadEffectiveState();
     
+    const { setupApPassword: _setupApPassword, ...safeConfig } = configData;
     res.json({
-      config: configData,
+      config: safeConfig,
       displayProfile: state.displayProfile,
       calibrationData: state.calibrationData,
       setupAp: getSetupApConfig(identity, configData),
@@ -89,10 +97,8 @@ export function startLocalApi(
   // POST /local/config - Update config
   app.post('/local/config', (req: Request, res: Response) => {
     try {
-      const { displayProfile, calibrationData, ...agentConfigUpdates } = req.body;
-      const configData = Object.keys(agentConfigUpdates).length > 0
-        ? saveAgentConfig(agentConfigUpdates)
-        : loadAgentConfig();
+      const { displayProfile, calibrationData } = req.body;
+      const configData = loadAgentConfig();
 
       if (displayProfile || calibrationData) {
         saveState({
@@ -244,8 +250,8 @@ export function startLocalApi(
   }
   
   // Start server
-  app.listen(port, '0.0.0.0', () => {
-    console.log(`Local API server running on http://0.0.0.0:${port}`);
+  app.listen(port, host, () => {
+    console.log(`Local API server running on http://${host}:${port}`);
   });
 }
 

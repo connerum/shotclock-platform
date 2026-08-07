@@ -86,7 +86,7 @@ export default function RegisterPage() {
               onChange={(event) => setPassword(event.target.value)}
               className="w-full rounded px-3 py-3"
               autoComplete="new-password"
-              minLength={8}
+              minLength={12}
               required
             />
           </div>

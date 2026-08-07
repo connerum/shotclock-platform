@@ -13,7 +13,7 @@ interface SetupModeProps {
 export default function SetupMode({ setupAp }: SetupModeProps) {
   const setupInfo = {
     apSsid: setupAp?.apSsid || 'Shotclock-Setup',
-    apPassword: setupAp?.apPassword || 'shotclock123',
+    apPassword: setupAp?.apPassword || 'Not configured',
     portalHost: setupAp?.portalHost || 'sportsboard.local',
     portalUrl: setupAp?.portalUrl || 'http://sportsboard.local',
     fallbackPortalUrl: setupAp?.fallbackPortalUrl || 'http://192.168.4.1:8080',

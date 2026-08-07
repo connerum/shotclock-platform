@@ -11,6 +11,12 @@ build/
 .env.local
 .env.*.local
 
+# Local SQLite databases (production data lives outside the repository)
+prisma/*.db
+prisma/*.db-journal
+prisma/*.db-wal
+prisma/*.db-shm
+
 # IDE
 .idea/
 .vscode/
@@ -34,8 +40,12 @@ pnpm-debug.log*
 coverage/
 
 # Release builds (keep source)
-# releases/
+releases/
+apps/server-web/public/releases/*.tar.gz
 
 # Temporary files
 *.tmp
 *.temp
+
+# Local-only production handoff material (credentials, recovery keys, backups)
+.handoff-vault/

@@ -1,23 +1,30 @@
 {
   "name": "shotclock-platform",
   "private": true,
-  "version": "0.1.0",
+  "version": "1.0.0",
+  "packageManager": "pnpm@10.25.0",
   "description": "Shotclock Platform - Sports Scoreboard & Display Management System",
   "scripts": {
     "dev": "pnpm -r --parallel dev",
     "build": "pnpm -r build",
-    "clean": "pnpm -r --parallel clean && rm -rf node_modules"
+    "test": "tsx --test tests/*.test.ts",
+    "check:secrets": "bash scripts/check-secrets.sh",
+    "clean": "pnpm -r --parallel clean && rm -rf node_modules",
+    "user:manage": "pnpm --filter @shotclock/server-web exec tsx ../../scripts/manage-user.ts",
+    "device:provision-token": "pnpm --filter @shotclock/server-web exec tsx ../../scripts/provision-device-token.ts"
   },
   "devDependencies": {
-    "@types/node": "^20.11.0",
-    "typescript": "5.3.3"
+    "@prisma/client": "^5.22.0",
+    "@types/node": "^22.0.0",
+    "prisma": "^5.22.0",
+    "tsx": "4.21.0",
+    "typescript": "^5.9.3"
   },
   "engines": {
-    "node": ">=20.0.0 <23.0.0 || >=24.0.0",
+    "node": ">=20.0.0 <23.0.0",
     "pnpm": ">=8.0.0"
   },
-  "dependencies": {
-    "@prisma/client": "^5.22.0",
-    "prisma": "^5.22.0"
+  "prisma": {
+    "seed": "tsx prisma/seed.ts"
   }
 }

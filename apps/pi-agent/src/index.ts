@@ -1,10 +1,11 @@
 // Pi Agent - Main entry point
 
 import { loadConfig, saveConfig } from './config-store.js';
-import { loadIdentity, generateIdentity, isPaired } from './identity.js';
+import { loadIdentity, generateIdentity, isPaired, ensureDeviceAuthToken } from './identity.js';
 import { setupSocketClient, startPairingReconciliation } from './socket-client.js';
 import { startHeartbeat } from './heartbeat.js';
 import { startLocalApi } from './local-api.js';
+import { RUNTIME_VERSION } from './runtime-version.js';
 import { stopCaptivePortal } from './captive-portal.js';
 import { UpdateManager } from './update-manager.js';
 import { OfflineMode } from './offline-mode.js';
@@ -14,7 +15,7 @@ import { getPairingCode, regeneratePairingCode } from './pairing-code.js';
 import { wifiManager } from './wifi-manager.js';
 import { enterWifiSetupMode } from './setup-mode.js';
 
-const AGENT_VERSION = '0.1.0';
+const AGENT_VERSION = RUNTIME_VERSION;
 
 async function main() {
   console.log(`Shotclock Pi Agent v${AGENT_VERSION}`);
@@ -26,11 +27,20 @@ async function main() {
     console.log('Generating new device identity...');
     identity = generateIdentity();
   }
+  identity = ensureDeviceAuthToken(identity);
   console.log(`Device ID: ${identity.deviceId}`);
   console.log(`Device Name: ${identity.deviceName}`);
 
   // Load configuration
   const config = loadConfig();
+  if (process.env.NODE_ENV === 'production' && (
+    config.setupApPassword.length < 12
+    || config.setupApPassword.length > 63
+    || config.setupApPassword.startsWith('replace-')
+    || config.setupApPassword.startsWith('development-')
+  )) {
+    throw new Error('SETUP_AP_PASSWORD must be a unique 12-63 character value in production');
+  }
   console.log(`Server URL: ${config.serverUrl}`);
   console.log(`Mode: ${config.mode}`);
 

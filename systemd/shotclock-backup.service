@@ -1,0 +1,10 @@
+[Unit]
+Description=Back up Shotclock device state and WiFi profiles
+
+[Service]
+Type=oneshot
+ExecStart=/bin/bash /opt/shotclock/current/scripts/backup-pi.sh
+User=root
+Group=root
+PrivateTmp=true
+UMask=0077

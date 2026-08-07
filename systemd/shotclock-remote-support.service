@@ -1,0 +1,21 @@
+[Unit]
+Description=Persistent CourtCast reverse SSH support tunnel
+Wants=network-online.target
+After=network-online.target shotclock-agent.service
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+User=root
+Group=root
+ExecStart=/usr/bin/ssh -N -T -i /etc/shotclock/remote-support -o IdentitiesOnly=yes -o BatchMode=yes -o ExitOnForwardFailure=yes -o ServerAliveInterval=20 -o ServerAliveCountMax=3 -o ConnectTimeout=15 -o StrictHostKeyChecking=yes -o UserKnownHostsFile=/etc/shotclock/known_hosts -R 127.0.0.1:44092:127.0.0.1:22 courtcast-tunnel@5.161.109.106
+Restart=always
+RestartSec=15
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadOnlyPaths=/etc/shotclock
+
+[Install]
+WantedBy=multi-user.target

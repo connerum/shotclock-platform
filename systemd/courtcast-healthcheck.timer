@@ -1,0 +1,11 @@
+[Unit]
+Description=Check CourtCast application health every five minutes
+
+[Timer]
+OnBootSec=5m
+OnUnitActiveSec=5m
+AccuracySec=30s
+Unit=courtcast-healthcheck.service
+
+[Install]
+WantedBy=timers.target

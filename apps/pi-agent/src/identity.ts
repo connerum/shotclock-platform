@@ -3,7 +3,8 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
-import { v4 as uuidv4 } from 'uuid';
+import { randomBytes, randomUUID } from 'crypto';
+import { RUNTIME_VERSION } from './runtime-version.js';
 
 export interface DeviceIdentity {
   deviceId: string;
@@ -14,12 +15,13 @@ export interface DeviceIdentity {
   pairedAt?: number;
   organizationId?: string;
   venueId?: string;
+  authToken?: string;
 }
 
 const IDENTITY_DIR = path.join(os.homedir(), '.shotclock');
 const IDENTITY_FILE = path.join(IDENTITY_DIR, 'device.json');
 
-const FIRMWARE_VERSION = '0.1.0';
+const FIRMWARE_VERSION = RUNTIME_VERSION;
 
 function ensureIdentityDir(): void {
   if (!fs.existsSync(IDENTITY_DIR)) {
@@ -44,21 +46,34 @@ export function loadIdentity(): DeviceIdentity | null {
 
 export function generateIdentity(): DeviceIdentity {
   const identity: DeviceIdentity = {
-    deviceId: `shotclock-${uuidv4().substring(0, 8)}`,
-    deviceName: `Shotclock Display ${uuidv4().substring(0, 4)}`,
+    deviceId: `shotclock-${randomUUID().substring(0, 8)}`,
+    deviceName: `Shotclock Display ${randomUUID().substring(0, 4)}`,
     firmwareVersion: FIRMWARE_VERSION,
     controllerType: 'generic',
     createdAt: Date.now(),
+    authToken: getConfiguredOrGeneratedAuthToken(),
   };
   
   saveIdentity(identity);
   return identity;
 }
 
+export function ensureDeviceAuthToken(identity: DeviceIdentity): DeviceIdentity {
+  const configured = process.env.DEVICE_AUTH_TOKEN?.trim();
+  const authToken = isValidConfiguredToken(configured)
+    ? configured
+    : identity.authToken && identity.authToken.length >= 32
+      ? identity.authToken
+      : getConfiguredOrGeneratedAuthToken();
+  if (identity.authToken === authToken && identity.firmwareVersion === FIRMWARE_VERSION) return identity;
+  return updateIdentity({ authToken, firmwareVersion: FIRMWARE_VERSION });
+}
+
 export function saveIdentity(identity: DeviceIdentity): void {
   try {
     ensureIdentityDir();
-    fs.writeFileSync(IDENTITY_FILE, JSON.stringify(identity, null, 2));
+    fs.writeFileSync(IDENTITY_FILE, JSON.stringify(identity, null, 2), { mode: 0o600 });
+    fs.chmodSync(IDENTITY_FILE, 0o600);
     console.log('Identity saved');
   } catch (error) {
     console.error('Error saving identity:', error);
@@ -113,4 +128,14 @@ export function getIdentityPath(): string {
 
 export function getFirmwareVersion(): string {
   return FIRMWARE_VERSION;
+}
+
+function getConfiguredOrGeneratedAuthToken(): string {
+  const configured = process.env.DEVICE_AUTH_TOKEN?.trim();
+  if (isValidConfiguredToken(configured)) return configured;
+  return randomBytes(32).toString('hex');
+}
+
+function isValidConfiguredToken(value: string | undefined): value is string {
+  return Boolean(value && value.length >= 32 && !value.startsWith('replace-') && !value.startsWith('development-'));
 }

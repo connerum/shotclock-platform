@@ -230,7 +230,7 @@ curl http://localhost:3001/local/update/status
   "heartbeatInterval": 30000,
   "pairingCodeLength": 6,
   "setupApSsid": "Shotclock-Setup",
-  "setupApPassword": "shotclock123",
+  "setupApPassword": "<unique-device-password>",
   "updateCheckInterval": 3600000,
   "localApiPort": 3001,
   "deviceName": "My Display"

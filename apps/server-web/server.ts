@@ -1,7 +1,11 @@
 // Custom Next.js server with Socket.IO and Prisma
 
+// Custom servers load application modules before the Next CLI gets a chance to
+// install its Node runtime globals. This baseline must be first so server-side
+// auth/cookies always receive a real AsyncLocalStorage implementation.
+import 'next/dist/server/node-environment';
+
 import { createServer, IncomingMessage, ServerResponse } from 'http';
-import { parse } from 'url';
 import { createReadStream, existsSync } from 'fs';
 import { stat } from 'fs/promises';
 import { extname, join, normalize, sep } from 'path';
@@ -10,6 +14,7 @@ import { Server as SocketIOServer } from 'socket.io';
 import { DeviceToServerEvents, ServerToDeviceEvents } from '@shotclock/shared/socket';
 import { setupSocketServer, TypedServer } from './socket/server';
 import { setServerIO } from './lib/socket';
+import { prisma } from './lib/prisma';
 
 const dev = process.env.NODE_ENV !== 'production';
 const hostname = process.env.HOSTNAME || 'localhost';
@@ -20,16 +25,15 @@ const handle = app.getRequestHandler();
 
 app.prepare().then(() => {
   const httpServer = createServer(async (req, res) => {
-    const parsedUrl = parse(req.url!, true);
     const servedMedia = await serveUploadedMedia(req, res);
     if (servedMedia) return;
 
-    handle(req, res, parsedUrl);
+    handle(req, res);
   });
 
   const io = new SocketIOServer(httpServer, {
     cors: {
-      origin: '*',
+      origin: getAllowedOrigins(),
       methods: ['GET', 'POST'],
     },
     path: '/socket.io',
@@ -42,6 +46,15 @@ app.prepare().then(() => {
   // Setup Socket.IO handlers (includes device and admin handlers with Prisma integration)
   setupSocketServer(io as TypedServer);
 
+  const staleDeviceTimer = setInterval(() => {
+    const staleBefore = new Date(Date.now() - 2 * 60 * 1000);
+    void prisma.device.updateMany({
+      where: { isOnline: true, OR: [{ lastSeen: null }, { lastSeen: { lt: staleBefore } }] },
+      data: { isOnline: false, status: 'offline' },
+    }).catch((error) => console.error('Failed to reconcile stale devices:', error));
+  }, 60_000);
+  staleDeviceTimer.unref();
+
   httpServer.listen(port, () => {
     console.log(`> Ready on http://${hostname}:${port}`);
     console.log(`> Socket.IO server running on path /socket.io`);
@@ -53,8 +66,20 @@ export function getServerIO() {
   return (global as any).socketIO as SocketIOServer<DeviceToServerEvents, ServerToDeviceEvents>;
 }
 
+function getAllowedOrigins(): string[] {
+  const configured = process.env.ALLOWED_ORIGINS
+    || process.env.NEXT_PUBLIC_SERVER_URL
+    || process.env.SERVER_URL;
+  const origins = (configured || 'http://localhost:3000')
+    .split(',')
+    .map((value) => value.trim())
+    .filter(Boolean);
+  if (process.env.NODE_ENV !== 'production') origins.push('http://127.0.0.1:3000');
+  return [...new Set(origins)];
+}
+
 async function serveUploadedMedia(req: IncomingMessage, res: ServerResponse) {
-  const pathname = parse(req.url || '').pathname;
+  const pathname = new URL(req.url || '/', 'http://localhost').pathname;
   if (!pathname?.startsWith('/media/')) return false;
 
   try {

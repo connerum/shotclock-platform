@@ -28,7 +28,7 @@ interface CaptivePortalConfig {
 
 const DEFAULT_CONFIG: CaptivePortalConfig = {
   apSsid: 'Shotclock-Setup',
-  apPassword: 'shotclock123',
+  apPassword: 'development-only-password',
   portalHost: 'sportsboard.local',
   portalUrl: 'http://sportsboard.local',
   fallbackPortalUrl: 'http://192.168.4.1:8080',

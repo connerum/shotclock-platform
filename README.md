@@ -83,7 +83,7 @@ Timer state, scoreboard state, and wrestling match state logic.
 ## Apps
 
 ### @shotclock/server-web
-Next.js 14 application with:
+Next.js 15 application with:
 - Dashboard UI for device management
 - Email/password authentication with per-user device ownership
 - Socket.IO server for real-time communication
@@ -111,7 +111,7 @@ React kiosk application:
 
 ### Prerequisites
 
-- Node.js 20 LTS, Node.js 22 LTS, or Node.js 24 LTS
+- Node.js 20 LTS or Node.js 22 LTS (production uses Node 22)
 - pnpm 10+
 - SQLite through Prisma
 
@@ -254,12 +254,12 @@ shotclock-platform/
 ### Production Build
 
 ```bash
-./scripts/build-release.sh 0.2.0
+./scripts/build-pi-release.sh 1.0.0
 ```
 
-This creates:
-- `/opt/shotclock/releases/0.2.0/` - Release files
-- `/opt/shotclock/releases/shotclock-0.2.0.tar.gz` - Archive
+This creates `releases/shotclock-1.0.0.tar.gz` and its SHA-256 file. See
+[docs/PRODUCTION_HANDOFF.md](docs/PRODUCTION_HANDOFF.md) for the validated OTA,
+server deployment, backup, and recovery procedures.
 
 ### Pi Installation
 

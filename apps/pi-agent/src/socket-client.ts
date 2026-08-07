@@ -51,6 +51,10 @@ export function setupSocketClient(
     reconnectionDelay: 1000,
     reconnectionDelayMax: 5000,
     timeout: 10000,
+    auth: {
+      deviceId: identity.deviceId,
+      token: identity.authToken,
+    },
   }) as TypedSocket;
 
   // Handle connection
@@ -330,7 +334,10 @@ export function startPairingReconciliation(identity: DeviceIdentity, config: Age
 
       const serverUrl = config.serverUrl.replace(/\/$/, '');
       const response = await fetch(`${serverUrl}/api/device-status/${identity.deviceId}/pairing`, {
-        headers: { Accept: 'application/json' },
+        headers: {
+          Accept: 'application/json',
+          Authorization: `Bearer ${identity.authToken}`,
+        },
       });
 
       if (!response.ok) return;

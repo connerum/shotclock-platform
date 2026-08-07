@@ -35,12 +35,10 @@ export default async function DashboardLayout({
                   Pair
                 </Link>
                 {isSuperUser(user) && (
-                  <Link
-                    href="/releases"
-                    className="cc-nav-link px-3 py-2"
-                  >
-                    Releases
-                  </Link>
+                  <>
+                    <Link href="/releases" className="cc-nav-link px-3 py-2">Releases</Link>
+                    <Link href="/users" className="cc-nav-link px-3 py-2">Users</Link>
+                  </>
                 )}
               </div>
             </div>
@@ -54,6 +52,7 @@ export default async function DashboardLayout({
                   Sign Out
                 </button>
               </form>
+              <Link href="/account" className="cc-btn cc-btn-secondary px-3 py-1.5 text-xs">Account</Link>
             </div>
           </div>
         </div>

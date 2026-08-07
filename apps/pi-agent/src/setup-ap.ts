@@ -1,10 +1,9 @@
 // Setup AP - hostapd + dnsmasq management for setup access point
 
 import * as fs from 'fs';
-import { exec, execFile } from 'child_process';
+import { execFile } from 'child_process';
 import { promisify } from 'util';
 
-const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
 
 interface CaptivePortalConfig {
@@ -21,7 +20,7 @@ interface CaptivePortalConfig {
 
 const DEFAULT_AP_CONFIG: CaptivePortalConfig = {
   apSsid: 'Shotclock-Setup',
-  apPassword: 'shotclock123',
+  apPassword: 'development-only-password',
   portalHost: 'sportsboard.local',
   apChannel: 6,
   apInterface: 'wlan0',
@@ -110,7 +109,7 @@ export class SetupAP {
    */
   async isActive(): Promise<boolean> {
     try {
-      const { stdout } = await execAsync('systemctl is-active hostapd');
+      const { stdout } = await execFileAsync('systemctl', ['is-active', 'hostapd']);
       return stdout.trim() === 'active';
     } catch {
       return this.isRunning;
@@ -148,7 +147,7 @@ rsn_pairwise=CCMP
     await fs.promises.mkdir('/etc/hostapd', { recursive: true });
     await fs.promises.writeFile(HOSTAPD_CONF, config);
     await fs.promises.writeFile(HOSTAPD_DEFAULTS, `DAEMON_CONF="${HOSTAPD_CONF}"\n`);
-    await execAsync('systemctl unmask hostapd');
+    await execFileAsync('systemctl', ['unmask', 'hostapd']);
   }
 
   private async configureDnsmasq(): Promise<void> {
@@ -249,11 +248,21 @@ listen-address=${serverIp}
     try {
       const apInterface = this.getSafeInterfaceName(this.config.apInterface);
       const wanInterface = this.getSafeInterfaceName(this.config.wanInterface);
-      await execAsync(`iptables -t nat -C POSTROUTING -o ${wanInterface} -j MASQUERADE || iptables -t nat -A POSTROUTING -o ${wanInterface} -j MASQUERADE`);
-      await execAsync(`iptables -C FORWARD -i ${apInterface} -o ${wanInterface} -j ACCEPT || iptables -A FORWARD -i ${apInterface} -o ${wanInterface} -j ACCEPT`);
-      await execAsync(`iptables -C FORWARD -i ${wanInterface} -o ${apInterface} -m state --state RELATED,ESTABLISHED -j ACCEPT || iptables -A FORWARD -i ${wanInterface} -o ${apInterface} -m state --state RELATED,ESTABLISHED -j ACCEPT`);
+      await this.ensureIptablesRule(['-t', 'nat', '-C', 'POSTROUTING', '-o', wanInterface, '-j', 'MASQUERADE']);
+      await this.ensureIptablesRule(['-C', 'FORWARD', '-i', apInterface, '-o', wanInterface, '-j', 'ACCEPT']);
+      await this.ensureIptablesRule(['-C', 'FORWARD', '-i', wanInterface, '-o', apInterface, '-m', 'state', '--state', 'RELATED,ESTABLISHED', '-j', 'ACCEPT']);
     } catch (error) {
       console.error('NAT setup error (may be expected):', error);
+    }
+  }
+
+  private async ensureIptablesRule(checkArgs: string[]): Promise<void> {
+    try {
+      await execFileAsync('iptables', checkArgs);
+      return;
+    } catch {
+      const addArgs = checkArgs.map((value) => value === '-C' ? '-A' : value);
+      await execFileAsync('iptables', addArgs);
     }
   }
 

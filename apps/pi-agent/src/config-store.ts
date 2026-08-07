@@ -14,6 +14,7 @@ export interface AgentConfig {
   setupPortalHost: string;
   updateCheckInterval: number;
   localApiPort: number;
+  localApiHost: string;
   deviceName: string;
   organizationId?: string;
   venueId?: string;
@@ -28,10 +29,11 @@ const DEFAULT_CONFIG: AgentConfig = {
   heartbeatInterval: parseInt(process.env.AGENT_HEARTBEAT_INTERVAL || '30000', 10),
   pairingCodeLength: parseInt(process.env.PAIRING_CODE_LENGTH || '6', 10),
   setupApSsid: process.env.SETUP_AP_SSID || 'Shotclock-Setup',
-  setupApPassword: process.env.SETUP_AP_PASSWORD || 'shotclock123',
+  setupApPassword: process.env.SETUP_AP_PASSWORD || 'development-only-password',
   setupPortalHost: process.env.SETUP_PORTAL_HOST || 'sportsboard.local',
   updateCheckInterval: parseInt(process.env.UPDATE_CHECK_INTERVAL || '3600000', 10),
   localApiPort: parseInt(process.env.AGENT_LOCAL_API_PORT || '3001', 10),
+  localApiHost: process.env.AGENT_LOCAL_API_HOST || '127.0.0.1',
   deviceName: process.env.DEVICE_NAME || process.env.DEFAULT_DEVICE_NAME || 'Shotclock Display',
 };
 
@@ -48,7 +50,14 @@ export function loadConfig(): AgentConfig {
     if (fs.existsSync(CONFIG_FILE)) {
       const data = fs.readFileSync(CONFIG_FILE, 'utf-8');
       const config = JSON.parse(data);
-      return { ...DEFAULT_CONFIG, ...config };
+      return {
+        ...DEFAULT_CONFIG,
+        ...config,
+        ...(process.env.SERVER_URL && { serverUrl: process.env.SERVER_URL }),
+        ...(process.env.SETUP_AP_PASSWORD && { setupApPassword: process.env.SETUP_AP_PASSWORD }),
+        ...(process.env.SETUP_AP_SSID && { setupApSsid: process.env.SETUP_AP_SSID }),
+        ...(process.env.AGENT_LOCAL_API_HOST && { localApiHost: process.env.AGENT_LOCAL_API_HOST }),
+      };
     }
   } catch (error) {
     console.error('Error loading config:', error);
@@ -64,7 +73,8 @@ export function saveConfig(config: Partial<AgentConfig>): AgentConfig {
     const currentConfig = loadConfig();
     const newConfig = { ...currentConfig, ...config };
     
-    fs.writeFileSync(CONFIG_FILE, JSON.stringify(newConfig, null, 2));
+    fs.writeFileSync(CONFIG_FILE, JSON.stringify(newConfig, null, 2), { mode: 0o600 });
+    fs.chmodSync(CONFIG_FILE, 0o600);
     console.log('Config saved');
     
     return newConfig;
