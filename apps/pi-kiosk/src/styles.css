@@ -150,11 +150,11 @@ html.show-cursor * {
 }
 
 .pitchkount-main {
-  grid-template-rows: 12% 10% 52% 16% 10%;
+  grid-template-rows: 16% 58% 16% 10%;
 }
 
 .pitchkount-main--no-speed {
-  grid-template-rows: 12% 10% 52% 16% 10%;
+  grid-template-rows: 16% 58% 16% 10%;
 }
 
 .pitchkount-stats-slide {
@@ -174,15 +174,20 @@ html.show-cursor * {
 }
 
 .pitchkount-school-banner span {
+  max-width: 100%;
+  overflow: hidden;
   color: var(--pk-red);
   font-family: "Arial Narrow", Arial, sans-serif;
   font-size: clamp(5px, 4.6cqw, 8px);
   font-weight: 900;
   letter-spacing: 0.24em;
   line-height: 1;
+  text-align: center;
+  white-space: nowrap;
 }
 
 .pitchkount-school-banner strong {
+  width: 100%;
   max-width: 100%;
   overflow: hidden;
   margin-top: 0.65cqh;
@@ -190,34 +195,13 @@ html.show-cursor * {
   font-size: clamp(9px, 11cqw, 18px);
   letter-spacing: 0.09em;
   line-height: 1;
-  text-overflow: ellipsis;
+  text-align: center;
   text-shadow: 0 0 2cqw rgba(0, 139, 218, 0.46);
   white-space: nowrap;
 }
 
-.pitchkount-namebar {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  align-items: center;
-  gap: 3cqw;
-  padding: 0 5cqw;
-  border-bottom: max(1px, 0.4cqw) solid rgba(255, 255, 255, 0.15);
-  background: rgba(0, 29, 47, 0.62);
-}
-
-.pitchkount-namebar span {
-  color: var(--pk-red);
-  font-size: clamp(8px, 9cqw, 15px);
-  line-height: 1;
-}
-
-.pitchkount-namebar strong {
-  overflow: hidden;
-  font-size: clamp(8px, 9.2cqw, 15px);
-  letter-spacing: 0.03em;
-  line-height: 1;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+.pitchkount-player-banner span {
+  letter-spacing: 0.12em;
 }
 
 .pitchkount-main-hero {
@@ -337,18 +321,10 @@ html.show-cursor * {
 }
 
 .pitchkount-remaining-card strong {
-  color: #fff;
+  color: var(--pk-red);
   font-size: clamp(23px, 27cqw, 43px);
   letter-spacing: -0.035em;
   line-height: 0.84;
-}
-
-.pitchkount-remaining-card small {
-  color: rgba(255, 255, 255, 0.56);
-  font-family: Arial, sans-serif;
-  font-size: clamp(5px, 4.6cqw, 7px);
-  font-weight: 900;
-  line-height: 1;
 }
 
 .pitchkount-results {
@@ -508,15 +484,15 @@ html.show-cursor * {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 0 3cqw;
+  padding: 0 1cqw;
   border-top: max(1px, 0.55cqw) solid rgba(0, 139, 218, 0.7);
   background: linear-gradient(90deg, #010306, #002c49 50%, #010306);
 }
 
 .pitchkount-logo {
   display: block;
-  width: 92%;
-  height: 82%;
-  object-fit: contain;
+  width: 100%;
+  height: 92%;
+  object-fit: fill;
   filter: drop-shadow(0 0 1.5cqw rgba(0, 139, 218, 0.42));
 }

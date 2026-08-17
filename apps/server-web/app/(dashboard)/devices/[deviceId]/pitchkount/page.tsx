@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type CSSProperties } from 'react';
 import {
   DEFAULT_PITCHKOUNT_STATE,
   PITCHKOUNT_DAILY_LIMIT,
@@ -365,6 +365,9 @@ function NumberField({ label, value, maximum, step = '1', onChange }: { label: s
 function PitchKountPreview({ state }: { state: PitchKountState }) {
   const [slide, setSlide] = useState<'main' | 'stats'>('main');
   const pitchesRemaining = Math.max(0, PITCHKOUNT_DAILY_LIMIT - state.pitchCount);
+  const [firstName, ...remainingNames] = state.pitcherName.trim().split(/\s+/);
+  const lastName = remainingNames.join(' ') || firstName;
+  const firstLine = remainingNames.length > 0 ? `#${state.pitcherNumber} · ${firstName}` : `#${state.pitcherNumber}`;
 
   useEffect(() => {
     const duration = slide === 'main'
@@ -378,17 +381,13 @@ function PitchKountPreview({ state }: { state: PitchKountState }) {
 
   return (
     <div className="mx-auto aspect-[1/2] w-full max-w-[270px] overflow-hidden border border-sky-500/70 bg-[radial-gradient(circle_at_50%_34%,rgba(0,117,185,0.22),transparent_36%),linear-gradient(145deg,#07121e,#010409_42%,#020910)] font-sans text-white shadow-[inset_0_0_28px_rgba(0,139,218,0.28)]">
-      <div className="flex h-[12%] flex-col items-center justify-center border-b border-sky-500/70 bg-black/55">
-        <span className="text-[8px] font-black tracking-[0.22em] text-red-500">{slide === 'main' ? 'SCHOOL' : 'PITCHER'}</span>
-        <strong className="mt-1 max-w-[92%] truncate text-base font-black tracking-[0.08em]">{slide === 'main' ? state.teamName : state.pitcherName}</strong>
+      <div className={`flex flex-col items-center justify-center border-b border-sky-500/70 bg-black/55 ${slide === 'main' ? 'h-[16%]' : 'h-[12%]'}`}>
+        <span className="max-w-[96%] overflow-hidden whitespace-nowrap font-black tracking-[0.16em] text-red-500" style={fitPreviewEyebrowText(slide === 'main' ? firstLine : `PITCHER · #${state.pitcherNumber}`)}>{slide === 'main' ? firstLine : `PITCHER · #${state.pitcherNumber}`}</span>
+        <strong className="mt-1 w-[96%] overflow-hidden whitespace-nowrap text-center font-black" style={fitPreviewBannerText(slide === 'main' ? lastName : state.pitcherName)}>{slide === 'main' ? lastName : state.pitcherName}</strong>
       </div>
       {slide === 'main' ? (
-        <div className="h-[88%]">
-          <div className="flex h-[10%] items-center gap-3 border-b border-white/10 bg-sky-950/30 px-3">
-            <span className="text-sm font-black text-red-500">#{state.pitcherNumber}</span>
-            <strong className="min-w-0 truncate text-sm font-black">{state.pitcherName}</strong>
-          </div>
-          <div className="grid h-[58%] grid-cols-[43%_57%] px-[4%] py-[3%]">
+        <div className="h-[84%]">
+          <div className="grid h-[64%] grid-cols-[43%_57%] px-[4%] py-[3%]">
             <div className="overflow-hidden border border-sky-500/70 bg-sky-950/30">
               {state.headshotUrl ? <img src={state.headshotUrl} alt="" className="h-full w-full object-cover object-top" /> : <div className="flex h-full flex-col items-center justify-center text-white/30"><span className="text-[8px] font-black">PLAYER</span><strong className="mt-2 text-3xl">#{state.pitcherNumber}</strong></div>}
             </div>
@@ -398,12 +397,12 @@ function PitchKountPreview({ state }: { state: PitchKountState }) {
                 <strong className="self-center justify-self-center text-5xl leading-none tracking-tighter">{state.pitchCount}</strong>
               </div>
               <div className="grid min-h-0 grid-rows-[auto_1fr] border border-sky-500/70 bg-black/55 px-2 pt-2">
-                <span className="text-[10px] font-black tracking-widest text-red-500">PITCHES LEFT</span>
-                <div className="self-center justify-self-center"><strong className="text-4xl leading-none">{pitchesRemaining}</strong><small className="ml-1 text-[7px] font-black text-white/45">OF {PITCHKOUNT_DAILY_LIMIT}</small></div>
+                <span className="text-[10px] font-black tracking-widest text-red-500">REMAINING</span>
+                <div className="self-center justify-self-center"><strong className="text-4xl leading-none text-red-500">{pitchesRemaining}</strong></div>
               </div>
             </div>
           </div>
-          <div className={`mx-[4%] grid h-[22%] gap-2 pb-[3%] text-center ${state.showPitchSpeed ? 'grid-cols-3' : 'grid-cols-2'}`}>
+          <div className={`mx-[4%] grid h-[26%] gap-2 pb-[3%] text-center ${state.showPitchSpeed ? 'grid-cols-3' : 'grid-cols-2'}`}>
             <PreviewPitchMetric label="STRIKES" value={state.strikes} />
             <PreviewPitchMetric label="BALLS" value={state.balls} />
             {state.showPitchSpeed && <PreviewPitchMetric label="SPEED" value={state.pitchSpeedMph} unit="MPH" />}
@@ -440,7 +439,19 @@ function PreviewStat({ label, value }: { label: string; value: string | number }
 }
 
 function PreviewFooter() {
-  return <div className="flex h-[10%] items-center justify-center border-t border-sky-500/70 bg-gradient-to-r from-black via-sky-950 to-black px-[4%]"><img src="/images/sports/pitchkount-logo.png" alt="PitchKount" className="h-[82%] w-[92%] object-contain drop-shadow-[0_0_4px_rgba(0,139,218,0.45)]" /></div>;
+  return <div className="flex h-[10%] items-center justify-center border-t border-sky-500/70 bg-gradient-to-r from-black via-sky-950 to-black px-[1%]"><img src="/images/sports/pitchkount-logo.png" alt="PitchKount" className="h-[92%] w-full object-fill drop-shadow-[0_0_4px_rgba(0,139,218,0.45)]" /></div>;
+}
+
+function fitPreviewBannerText(text: string): CSSProperties {
+  const fontSize = Math.max(9, Math.min(16, 190 / Math.max(text.length, 1)));
+  return {
+    fontSize: `${fontSize}px`,
+    letterSpacing: text.length > 16 ? '0.01em' : text.length > 11 ? '0.035em' : '0.08em',
+  };
+}
+
+function fitPreviewEyebrowText(text: string): CSSProperties {
+  return { fontSize: `${Math.max(5, Math.min(8, 165 / Math.max(text.length, 1)))}px` };
 }
 
 function getPublicMediaUrl(url: string) {

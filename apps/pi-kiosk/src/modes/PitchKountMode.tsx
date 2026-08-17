@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type CSSProperties } from 'react';
 import {
   PITCHKOUNT_DAILY_LIMIT,
   PITCHKOUNT_MAIN_SLIDE_DURATION_MS,
@@ -31,11 +31,7 @@ export default function PitchKountMode({ pitchKount }: { pitchKount?: PitchKount
 
         {activeSlide === 'main' ? (
           <main className={`pitchkount-slide pitchkount-main ${state.showPitchSpeed ? '' : 'pitchkount-main--no-speed'}`} key="main">
-            <SchoolBanner teamName={state.teamName} />
-            <section className="pitchkount-namebar">
-              <span>#{state.pitcherNumber}</span>
-              <strong>{state.pitcherName}</strong>
-            </section>
+            <PlayerBanner playerName={state.pitcherName} playerNumber={state.pitcherNumber} />
             <section className="pitchkount-main-hero">
               <Headshot state={state} />
               <div className="pitchkount-count-stack">
@@ -44,10 +40,9 @@ export default function PitchKountMode({ pitchKount }: { pitchKount?: PitchKount
                   <strong>{state.pitchCount}</strong>
                 </div>
                 <div className="pitchkount-remaining-card">
-                  <div className="pitchkount-label">PITCHES LEFT</div>
+                  <div className="pitchkount-label">REMAINING</div>
                   <div>
                     <strong>{pitchesRemaining}</strong>
-                    <small>OF {PITCHKOUNT_DAILY_LIMIT}</small>
                   </div>
                 </div>
               </div>
@@ -90,9 +85,30 @@ function SchoolBanner({ teamName, label = 'SCHOOL' }: { teamName: string; label?
   return (
     <header className="pitchkount-school-banner">
       <span>{label}</span>
-      <strong>{teamName}</strong>
+      <strong style={fitBannerText(teamName)}>{teamName}</strong>
     </header>
   );
+}
+
+function PlayerBanner({ playerName, playerNumber }: { playerName: string; playerNumber: string }) {
+  const [firstName, ...remainingNames] = playerName.trim().split(/\s+/);
+  const lastName = remainingNames.join(' ') || firstName;
+  const firstLine = remainingNames.length > 0 ? `#${playerNumber} · ${firstName}` : `#${playerNumber}`;
+
+  return (
+    <header className="pitchkount-school-banner pitchkount-player-banner">
+      <span style={fitBannerText(firstLine, 5.2, 120)}>{firstLine}</span>
+      <strong style={fitBannerText(lastName)}>{lastName}</strong>
+    </header>
+  );
+}
+
+function fitBannerText(text: string, maximumCqw = 11, widthFactor = 130): CSSProperties {
+  const fontSize = Math.max(4.5, Math.min(maximumCqw, widthFactor / Math.max(text.length, 1)));
+  return {
+    fontSize: `${fontSize}cqw`,
+    letterSpacing: text.length > 16 ? '0.015em' : text.length > 11 ? '0.04em' : undefined,
+  };
 }
 
 function Headshot({ state, compact = false }: { state: PitchKountState; compact?: boolean }) {
