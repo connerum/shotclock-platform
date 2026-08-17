@@ -45,6 +45,18 @@ html.show-cursor * {
 
 /* PitchKount uses container-relative sizing so the same composition is legible
    at the native 128x256 LED resolution and in larger browser previews. */
+@keyframes pitchkount-slide-in {
+  from {
+    opacity: 0;
+    transform: translateX(5cqw);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
 .pitchkount-stage {
   display: flex;
   width: 100%;
@@ -58,11 +70,8 @@ html.show-cursor * {
 
 .pitchkount-board {
   --pk-blue: #058bd3;
-  --pk-blue-soft: #003e67;
   --pk-red: #f12822;
   position: relative;
-  display: grid;
-  grid-template-rows: 11% 12% 32% 18% 10% 17%;
   width: min(100cqw, 50cqh);
   height: min(100cqh, 200cqw);
   min-width: 0;
@@ -131,45 +140,387 @@ html.show-cursor * {
   opacity: 0.10;
 }
 
-.pitchkount-header,
-.pitchkount-pitcher,
-.pitchkount-count-panel,
-.pitchkount-live-row,
-.pitchkount-results,
-.pitchkount-stats {
+.pitchkount-slide {
   position: relative;
   z-index: 2;
-  min-width: 0;
-  min-height: 0;
+  display: grid;
+  width: 100%;
+  height: 100%;
+  animation: pitchkount-slide-in 320ms ease-out both;
 }
 
-.pitchkount-header {
+.pitchkount-main {
+  grid-template-rows: 12% 10% 38% 12% 18% 10%;
+}
+
+.pitchkount-main--no-speed {
+  grid-template-rows: 13% 11% 51% 15% 10%;
+}
+
+.pitchkount-stats-slide {
+  grid-template-rows: 12% 20% 58% 10%;
+}
+
+.pitchkount-school-banner {
   display: flex;
+  min-width: 0;
+  flex-direction: column;
   align-items: center;
-  justify-content: space-between;
-  padding: 1.4cqh 4cqw 1cqh;
-  border-bottom: max(1px, 0.45cqw) solid rgba(0, 139, 218, 0.55);
-  background: linear-gradient(90deg, rgba(1, 6, 12, 0.96), rgba(4, 28, 45, 0.72));
+  justify-content: center;
+  padding: 1cqh 4cqw;
+  border-bottom: max(1px, 0.55cqw) solid rgba(0, 139, 218, 0.78);
+  background: linear-gradient(90deg, rgba(1, 6, 12, 0.98), rgba(0, 76, 122, 0.72), rgba(1, 6, 12, 0.98));
+  box-shadow: 0 1.2cqh 4cqw rgba(0, 0, 0, 0.52);
 }
 
-.pitchkount-team {
-  max-width: 34%;
-  overflow: hidden;
-  color: #b9d9ed;
+.pitchkount-school-banner span {
+  color: var(--pk-red);
   font-family: "Arial Narrow", Arial, sans-serif;
-  font-size: clamp(5px, 5.5cqw, 9px);
+  font-size: clamp(5px, 4.6cqw, 8px);
   font-weight: 900;
-  letter-spacing: 0.11em;
+  letter-spacing: 0.24em;
+  line-height: 1;
+}
+
+.pitchkount-school-banner strong {
+  max-width: 100%;
+  overflow: hidden;
+  margin-top: 0.65cqh;
+  color: #fff;
+  font-size: clamp(9px, 11cqw, 18px);
+  letter-spacing: 0.09em;
+  line-height: 1;
+  text-overflow: ellipsis;
+  text-shadow: 0 0 2cqw rgba(0, 139, 218, 0.46);
+  white-space: nowrap;
+}
+
+.pitchkount-namebar {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 3cqw;
+  padding: 0 5cqw;
+  border-bottom: max(1px, 0.4cqw) solid rgba(255, 255, 255, 0.15);
+  background: rgba(0, 29, 47, 0.62);
+}
+
+.pitchkount-namebar span {
+  color: var(--pk-red);
+  font-size: clamp(8px, 9cqw, 15px);
+  line-height: 1;
+}
+
+.pitchkount-namebar strong {
+  overflow: hidden;
+  font-size: clamp(8px, 9.2cqw, 15px);
+  letter-spacing: 0.03em;
   line-height: 1;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.pitchkount-main-hero {
+  display: grid;
+  grid-template-columns: 43% 57%;
+  min-width: 0;
+  min-height: 0;
+  padding: 1.4cqh 4cqw;
+}
+
+.pitchkount-headshot {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  border: max(1px, 0.55cqw) solid rgba(0, 139, 218, 0.72);
+  background:
+    linear-gradient(180deg, rgba(0, 75, 121, 0.38), rgba(0, 0, 0, 0.84)),
+    repeating-linear-gradient(135deg, transparent 0 5cqw, rgba(0, 139, 218, 0.08) 5cqw 6cqw);
+  box-shadow: inset 0 0 7cqw rgba(0, 105, 174, 0.26);
+}
+
+.pitchkount-headshot::after {
+  position: absolute;
+  right: -1px;
+  bottom: -1px;
+  width: 14cqw;
+  height: max(2px, 0.9cqw);
+  background: var(--pk-red);
+  content: "";
+}
+
+.pitchkount-headshot img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center top;
+}
+
+.pitchkount-headshot-placeholder {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: rgba(255, 255, 255, 0.38);
+}
+
+.pitchkount-headshot-placeholder span {
+  font-family: "Arial Narrow", Arial, sans-serif;
+  font-size: clamp(5px, 5cqw, 8px);
+  font-weight: 900;
+  letter-spacing: 0.13em;
+}
+
+.pitchkount-headshot-placeholder strong {
+  margin-top: 1cqh;
+  color: rgba(255, 255, 255, 0.62);
+  font-size: clamp(18px, 20cqw, 32px);
+  line-height: 1;
+}
+
+.pitchkount-count-card {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border-top: max(1px, 0.55cqw) solid rgba(0, 139, 218, 0.72);
+  border-right: max(1px, 0.55cqw) solid rgba(0, 139, 218, 0.72);
+  border-bottom: max(1px, 0.55cqw) solid rgba(0, 139, 218, 0.72);
+  background: radial-gradient(circle at 50% 44%, rgba(0, 117, 185, 0.22), rgba(0, 0, 0, 0.82) 72%);
+}
+
+.pitchkount-label {
+  color: var(--pk-red);
+  font-family: "Arial Narrow", Arial, sans-serif;
+  font-size: clamp(6px, 6cqw, 10px);
+  font-weight: 900;
+  letter-spacing: 0.11em;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.pitchkount-count-card > strong {
+  margin-top: 0.6cqh;
+  font-size: clamp(33px, 39cqw, 62px);
+  letter-spacing: -0.045em;
+  line-height: 0.82;
+  text-shadow: 0 0 4cqw rgba(0, 139, 218, 0.34);
+}
+
+.pitchkount-remaining {
+  display: grid;
+  grid-template-columns: auto auto;
+  align-items: baseline;
+  gap: 0 2cqw;
+  margin-top: 1.5cqh;
+  padding-top: 1cqh;
+  border-top: max(1px, 0.4cqw) solid rgba(255, 255, 255, 0.22);
+}
+
+.pitchkount-remaining span {
+  color: #8dc7e8;
+  font-family: "Arial Narrow", Arial, sans-serif;
+  font-size: clamp(5px, 4.8cqw, 8px);
+  font-weight: 900;
+  letter-spacing: 0.08em;
+}
+
+.pitchkount-remaining b {
+  grid-row: span 2;
+  color: #fff;
+  font-size: clamp(14px, 16cqw, 26px);
+  line-height: 1;
+}
+
+.pitchkount-remaining small {
+  color: rgba(255, 255, 255, 0.56);
+  font-family: Arial, sans-serif;
+  font-size: clamp(4px, 3.8cqw, 6px);
+  font-weight: 900;
+  line-height: 1;
+}
+
+.pitchkount-results {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  align-items: stretch;
+  gap: 2cqw;
+  padding: 0.7cqh 4cqw 1.3cqh;
+}
+
+.pitchkount-results > div {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3cqw;
+  border-top: max(1px, 0.45cqw) solid rgba(0, 139, 218, 0.62);
+  border-bottom: max(1px, 0.45cqw) solid rgba(0, 139, 218, 0.62);
+  background: rgba(0, 35, 57, 0.62);
+}
+
+.pitchkount-results span {
+  color: var(--pk-red);
+  font-family: "Arial Narrow", Arial, sans-serif;
+  font-size: clamp(6px, 6cqw, 10px);
+  font-weight: 900;
+  letter-spacing: 0.07em;
+}
+
+.pitchkount-results strong {
+  font-size: clamp(14px, 15cqw, 24px);
+  line-height: 1;
+}
+
+.pitchkount-speed-panel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  margin: 0 4cqw 1.6cqh;
+  border: max(1px, 0.55cqw) solid rgba(0, 139, 218, 0.72);
+  background: linear-gradient(90deg, rgba(0, 0, 0, 0.74), rgba(0, 75, 121, 0.33), rgba(0, 0, 0, 0.74));
+}
+
+.pitchkount-speed-panel > div:last-child {
+  display: flex;
+  align-items: baseline;
+  gap: 2cqw;
+  margin-top: 1cqh;
+}
+
+.pitchkount-speed-panel strong {
+  font-size: clamp(24px, 27cqw, 43px);
+  letter-spacing: -0.04em;
+  line-height: 0.8;
+}
+
+.pitchkount-speed-panel span {
+  font-family: "Arial Narrow", Arial, sans-serif;
+  font-size: clamp(6px, 6cqw, 10px);
+  font-weight: 900;
+}
+
+.pitchkount-stats-player {
+  display: grid;
+  grid-template-columns: 30% 70%;
+  min-width: 0;
+  min-height: 0;
+  gap: 3cqw;
+  padding: 1.2cqh 4cqw;
+  border-bottom: max(1px, 0.4cqw) solid rgba(255, 255, 255, 0.14);
+  background: rgba(0, 29, 47, 0.48);
+}
+
+.pitchkount-headshot--compact {
+  width: 100%;
+  height: 100%;
+}
+
+.pitchkount-stats-player > div:last-child {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.pitchkount-stats-player > div:last-child > span {
+  color: var(--pk-red);
+  font-family: "Arial Narrow", Arial, sans-serif;
+  font-size: clamp(6px, 5.8cqw, 9px);
+  font-weight: 900;
+  letter-spacing: 0.15em;
+  line-height: 1;
+}
+
+.pitchkount-stats-player > div:last-child > strong {
+  overflow: hidden;
+  margin-top: 1cqh;
+  font-size: clamp(8px, 9cqw, 15px);
+  letter-spacing: 0.02em;
+  line-height: 1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pitchkount-stats-player small {
+  margin-top: 1cqh;
+  color: #8dc7e8;
+  font-family: "Arial Narrow", Arial, sans-serif;
+  font-size: clamp(5px, 5cqw, 8px);
+  font-weight: 900;
+  letter-spacing: 0.08em;
+}
+
+.pitchkount-stats-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: repeat(3, minmax(0, 1fr));
+  gap: 1.6cqw;
+  min-width: 0;
+  min-height: 0;
+  padding: 1.5cqh 4cqw;
+}
+
+.pitchkount-stat {
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border: max(1px, 0.5cqw) solid rgba(0, 139, 218, 0.58);
+  background: linear-gradient(145deg, rgba(0, 70, 113, 0.27), rgba(0, 0, 0, 0.74));
+}
+
+.pitchkount-stat--featured {
+  border-color: rgba(241, 40, 34, 0.7);
+  box-shadow: inset 0 0 5cqw rgba(241, 40, 34, 0.08);
+}
+
+.pitchkount-stat span {
+  color: var(--pk-red);
+  font-family: "Arial Narrow", Arial, sans-serif;
+  font-size: clamp(6px, 5.8cqw, 9px);
+  font-weight: 900;
+  letter-spacing: 0.09em;
+  line-height: 1;
+}
+
+.pitchkount-stat strong {
+  max-width: 92%;
+  overflow: hidden;
+  margin-top: 1.2cqh;
+  font-size: clamp(14px, 15cqw, 24px);
+  letter-spacing: -0.025em;
+  line-height: 1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pitchkount-stat--compact strong {
+  font-size: clamp(7px, 7cqw, 12px);
+  letter-spacing: 0.01em;
+}
+
+.pitchkount-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 4cqw;
+  border-top: max(1px, 0.55cqw) solid rgba(0, 139, 218, 0.7);
+  background: linear-gradient(90deg, #010306, #002c49 50%, #010306);
 }
 
 .pitchkount-wordmark {
   display: flex;
   align-items: baseline;
   color: #fff;
-  font-size: clamp(9px, 10cqw, 16px);
+  font-size: clamp(9px, 11cqw, 18px);
   font-style: italic;
   letter-spacing: -0.035em;
   line-height: 1;
@@ -180,233 +531,10 @@ html.show-cursor * {
   color: var(--pk-blue);
 }
 
-.pitchkount-pitcher {
-  display: grid;
-  grid-template-columns: 26% 74%;
-  align-items: center;
-  padding: 0 4cqw;
-  border-bottom: max(1px, 0.4cqw) solid rgba(255, 255, 255, 0.12);
-  background: linear-gradient(90deg, rgba(0, 88, 141, 0.24), rgba(0, 0, 0, 0.18));
-}
-
-.pitchkount-number {
-  color: var(--pk-red);
-  font-size: clamp(8px, 10cqw, 16px);
-  letter-spacing: -0.03em;
-  line-height: 1;
-}
-
-.pitchkount-pitcher-copy {
-  min-width: 0;
-  padding-left: 2cqw;
-  border-left: max(1px, 0.4cqw) solid rgba(0, 139, 218, 0.62);
-}
-
-.pitchkount-pitcher-copy span {
-  display: block;
-  color: var(--pk-red);
-  font-family: "Arial Narrow", Arial, sans-serif;
-  font-size: clamp(4px, 3.7cqw, 7px);
-  font-weight: 900;
-  letter-spacing: 0.16em;
-  line-height: 1;
-}
-
-.pitchkount-pitcher-copy strong {
-  display: block;
-  overflow: hidden;
-  margin-top: 0.5cqh;
-  font-size: clamp(7px, 8.2cqw, 13px);
-  letter-spacing: 0.02em;
-  line-height: 1;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.pitchkount-count-panel {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  margin: 1.3cqh 4cqw;
-  border: max(1px, 0.55cqw) solid rgba(0, 139, 218, 0.72);
-  background:
-    linear-gradient(90deg, transparent 49.7%, rgba(255, 255, 255, 0.045) 50%, transparent 50.3%),
-    radial-gradient(circle at 50% 50%, rgba(0, 117, 185, 0.18), rgba(0, 0, 0, 0.84) 72%);
-  box-shadow: inset 0 0 7cqw rgba(0, 105, 174, 0.2), 0 0 4cqw rgba(0, 119, 195, 0.12);
-}
-
-.pitchkount-panel-corners::before,
-.pitchkount-panel-corners::after {
-  position: absolute;
-  width: 11cqw;
-  height: max(2px, 0.9cqw);
-  background: var(--pk-red);
-  content: "";
-}
-
-.pitchkount-panel-corners::before {
-  top: -1px;
-  left: -1px;
-}
-
-.pitchkount-panel-corners::after {
-  right: -1px;
-  bottom: -1px;
-}
-
-.pitchkount-label {
-  color: var(--pk-red);
-  font-family: "Arial Narrow", Arial, sans-serif;
-  font-size: clamp(5px, 5cqw, 8px);
-  font-weight: 900;
-  letter-spacing: 0.13em;
-  line-height: 1;
-  white-space: nowrap;
-}
-
-.pitchkount-count {
-  margin-top: -0.5cqh;
-  color: #fff;
-  font-size: clamp(42px, 47cqw, 76px);
-  letter-spacing: -0.035em;
-  line-height: 0.98;
-  text-shadow: 0 0 1.4cqw rgba(255, 255, 255, 0.35), 0 0 5cqw rgba(0, 139, 218, 0.28);
-}
-
-.pitchkount-live-row {
-  display: grid;
-  grid-template-columns: 49% 51%;
-  gap: 1.8cqw;
-  padding: 0 4cqw 1.2cqh;
-}
-
-.pitchkount-live-card {
-  display: flex;
-  min-width: 0;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  overflow: hidden;
-  border: max(1px, 0.45cqw) solid rgba(0, 139, 218, 0.58);
-  background: rgba(0, 0, 0, 0.68);
-}
-
-.pitchkount-speed {
-  display: flex;
-  align-items: baseline;
-  gap: 1.2cqw;
-  margin-top: 0.4cqh;
-}
-
-.pitchkount-speed strong {
-  font-size: clamp(17px, 20cqw, 32px);
-  letter-spacing: -0.04em;
-  line-height: 1;
-}
-
-.pitchkount-speed span {
-  font-family: "Arial Narrow", Arial, sans-serif;
-  font-size: clamp(4px, 4cqw, 7px);
-  font-weight: 900;
-}
-
-.pitchkount-type-card > strong {
-  z-index: 1;
-  max-width: 94%;
-  overflow: hidden;
-  margin-top: 1cqh;
-  font-size: clamp(6px, 7cqw, 12px);
-  letter-spacing: 0.025em;
-  line-height: 1;
-  text-align: center;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.pitchkount-seam {
-  position: absolute;
-  right: -8cqw;
-  bottom: -9cqw;
-  width: 28cqw;
-  height: 28cqw;
-  border: max(1px, 0.7cqw) dashed rgba(241, 40, 34, 0.35);
-  border-radius: 999px;
-}
-
-.pitchkount-results {
-  display: grid;
-  grid-template-columns: 1fr auto 1fr;
-  align-items: center;
-  margin: 0 4cqw 1cqh;
-  border-top: max(1px, 0.45cqw) solid rgba(0, 139, 218, 0.58);
-  border-bottom: max(1px, 0.45cqw) solid rgba(0, 139, 218, 0.58);
-  background: linear-gradient(90deg, rgba(0, 87, 141, 0.13), rgba(0, 0, 0, 0.65), rgba(0, 87, 141, 0.13));
-}
-
-.pitchkount-results > div:not(.pitchkount-result-divider) {
-  display: flex;
-  align-items: baseline;
-  justify-content: center;
-  gap: 2cqw;
-}
-
-.pitchkount-results span {
-  color: var(--pk-red);
-  font-family: "Arial Narrow", Arial, sans-serif;
-  font-size: clamp(4px, 4.4cqw, 7px);
+.pitchkount-footer > span {
+  color: rgba(255, 255, 255, 0.55);
+  font-family: Arial, sans-serif;
+  font-size: clamp(5px, 4.5cqw, 7px);
   font-weight: 900;
   letter-spacing: 0.08em;
-}
-
-.pitchkount-results strong {
-  font-size: clamp(10px, 11cqw, 18px);
-  line-height: 1;
-}
-
-.pitchkount-result-divider {
-  width: max(1px, 0.45cqw);
-  height: 45%;
-  background: rgba(255, 255, 255, 0.27);
-}
-
-.pitchkount-stats {
-  display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-  align-items: stretch;
-  padding: 0 4cqw 1.6cqh;
-}
-
-.pitchkount-stat {
-  display: flex;
-  min-width: 0;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  border-left: max(1px, 0.35cqw) solid rgba(0, 139, 218, 0.35);
-  background: rgba(1, 5, 10, 0.58);
-}
-
-.pitchkount-stat:last-child {
-  border-right: max(1px, 0.35cqw) solid rgba(0, 139, 218, 0.35);
-}
-
-.pitchkount-stat span {
-  color: var(--pk-red);
-  font-family: "Arial Narrow", Arial, sans-serif;
-  font-size: clamp(4px, 3.8cqw, 6px);
-  font-weight: 900;
-  letter-spacing: 0.09em;
-  line-height: 1;
-}
-
-.pitchkount-stat strong {
-  max-width: 95%;
-  overflow: hidden;
-  margin-top: 1cqh;
-  font-size: clamp(6px, 6.2cqw, 10px);
-  letter-spacing: -0.025em;
-  line-height: 1;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }

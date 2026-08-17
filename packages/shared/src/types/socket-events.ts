@@ -77,12 +77,17 @@ export const PITCHKOUNT_PITCH_TYPES = [
 
 export type PitchKountPitchType = typeof PITCHKOUNT_PITCH_TYPES[number];
 
+export const PITCHKOUNT_DAILY_LIMIT = 110;
+export const PITCHKOUNT_SLIDE_DURATION_MS = 8000;
+
 export interface PitchKountState {
   pitcherName: string;
   pitcherNumber: string;
   teamName: string;
+  headshotUrl?: string;
   pitchCount: number;
   pitchSpeedMph: number;
+  showPitchSpeed: boolean;
   pitchType: PitchKountPitchType;
   strikes: number;
   balls: number;
@@ -100,6 +105,7 @@ export const DEFAULT_PITCHKOUNT_STATE: PitchKountState = {
   teamName: 'HOME',
   pitchCount: 0,
   pitchSpeedMph: 0,
+  showPitchSpeed: true,
   pitchType: 'Fastball',
   strikes: 0,
   balls: 0,
@@ -124,8 +130,10 @@ export function normalizePitchKountState(value: unknown): PitchKountState {
     pitcherName: normalizePitchKountText(state.pitcherName, DEFAULT_PITCHKOUNT_STATE.pitcherName, 28),
     pitcherNumber: normalizePitcherNumber(state.pitcherNumber),
     teamName: normalizePitchKountText(state.teamName, DEFAULT_PITCHKOUNT_STATE.teamName, 20),
+    ...(normalizePitchKountMediaUrl(state.headshotUrl) ? { headshotUrl: normalizePitchKountMediaUrl(state.headshotUrl) } : {}),
     pitchCount: normalizePitchKountInteger(state.pitchCount, 999),
     pitchSpeedMph: normalizePitchKountInteger(state.pitchSpeedMph, 120),
+    showPitchSpeed: state.showPitchSpeed !== false,
     pitchType,
     strikes: normalizePitchKountInteger(state.strikes, 999),
     balls: normalizePitchKountInteger(state.balls, 999),
@@ -136,6 +144,14 @@ export function normalizePitchKountState(value: unknown): PitchKountState {
     strikeouts: normalizePitchKountInteger(state.strikeouts, 999),
     walks: normalizePitchKountInteger(state.walks, 999),
   };
+}
+
+function normalizePitchKountMediaUrl(value: unknown): string | undefined {
+  if (typeof value !== 'string') return undefined;
+  const normalized = value.trim().slice(0, 512);
+  if (/^\/media\/[A-Za-z0-9._~!$&'()*+,;=:@%/-]+$/.test(normalized)) return normalized;
+  if (/^https:\/\/[^\s]+$/i.test(normalized)) return normalized;
+  return undefined;
 }
 
 function normalizePitchKountText(value: unknown, fallback: string, maxLength: number): string {

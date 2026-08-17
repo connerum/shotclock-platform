@@ -4,6 +4,7 @@ import { unlink } from 'fs/promises';
 import { join } from 'path';
 import { prisma } from '@/lib/prisma';
 import { canAccessDevice, requireApiUser } from '@/lib/auth';
+import { resolveMediaRoot } from '@/lib/media-path';
 
 interface RouteParams {
   params: Promise<{ deviceId: string; assetId: string }>;
@@ -58,7 +59,7 @@ export async function DELETE(_request: NextRequest, { params }: RouteParams) {
     }
 
     await prisma.deviceMediaAsset.delete({ where: { id: mediaAsset.id } });
-    await unlink(join(getServerWebRoot(), 'public', 'media', 'devices', deviceId, mediaAsset.filename)).catch(() => {});
+    await unlink(join(getDurableMediaRoot(), 'devices', deviceId, mediaAsset.filename)).catch(() => {});
 
     return NextResponse.json({ success: true });
   } catch (error) {
@@ -99,4 +100,12 @@ function getServerWebRoot() {
   }
 
   return cwd;
+}
+
+function getDurableMediaRoot() {
+  return resolveMediaRoot({
+    configuredRoot: process.env.COURTCAST_MEDIA_DIR,
+    cwd: getServerWebRoot(),
+    production: process.env.NODE_ENV === 'production',
+  });
 }

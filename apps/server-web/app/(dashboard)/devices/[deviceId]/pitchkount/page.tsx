@@ -2,10 +2,12 @@
 
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useState } from 'react';
 import {
   DEFAULT_PITCHKOUNT_STATE,
+  PITCHKOUNT_DAILY_LIMIT,
   PITCHKOUNT_PITCH_TYPES,
+  PITCHKOUNT_SLIDE_DURATION_MS,
   normalizePitchKountState,
   type DeviceMode,
   type PitchKountPitchType,
@@ -29,6 +31,7 @@ export default function PitchKountPage() {
   const [pitchKount, setPitchKount] = useState<PitchKountState>(DEFAULT_PITCHKOUNT_STATE);
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
+  const [uploadingHeadshot, setUploadingHeadshot] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
@@ -92,6 +95,32 @@ export default function PitchKountPage() {
       ...(result === 'ball' ? { balls: pitchKount.balls + 1 } : {}),
     };
     void sendState(next, result === 'pitch' ? 'Pitch recorded.' : `${result === 'strike' ? 'Strike' : 'Ball'} recorded.`);
+  };
+
+  const uploadHeadshot = async (file: File | null) => {
+    if (!file) return;
+
+    setUploadingHeadshot(true);
+    setError(null);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('slot', 'pitchkount-headshot');
+
+      const response = await fetch(`/api/devices/${deviceId}/media`, {
+        method: 'POST',
+        body: formData,
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data?.error || `Upload failed with HTTP ${response.status}`);
+
+      const headshotUrl = getPublicMediaUrl(data.mediaAsset.url);
+      await sendState({ ...pitchKount, headshotUrl }, 'Player headshot updated.');
+    } catch (uploadError) {
+      setError(uploadError instanceof Error ? uploadError.message : 'Headshot upload failed.');
+    } finally {
+      setUploadingHeadshot(false);
+    }
   };
 
   if (loading) {
@@ -173,7 +202,7 @@ export default function PitchKountPage() {
               />
             </div>
 
-            <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-end">
+            <div className="mt-5 grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto_auto] sm:items-end">
               <label className="flex-1 text-sm font-semibold text-white/70">
                 Pitch type
                 <select
@@ -185,6 +214,20 @@ export default function PitchKountPage() {
                   {PITCHKOUNT_PITCH_TYPES.map((pitchType) => <option key={pitchType} value={pitchType}>{pitchType}</option>)}
                 </select>
               </label>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={pitchKount.showPitchSpeed}
+                disabled={sending}
+                onClick={() => sendPatch({ showPitchSpeed: !pitchKount.showPitchSpeed }, pitchKount.showPitchSpeed ? 'Pitch speed hidden.' : 'Pitch speed shown.')}
+                className={`rounded-lg border px-5 py-3 text-left font-bold disabled:opacity-50 ${
+                  pitchKount.showPitchSpeed
+                    ? 'border-sky-500/50 bg-sky-950/50 text-sky-200'
+                    : 'border-white/15 bg-white/5 text-white/55'
+                }`}
+              >
+                Speed display: {pitchKount.showPitchSpeed ? 'On' : 'Off'}
+              </button>
               <button
                 type="button"
                 disabled={sending}
@@ -200,6 +243,47 @@ export default function PitchKountPage() {
             <div className="mb-4">
               <div className="text-xs font-black uppercase tracking-[0.18em] text-sky-400">Pitcher card</div>
               <p className="mt-1 text-sm text-white/50">Edit identity and season statistics, then send them together.</p>
+            </div>
+
+            <div className="mb-5 flex flex-col gap-4 rounded-xl border border-white/10 bg-black/20 p-4 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex min-w-0 items-center gap-4">
+                <div className="flex h-24 w-20 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-sky-500/35 bg-[#02070c]">
+                  {pitchKount.headshotUrl ? (
+                    <img src={pitchKount.headshotUrl} alt="Player headshot preview" className="h-full w-full object-cover object-top" />
+                  ) : (
+                    <span className="text-center text-xs font-black uppercase tracking-wider text-white/25">No<br />photo</span>
+                  )}
+                </div>
+                <div>
+                  <div className="text-xs font-black uppercase tracking-[0.18em] text-sky-400">Player headshot</div>
+                  <p className="mt-1 text-sm text-white/50">Portrait crop recommended. PNG, JPG, or WebP.</p>
+                </div>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <label className={`cursor-pointer rounded-lg border border-sky-500/35 bg-sky-950/30 px-4 py-2.5 font-bold text-sky-200 hover:bg-sky-900/40 ${uploadingHeadshot || sending ? 'pointer-events-none opacity-50' : ''}`}>
+                  {uploadingHeadshot ? 'Uploading...' : pitchKount.headshotUrl ? 'Replace photo' : 'Upload photo'}
+                  <input
+                    type="file"
+                    accept="image/png,image/jpeg,image/webp"
+                    disabled={uploadingHeadshot || sending}
+                    onChange={(event) => {
+                      void uploadHeadshot(event.currentTarget.files?.[0] || null);
+                      event.currentTarget.value = '';
+                    }}
+                    className="sr-only"
+                  />
+                </label>
+                {pitchKount.headshotUrl && (
+                  <button
+                    type="button"
+                    disabled={uploadingHeadshot || sending}
+                    onClick={() => sendPatch({ headshotUrl: undefined }, 'Player headshot removed.')}
+                    className="rounded-lg border border-red-500/25 bg-red-950/20 px-4 py-2.5 font-bold text-red-200 hover:bg-red-900/30 disabled:opacity-50"
+                  >
+                    Remove
+                  </button>
+                )}
+              </div>
             </div>
 
             <div className="grid gap-4 md:grid-cols-3">
@@ -233,7 +317,7 @@ export default function PitchKountPage() {
           <div className="mb-4 flex items-start justify-between gap-3">
             <div>
               <div className="text-xs font-black uppercase tracking-[0.18em] text-white/40">Display preview</div>
-              <div className="mt-1 text-sm text-white/60">1:2 portrait · 128 × 256</div>
+              <div className="mt-1 text-sm text-white/60">1:2 portrait · rotates every {PITCHKOUNT_SLIDE_DURATION_MS / 1000}s</div>
             </div>
             <span className="rounded bg-sky-500/15 px-2 py-1 text-xs font-bold text-sky-300">LIVE DATA</span>
           </div>
@@ -290,41 +374,76 @@ function NumberField({ label, value, maximum, step = '1', onChange }: { label: s
 }
 
 function PitchKountPreview({ state }: { state: PitchKountState }) {
+  const [slide, setSlide] = useState<'main' | 'stats'>('main');
+  const pitchesRemaining = Math.max(0, PITCHKOUNT_DAILY_LIMIT - state.pitchCount);
+
+  useEffect(() => {
+    const interval = window.setInterval(() => {
+      setSlide((current) => current === 'main' ? 'stats' : 'main');
+    }, PITCHKOUNT_SLIDE_DURATION_MS);
+    return () => window.clearInterval(interval);
+  }, []);
+
   return (
-    <div className="mx-auto aspect-[1/2] w-full max-w-[270px] overflow-hidden border border-sky-500/70 bg-[#02070c] p-[4%] font-sans text-white shadow-[inset_0_0_28px_rgba(0,139,218,0.28)]">
-      <div className="flex h-[10%] items-center justify-between border-b border-sky-500/40">
-        <span className="max-w-[36%] truncate text-[8px] font-black tracking-[0.14em] text-sky-200">{state.teamName}</span>
-        <strong className="text-sm italic tracking-tight">PITCH<span className="text-sky-500">KOUNT</span></strong>
+    <div className="mx-auto aspect-[1/2] w-full max-w-[270px] overflow-hidden border border-sky-500/70 bg-[radial-gradient(circle_at_50%_34%,rgba(0,117,185,0.22),transparent_36%),linear-gradient(145deg,#07121e,#010409_42%,#020910)] font-sans text-white shadow-[inset_0_0_28px_rgba(0,139,218,0.28)]">
+      <div className="flex h-[12%] flex-col items-center justify-center border-b border-sky-500/70 bg-black/55">
+        <span className="text-[8px] font-black tracking-[0.22em] text-red-500">SCHOOL</span>
+        <strong className="mt-1 max-w-[92%] truncate text-base font-black tracking-[0.08em]">{state.teamName}</strong>
       </div>
-      <div className="flex h-[11%] items-center gap-2 border-b border-white/10">
-        <span className="text-base font-black text-red-500">#{state.pitcherNumber}</span>
-        <div className="min-w-0 border-l border-sky-500/70 pl-2"><span className="block text-[7px] font-black tracking-widest text-red-400">ON THE MOUND</span><strong className="block truncate text-xs">{state.pitcherName}</strong></div>
-      </div>
-      <div className="my-[4%] flex h-[30%] flex-col items-center justify-center border border-sky-500/70 bg-[radial-gradient(circle,rgba(0,117,185,0.2),rgba(0,0,0,0.8))]">
-        <span className="text-[9px] font-black tracking-[0.18em] text-red-500">PITCH COUNT</span>
-        <strong className="text-7xl leading-none tracking-tighter">{state.pitchCount}</strong>
-      </div>
-      <div className="grid h-[17%] grid-cols-2 gap-2">
-        <PreviewCard label="PITCH SPEED"><strong className="text-2xl leading-none">{state.pitchSpeedMph}</strong><span className="ml-1 text-[7px] font-bold">MPH</span></PreviewCard>
-        <PreviewCard label="PITCH TYPE"><strong className="mt-2 block truncate text-xs">{state.pitchType}</strong></PreviewCard>
-      </div>
-      <div className="mt-[4%] grid h-[9%] grid-cols-2 items-center border-y border-sky-500/50 text-center">
-        <div><span className="text-[7px] font-black text-red-400">STRIKES</span> <strong>{state.strikes}</strong></div>
-        <div className="border-l border-white/20"><span className="text-[7px] font-black text-red-400">BALLS</span> <strong>{state.balls}</strong></div>
-      </div>
-      <div className="grid h-[15%] grid-cols-5 items-stretch pt-[4%] text-center">
-        {[
-          ['ERA', state.era.toFixed(2)],
-          ['W–L', `${state.wins}–${state.losses}`],
-          ['IP', state.inningsPitched],
-          ['K', state.strikeouts],
-          ['BB', state.walks],
-        ].map(([label, value]) => <div key={label} className="flex min-w-0 flex-col justify-center border-l border-sky-500/30 last:border-r"><span className="text-[7px] font-black text-red-400">{label}</span><strong className="mt-1 truncate text-[10px]">{value}</strong></div>)}
-      </div>
+      {slide === 'main' ? (
+        <div className="h-[88%]">
+          <div className="flex h-[11%] items-center gap-3 border-b border-white/10 bg-sky-950/30 px-3">
+            <span className="text-sm font-black text-red-500">#{state.pitcherNumber}</span>
+            <strong className="min-w-0 truncate text-sm font-black">{state.pitcherName}</strong>
+          </div>
+          <div className={`grid px-[4%] pt-[4%] ${state.showPitchSpeed ? 'h-[44%]' : 'h-[66%]'} grid-cols-[43%_57%]`}>
+            <div className="overflow-hidden border border-sky-500/70 bg-sky-950/30">
+              {state.headshotUrl ? <img src={state.headshotUrl} alt="" className="h-full w-full object-cover object-top" /> : <div className="flex h-full flex-col items-center justify-center text-white/30"><span className="text-[8px] font-black">PLAYER</span><strong className="mt-2 text-3xl">#{state.pitcherNumber}</strong></div>}
+            </div>
+            <div className="flex flex-col items-center justify-center border-y border-r border-sky-500/70 bg-black/55">
+              <span className="text-[10px] font-black tracking-widest text-red-500">PITCH COUNT</span>
+              <strong className="text-6xl leading-none tracking-tighter">{state.pitchCount}</strong>
+              <div className="mt-2 border-t border-white/20 pt-1 text-center"><span className="text-[8px] font-black text-sky-300">PITCHES LEFT</span> <strong className="text-lg">{pitchesRemaining}</strong><small className="ml-1 text-[7px] text-white/45">OF {PITCHKOUNT_DAILY_LIMIT}</small></div>
+            </div>
+          </div>
+          <div className="mx-[4%] grid h-[13%] grid-cols-2 gap-2 py-[2%] text-center">
+            <div className="flex items-center justify-center gap-2 border-y border-sky-500/60 bg-sky-950/20"><span className="text-[9px] font-black text-red-500">STRIKES</span><strong className="text-xl">{state.strikes}</strong></div>
+            <div className="flex items-center justify-center gap-2 border-y border-sky-500/60 bg-sky-950/20"><span className="text-[9px] font-black text-red-500">BALLS</span><strong className="text-xl">{state.balls}</strong></div>
+          </div>
+          {state.showPitchSpeed && <div className="mx-[4%] flex h-[22%] flex-col items-center justify-center border border-sky-500/70 bg-black/55"><span className="text-[10px] font-black tracking-widest text-red-500">PITCH SPEED</span><div><strong className="text-4xl leading-none">{state.pitchSpeedMph}</strong><span className="ml-2 text-[9px] font-black">MPH</span></div></div>}
+          <PreviewFooter slide="01" />
+        </div>
+      ) : (
+        <div className="h-[88%]">
+          <div className="grid h-[21%] grid-cols-[30%_70%] gap-3 border-b border-white/10 bg-sky-950/25 p-[4%]">
+            <div className="overflow-hidden border border-sky-500/60 bg-black/40">{state.headshotUrl ? <img src={state.headshotUrl} alt="" className="h-full w-full object-cover object-top" /> : <div className="flex h-full items-center justify-center text-xl font-black text-white/30">#{state.pitcherNumber}</div>}</div>
+            <div className="flex min-w-0 flex-col justify-center"><span className="text-[9px] font-black tracking-widest text-red-500">PLAYER STATS</span><strong className="mt-1 truncate text-sm">{state.pitcherName}</strong><small className="mt-1 text-[8px] font-black text-sky-300">#{state.pitcherNumber} · PITCHER</small></div>
+          </div>
+          <div className="grid h-[69%] grid-cols-2 grid-rows-3 gap-2 p-[4%]">
+            <PreviewStat label="ERA" value={state.era.toFixed(2)} />
+            <PreviewStat label="RECORD" value={`${state.wins}–${state.losses}`} />
+            <PreviewStat label="INNINGS" value={state.inningsPitched} />
+            <PreviewStat label="STRIKEOUTS" value={state.strikeouts} />
+            <PreviewStat label="WALKS" value={state.walks} />
+            <PreviewStat label="PITCH TYPE" value={state.pitchType} compact />
+          </div>
+          <PreviewFooter slide="02" />
+        </div>
+      )}
     </div>
   );
 }
 
-function PreviewCard({ label, children }: { label: string; children: ReactNode }) {
-  return <div className="min-w-0 overflow-hidden border border-sky-500/60 bg-black/60 p-2 text-center"><span className="block text-[7px] font-black tracking-wider text-red-400">{label}</span>{children}</div>;
+function PreviewStat({ label, value, compact = false }: { label: string; value: string | number; compact?: boolean }) {
+  return <div className="flex min-w-0 flex-col items-center justify-center overflow-hidden border border-sky-500/60 bg-black/55"><span className="text-[9px] font-black tracking-wider text-red-500">{label}</span><strong className={`mt-2 max-w-[92%] truncate ${compact ? 'text-sm' : 'text-2xl'}`}>{value}</strong></div>;
+}
+
+function PreviewFooter({ slide }: { slide: string }) {
+  return <div className="flex h-[10%] items-center justify-between border-t border-sky-500/70 bg-gradient-to-r from-black via-sky-950 to-black px-[4%]"><strong className="text-base italic">PITCH<span className="text-sky-500">KOUNT</span></strong><span className="text-[8px] font-black text-white/40">{slide} / 02</span></div>;
+}
+
+function getPublicMediaUrl(url: string) {
+  if (url.startsWith('http://') || url.startsWith('https://')) return url;
+  if (typeof window === 'undefined') return url;
+  return `${window.location.origin}${url}`;
 }

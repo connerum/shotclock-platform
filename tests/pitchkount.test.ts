@@ -10,8 +10,10 @@ test('PitchKount state is safe and bounded for the kiosk', () => {
     pitcherName: '  Aiden   Thompson  ',
     pitcherNumber: '#1234',
     teamName: 'Legacy One Performance',
+    headshotUrl: 'javascript:alert(1)',
     pitchCount: 5000,
     pitchSpeedMph: 999,
+    showPitchSpeed: false,
     pitchType: 'Unknown Pitch',
     strikes: -10,
     balls: 34.6,
@@ -28,6 +30,8 @@ test('PitchKount state is safe and bounded for the kiosk', () => {
   assert.equal(state.teamName, 'Legacy One Performan');
   assert.equal(state.pitchCount, 999);
   assert.equal(state.pitchSpeedMph, 120);
+  assert.equal(state.showPitchSpeed, false);
+  assert.equal(state.headshotUrl, undefined);
   assert.equal(state.pitchType, DEFAULT_PITCHKOUNT_STATE.pitchType);
   assert.equal(state.strikes, 0);
   assert.equal(state.balls, 35);
@@ -39,8 +43,11 @@ test('PitchKount accepts baseball innings notation and known pitch types', () =>
   const state = normalizePitchKountState({
     inningsPitched: '52.2',
     pitchType: 'Curveball',
+    headshotUrl: 'https://courtcast.example/media/devices/display/player.webp',
   });
 
   assert.equal(state.inningsPitched, '52.2');
   assert.equal(state.pitchType, 'Curveball');
+  assert.equal(state.headshotUrl, 'https://courtcast.example/media/devices/display/player.webp');
+  assert.equal(state.showPitchSpeed, true);
 });

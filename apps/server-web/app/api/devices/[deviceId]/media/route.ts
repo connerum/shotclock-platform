@@ -5,8 +5,9 @@ import { mkdir, unlink, writeFile } from 'fs/promises';
 import { join } from 'path';
 import { prisma } from '@/lib/prisma';
 import { canAccessDevice, requireApiUser } from '@/lib/auth';
+import { resolveMediaRoot } from '@/lib/media-path';
 
-const MEDIA_SLOTS = ['ads', 'logo', 'sponsor', 'team-intro', 'music', 'scoreboard-home-logo', 'scoreboard-away-logo', 'practice-school-logo'] as const;
+const MEDIA_SLOTS = ['ads', 'logo', 'sponsor', 'team-intro', 'music', 'scoreboard-home-logo', 'scoreboard-away-logo', 'practice-school-logo', 'pitchkount-headshot'] as const;
 const IMAGE_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
 const VIDEO_MIME_TYPES = ['video/mp4', 'video/webm', 'video/quicktime'];
 const AUDIO_MIME_TYPES = ['audio/mpeg', 'audio/mp3', 'audio/wav', 'audio/ogg', 'audio/mp4', 'audio/aac'];
@@ -86,7 +87,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     const originalFilename = sanitizeFilename(file.name || 'media');
     const extension = getSafeExtension(file.type);
     const filename = `${Date.now()}-${randomUUID()}${extension}`;
-    const mediaDir = join(getServerWebRoot(), 'public', 'media', 'devices', deviceId);
+    const mediaDir = join(getDurableMediaRoot(), 'devices', deviceId);
     filepath = join(mediaDir, filename);
 
     await mkdir(mediaDir, { recursive: true });
@@ -131,7 +132,7 @@ function isMediaSlot(slot: string): slot is MediaSlot {
 }
 
 function isAllowedMimeType(slot: MediaSlot, mimeType: string) {
-  if (slot === 'scoreboard-home-logo' || slot === 'scoreboard-away-logo' || slot === 'practice-school-logo') {
+  if (slot === 'scoreboard-home-logo' || slot === 'scoreboard-away-logo' || slot === 'practice-school-logo' || slot === 'pitchkount-headshot') {
     return IMAGE_MIME_TYPES.includes(mimeType);
   }
   if (slot === 'music') return AUDIO_MIME_TYPES.includes(mimeType);
@@ -166,6 +167,14 @@ function getServerWebRoot() {
   }
 
   return cwd;
+}
+
+function getDurableMediaRoot() {
+  return resolveMediaRoot({
+    configuredRoot: process.env.COURTCAST_MEDIA_DIR,
+    cwd: getServerWebRoot(),
+    production: process.env.NODE_ENV === 'production',
+  });
 }
 
 async function getNextSortOrder(deviceId: string, slot: MediaSlot) {
