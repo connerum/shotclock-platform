@@ -11,8 +11,10 @@ courtcast.safety-linq.com {
 
     reverse_proxy 172.18.0.1:3000 {
         header_up Host {host}
-        header_up X-Real-IP {remote_addr}
-        header_up X-Forwarded-For {proxy_add_x_forwarded_for}
+        # The public Caddy instance is the trusted edge. Overwrite client-supplied
+        # forwarding headers so rate limits and audit logs use the real peer IP.
+        header_up X-Real-IP {remote_host}
+        header_up X-Forwarded-For {remote_host}
         header_up X-Forwarded-Proto {scheme}
     }
 

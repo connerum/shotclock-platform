@@ -58,6 +58,19 @@ To roll the server back, point `/opt/courtcast/current` to the preceding release
 
 Public registration is disabled. The company administrator address and one-time password are in the handoff vault. The first login requires a password change. Administrators can create, reset, disable, and enable accounts at `/users`; users can change their own password at `/account`. Password changes and account actions revoke existing sessions.
 
+Login attempts are limited per public client IP. A blocked client can wait for the `Retry-After` interval (normally no more than 15 minutes). If the sole administrator has also lost the current password, generate a new random password, run the existing user-management command on the server, and restart the application to clear only the in-memory attempt counters:
+
+```bash
+ssh -F .handoff-vault/ssh-config courtcast-prod
+set -a; source /opt/courtcast/shared/.env; set +a
+export ADMIN_EMAIL='courtcast-admin@safety-linq.com' ADMIN_PASSWORD='<new random password>'
+sudo --preserve-env=DATABASE_URL,ADMIN_EMAIL,ADMIN_PASSWORD -u courtcast \
+  /opt/courtcast/current/node_modules/.bin/tsx /opt/courtcast/current/scripts/manage-user.ts
+sudo systemctl restart courtcast
+```
+
+Replace the vaulted `company-admin-password.txt` immediately. The reset forces a password change on first login and revokes older sessions.
+
 Displays authenticate with a unique random token. Tokens are stored hashed in the server database and as root-readable configuration on each display. To rotate one:
 
 ```bash
