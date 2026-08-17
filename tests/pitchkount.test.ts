@@ -2,6 +2,8 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
   DEFAULT_PITCHKOUNT_STATE,
+  PITCHKOUNT_MAIN_SLIDE_DURATION_MS,
+  PITCHKOUNT_STATS_SLIDE_DURATION_MS,
   normalizePitchKountState,
 } from '../packages/shared/src/types/socket-events.ts';
 
@@ -23,6 +25,7 @@ test('PitchKount state is safe and bounded for the kiosk', () => {
     inningsPitched: '52.3',
     strikeouts: 68,
     walks: 12,
+    whip: 120,
   });
 
   assert.equal(state.pitcherName, 'Aiden Thompson');
@@ -37,17 +40,25 @@ test('PitchKount state is safe and bounded for the kiosk', () => {
   assert.equal(state.balls, 35);
   assert.equal(state.era, 2.46);
   assert.equal(state.inningsPitched, '0.0');
+  assert.equal(state.whip, 99.99);
 });
 
 test('PitchKount accepts baseball innings notation and known pitch types', () => {
   const state = normalizePitchKountState({
     inningsPitched: '52.2',
     pitchType: 'Curveball',
+    whip: 1.234,
     headshotUrl: 'https://courtcast.example/media/devices/display/player.webp',
   });
 
   assert.equal(state.inningsPitched, '52.2');
   assert.equal(state.pitchType, 'Curveball');
+  assert.equal(state.whip, 1.23);
   assert.equal(state.headshotUrl, 'https://courtcast.example/media/devices/display/player.webp');
   assert.equal(state.showPitchSpeed, true);
+});
+
+test('PitchKount uses a long main slide and a short stats slide', () => {
+  assert.equal(PITCHKOUNT_MAIN_SLIDE_DURATION_MS, 45_000);
+  assert.equal(PITCHKOUNT_STATS_SLIDE_DURATION_MS, 5_000);
 });

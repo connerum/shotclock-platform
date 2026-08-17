@@ -78,7 +78,8 @@ export const PITCHKOUNT_PITCH_TYPES = [
 export type PitchKountPitchType = typeof PITCHKOUNT_PITCH_TYPES[number];
 
 export const PITCHKOUNT_DAILY_LIMIT = 110;
-export const PITCHKOUNT_SLIDE_DURATION_MS = 8000;
+export const PITCHKOUNT_MAIN_SLIDE_DURATION_MS = 45000;
+export const PITCHKOUNT_STATS_SLIDE_DURATION_MS = 5000;
 
 export interface PitchKountState {
   pitcherName: string;
@@ -97,6 +98,7 @@ export interface PitchKountState {
   inningsPitched: string;
   strikeouts: number;
   walks: number;
+  whip: number;
 }
 
 export const DEFAULT_PITCHKOUNT_STATE: PitchKountState = {
@@ -115,6 +117,7 @@ export const DEFAULT_PITCHKOUNT_STATE: PitchKountState = {
   inningsPitched: '0.0',
   strikeouts: 0,
   walks: 0,
+  whip: 0,
 };
 
 export function normalizePitchKountState(value: unknown): PitchKountState {
@@ -143,6 +146,7 @@ export function normalizePitchKountState(value: unknown): PitchKountState {
     inningsPitched,
     strikeouts: normalizePitchKountInteger(state.strikeouts, 999),
     walks: normalizePitchKountInteger(state.walks, 999),
+    whip: normalizePitchKountDecimal(state.whip, 99.99),
   };
 }
 

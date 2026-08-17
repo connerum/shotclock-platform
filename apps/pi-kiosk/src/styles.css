@@ -150,11 +150,11 @@ html.show-cursor * {
 }
 
 .pitchkount-main {
-  grid-template-rows: 12% 10% 38% 12% 18% 10%;
+  grid-template-rows: 12% 10% 52% 16% 10%;
 }
 
 .pitchkount-main--no-speed {
-  grid-template-rows: 13% 11% 51% 15% 10%;
+  grid-template-rows: 12% 10% 52% 16% 10%;
 }
 
 .pitchkount-stats-slide {
@@ -228,6 +228,13 @@ html.show-cursor * {
   padding: 1.4cqh 4cqw;
 }
 
+.pitchkount-count-stack {
+  display: grid;
+  min-width: 0;
+  min-height: 0;
+  grid-template-rows: 1fr 1fr;
+}
+
 .pitchkount-headshot {
   position: relative;
   min-width: 0;
@@ -282,14 +289,13 @@ html.show-cursor * {
 }
 
 .pitchkount-count-card {
-  display: flex;
+  display: grid;
   min-width: 0;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
+  min-height: 0;
+  grid-template-rows: auto 1fr;
+  padding: 1.2cqh 2cqw 0.5cqh;
   border-top: max(1px, 0.55cqw) solid rgba(0, 139, 218, 0.72);
   border-right: max(1px, 0.55cqw) solid rgba(0, 139, 218, 0.72);
-  border-bottom: max(1px, 0.55cqw) solid rgba(0, 139, 218, 0.72);
   background: radial-gradient(circle at 50% 44%, rgba(0, 117, 185, 0.22), rgba(0, 0, 0, 0.82) 72%);
 }
 
@@ -304,42 +310,43 @@ html.show-cursor * {
 }
 
 .pitchkount-count-card > strong {
-  margin-top: 0.6cqh;
-  font-size: clamp(33px, 39cqw, 62px);
+  align-self: center;
+  justify-self: center;
+  font-size: clamp(28px, 33cqw, 53px);
   letter-spacing: -0.045em;
   line-height: 0.82;
   text-shadow: 0 0 4cqw rgba(0, 139, 218, 0.34);
 }
 
-.pitchkount-remaining {
+.pitchkount-remaining-card {
   display: grid;
-  grid-template-columns: auto auto;
+  min-width: 0;
+  min-height: 0;
+  grid-template-rows: auto 1fr;
+  padding: 1.2cqh 2cqw 0.5cqh;
+  border: max(1px, 0.55cqw) solid rgba(0, 139, 218, 0.72);
+  background: radial-gradient(circle at 50% 44%, rgba(0, 117, 185, 0.22), rgba(0, 0, 0, 0.82) 72%);
+}
+
+.pitchkount-remaining-card > div:last-child {
+  display: flex;
+  align-self: center;
   align-items: baseline;
-  gap: 0 2cqw;
-  margin-top: 1.5cqh;
-  padding-top: 1cqh;
-  border-top: max(1px, 0.4cqw) solid rgba(255, 255, 255, 0.22);
+  justify-content: center;
+  gap: 2cqw;
 }
 
-.pitchkount-remaining span {
-  color: #8dc7e8;
-  font-family: "Arial Narrow", Arial, sans-serif;
-  font-size: clamp(5px, 4.8cqw, 8px);
-  font-weight: 900;
-  letter-spacing: 0.08em;
-}
-
-.pitchkount-remaining b {
-  grid-row: span 2;
+.pitchkount-remaining-card strong {
   color: #fff;
-  font-size: clamp(14px, 16cqw, 26px);
-  line-height: 1;
+  font-size: clamp(23px, 27cqw, 43px);
+  letter-spacing: -0.035em;
+  line-height: 0.84;
 }
 
-.pitchkount-remaining small {
+.pitchkount-remaining-card small {
   color: rgba(255, 255, 255, 0.56);
   font-family: Arial, sans-serif;
-  font-size: clamp(4px, 3.8cqw, 6px);
+  font-size: clamp(5px, 4.6cqw, 7px);
   font-weight: 900;
   line-height: 1;
 }
@@ -349,58 +356,48 @@ html.show-cursor * {
   grid-template-columns: 1fr 1fr;
   align-items: stretch;
   gap: 2cqw;
-  padding: 0.7cqh 4cqw 1.3cqh;
+  padding: 1.2cqh 4cqw 1.5cqh;
+}
+
+.pitchkount-results--with-speed {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
 .pitchkount-results > div {
   display: flex;
+  min-width: 0;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 3cqw;
-  border-top: max(1px, 0.45cqw) solid rgba(0, 139, 218, 0.62);
-  border-bottom: max(1px, 0.45cqw) solid rgba(0, 139, 218, 0.62);
+  gap: 0.7cqh;
+  border: max(1px, 0.45cqw) solid rgba(0, 139, 218, 0.62);
   background: rgba(0, 35, 57, 0.62);
+}
+
+.pitchkount-results > div > div {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 1cqw;
 }
 
 .pitchkount-results span {
   color: var(--pk-red);
   font-family: "Arial Narrow", Arial, sans-serif;
-  font-size: clamp(6px, 6cqw, 10px);
+  font-size: clamp(6px, 5.3cqw, 9px);
   font-weight: 900;
-  letter-spacing: 0.07em;
+  letter-spacing: 0.035em;
 }
 
 .pitchkount-results strong {
-  font-size: clamp(14px, 15cqw, 24px);
+  font-size: clamp(16px, 17cqw, 27px);
   line-height: 1;
 }
 
-.pitchkount-speed-panel {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  margin: 0 4cqw 1.6cqh;
-  border: max(1px, 0.55cqw) solid rgba(0, 139, 218, 0.72);
-  background: linear-gradient(90deg, rgba(0, 0, 0, 0.74), rgba(0, 75, 121, 0.33), rgba(0, 0, 0, 0.74));
-}
-
-.pitchkount-speed-panel > div:last-child {
-  display: flex;
-  align-items: baseline;
-  gap: 2cqw;
-  margin-top: 1cqh;
-}
-
-.pitchkount-speed-panel strong {
-  font-size: clamp(24px, 27cqw, 43px);
-  letter-spacing: -0.04em;
-  line-height: 0.8;
-}
-
-.pitchkount-speed-panel span {
+.pitchkount-results small {
+  color: rgba(255, 255, 255, 0.72);
   font-family: "Arial Narrow", Arial, sans-serif;
-  font-size: clamp(6px, 6cqw, 10px);
+  font-size: clamp(4px, 3.8cqw, 6px);
   font-weight: 900;
 }
 
@@ -510,31 +507,16 @@ html.show-cursor * {
 .pitchkount-footer {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 0 4cqw;
+  justify-content: center;
+  padding: 0 3cqw;
   border-top: max(1px, 0.55cqw) solid rgba(0, 139, 218, 0.7);
   background: linear-gradient(90deg, #010306, #002c49 50%, #010306);
 }
 
-.pitchkount-wordmark {
-  display: flex;
-  align-items: baseline;
-  color: #fff;
-  font-size: clamp(9px, 11cqw, 18px);
-  font-style: italic;
-  letter-spacing: -0.035em;
-  line-height: 1;
-  text-shadow: 0 0 2cqw rgba(0, 139, 218, 0.35);
-}
-
-.pitchkount-wordmark strong {
-  color: var(--pk-blue);
-}
-
-.pitchkount-footer > span {
-  color: rgba(255, 255, 255, 0.55);
-  font-family: Arial, sans-serif;
-  font-size: clamp(5px, 4.5cqw, 7px);
-  font-weight: 900;
-  letter-spacing: 0.08em;
+.pitchkount-logo {
+  display: block;
+  width: 92%;
+  height: 82%;
+  object-fit: contain;
+  filter: drop-shadow(0 0 1.5cqw rgba(0, 139, 218, 0.42));
 }

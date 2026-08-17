@@ -6,11 +6,10 @@ import { useEffect, useState } from 'react';
 import {
   DEFAULT_PITCHKOUNT_STATE,
   PITCHKOUNT_DAILY_LIMIT,
-  PITCHKOUNT_PITCH_TYPES,
-  PITCHKOUNT_SLIDE_DURATION_MS,
+  PITCHKOUNT_MAIN_SLIDE_DURATION_MS,
+  PITCHKOUNT_STATS_SLIDE_DURATION_MS,
   normalizePitchKountState,
   type DeviceMode,
-  type PitchKountPitchType,
   type PitchKountState,
 } from '@shotclock/shared/types';
 import { SyncTargetBanner, useDeviceCommandDispatcher } from '../../../SelectedDevicesProvider';
@@ -202,18 +201,7 @@ export default function PitchKountPage() {
               />
             </div>
 
-            <div className="mt-5 grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto_auto] sm:items-end">
-              <label className="flex-1 text-sm font-semibold text-white/70">
-                Pitch type
-                <select
-                  value={pitchKount.pitchType}
-                  disabled={sending}
-                  onChange={(event) => sendPatch({ pitchType: event.target.value as PitchKountPitchType }, 'Pitch type updated.')}
-                  className="mt-2 w-full rounded-lg px-4 py-3"
-                >
-                  {PITCHKOUNT_PITCH_TYPES.map((pitchType) => <option key={pitchType} value={pitchType}>{pitchType}</option>)}
-                </select>
-              </label>
+            <div className="mt-5 flex flex-wrap justify-end gap-3">
               <button
                 type="button"
                 role="switch"
@@ -292,13 +280,14 @@ export default function PitchKountPage() {
               <TextField label="Team name" value={pitchKount.teamName} maxLength={20} onChange={(teamName) => updateDraft('teamName', teamName)} />
             </div>
 
-            <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">
+            <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-8">
               <NumberField label="ERA" value={pitchKount.era} step="0.01" maximum={99.99} onChange={(era) => updateDraft('era', era)} />
               <NumberField label="Wins" value={pitchKount.wins} maximum={99} onChange={(wins) => updateDraft('wins', wins)} />
               <NumberField label="Losses" value={pitchKount.losses} maximum={99} onChange={(losses) => updateDraft('losses', losses)} />
               <TextField label="Innings" value={pitchKount.inningsPitched} maxLength={5} placeholder="52.1" onChange={(inningsPitched) => updateDraft('inningsPitched', inningsPitched)} />
               <NumberField label="Strikeouts" value={pitchKount.strikeouts} maximum={999} onChange={(strikeouts) => updateDraft('strikeouts', strikeouts)} />
               <NumberField label="Walks" value={pitchKount.walks} maximum={999} onChange={(walks) => updateDraft('walks', walks)} />
+              <NumberField label="WHIP" value={pitchKount.whip} step="0.01" maximum={99.99} onChange={(whip) => updateDraft('whip', whip)} />
               <div className="flex items-end">
                 <button
                   type="button"
@@ -317,7 +306,7 @@ export default function PitchKountPage() {
           <div className="mb-4 flex items-start justify-between gap-3">
             <div>
               <div className="text-xs font-black uppercase tracking-[0.18em] text-white/40">Display preview</div>
-              <div className="mt-1 text-sm text-white/60">1:2 portrait · rotates every {PITCHKOUNT_SLIDE_DURATION_MS / 1000}s</div>
+              <div className="mt-1 text-sm text-white/60">1:2 portrait · 45s main / 5s stats</div>
             </div>
             <span className="rounded bg-sky-500/15 px-2 py-1 text-xs font-bold text-sky-300">LIVE DATA</span>
           </div>
@@ -378,46 +367,54 @@ function PitchKountPreview({ state }: { state: PitchKountState }) {
   const pitchesRemaining = Math.max(0, PITCHKOUNT_DAILY_LIMIT - state.pitchCount);
 
   useEffect(() => {
-    const interval = window.setInterval(() => {
-      setSlide((current) => current === 'main' ? 'stats' : 'main');
-    }, PITCHKOUNT_SLIDE_DURATION_MS);
-    return () => window.clearInterval(interval);
-  }, []);
+    const duration = slide === 'main'
+      ? PITCHKOUNT_MAIN_SLIDE_DURATION_MS
+      : PITCHKOUNT_STATS_SLIDE_DURATION_MS;
+    const timeout = window.setTimeout(() => {
+      setSlide(slide === 'main' ? 'stats' : 'main');
+    }, duration);
+    return () => window.clearTimeout(timeout);
+  }, [slide]);
 
   return (
     <div className="mx-auto aspect-[1/2] w-full max-w-[270px] overflow-hidden border border-sky-500/70 bg-[radial-gradient(circle_at_50%_34%,rgba(0,117,185,0.22),transparent_36%),linear-gradient(145deg,#07121e,#010409_42%,#020910)] font-sans text-white shadow-[inset_0_0_28px_rgba(0,139,218,0.28)]">
       <div className="flex h-[12%] flex-col items-center justify-center border-b border-sky-500/70 bg-black/55">
-        <span className="text-[8px] font-black tracking-[0.22em] text-red-500">SCHOOL</span>
-        <strong className="mt-1 max-w-[92%] truncate text-base font-black tracking-[0.08em]">{state.teamName}</strong>
+        <span className="text-[8px] font-black tracking-[0.22em] text-red-500">{slide === 'main' ? 'SCHOOL' : 'PITCHER'}</span>
+        <strong className="mt-1 max-w-[92%] truncate text-base font-black tracking-[0.08em]">{slide === 'main' ? state.teamName : state.pitcherName}</strong>
       </div>
       {slide === 'main' ? (
         <div className="h-[88%]">
-          <div className="flex h-[11%] items-center gap-3 border-b border-white/10 bg-sky-950/30 px-3">
+          <div className="flex h-[10%] items-center gap-3 border-b border-white/10 bg-sky-950/30 px-3">
             <span className="text-sm font-black text-red-500">#{state.pitcherNumber}</span>
             <strong className="min-w-0 truncate text-sm font-black">{state.pitcherName}</strong>
           </div>
-          <div className={`grid px-[4%] pt-[4%] ${state.showPitchSpeed ? 'h-[44%]' : 'h-[66%]'} grid-cols-[43%_57%]`}>
+          <div className="grid h-[58%] grid-cols-[43%_57%] px-[4%] py-[3%]">
             <div className="overflow-hidden border border-sky-500/70 bg-sky-950/30">
               {state.headshotUrl ? <img src={state.headshotUrl} alt="" className="h-full w-full object-cover object-top" /> : <div className="flex h-full flex-col items-center justify-center text-white/30"><span className="text-[8px] font-black">PLAYER</span><strong className="mt-2 text-3xl">#{state.pitcherNumber}</strong></div>}
             </div>
-            <div className="flex flex-col items-center justify-center border-y border-r border-sky-500/70 bg-black/55">
-              <span className="text-[10px] font-black tracking-widest text-red-500">PITCH COUNT</span>
-              <strong className="text-6xl leading-none tracking-tighter">{state.pitchCount}</strong>
-              <div className="mt-2 border-t border-white/20 pt-1 text-center"><span className="text-[8px] font-black text-sky-300">PITCHES LEFT</span> <strong className="text-lg">{pitchesRemaining}</strong><small className="ml-1 text-[7px] text-white/45">OF {PITCHKOUNT_DAILY_LIMIT}</small></div>
+            <div className="grid min-h-0 grid-rows-2">
+              <div className="grid min-h-0 grid-rows-[auto_1fr] border-x border-t border-sky-500/70 bg-black/55 px-2 pt-2">
+                <span className="text-[10px] font-black tracking-widest text-red-500">PITCH COUNT</span>
+                <strong className="self-center justify-self-center text-5xl leading-none tracking-tighter">{state.pitchCount}</strong>
+              </div>
+              <div className="grid min-h-0 grid-rows-[auto_1fr] border border-sky-500/70 bg-black/55 px-2 pt-2">
+                <span className="text-[10px] font-black tracking-widest text-red-500">PITCHES LEFT</span>
+                <div className="self-center justify-self-center"><strong className="text-4xl leading-none">{pitchesRemaining}</strong><small className="ml-1 text-[7px] font-black text-white/45">OF {PITCHKOUNT_DAILY_LIMIT}</small></div>
+              </div>
             </div>
           </div>
-          <div className="mx-[4%] grid h-[13%] grid-cols-2 gap-2 py-[2%] text-center">
-            <div className="flex items-center justify-center gap-2 border-y border-sky-500/60 bg-sky-950/20"><span className="text-[9px] font-black text-red-500">STRIKES</span><strong className="text-xl">{state.strikes}</strong></div>
-            <div className="flex items-center justify-center gap-2 border-y border-sky-500/60 bg-sky-950/20"><span className="text-[9px] font-black text-red-500">BALLS</span><strong className="text-xl">{state.balls}</strong></div>
+          <div className={`mx-[4%] grid h-[22%] gap-2 pb-[3%] text-center ${state.showPitchSpeed ? 'grid-cols-3' : 'grid-cols-2'}`}>
+            <PreviewPitchMetric label="STRIKES" value={state.strikes} />
+            <PreviewPitchMetric label="BALLS" value={state.balls} />
+            {state.showPitchSpeed && <PreviewPitchMetric label="SPEED" value={state.pitchSpeedMph} unit="MPH" />}
           </div>
-          {state.showPitchSpeed && <div className="mx-[4%] flex h-[22%] flex-col items-center justify-center border border-sky-500/70 bg-black/55"><span className="text-[10px] font-black tracking-widest text-red-500">PITCH SPEED</span><div><strong className="text-4xl leading-none">{state.pitchSpeedMph}</strong><span className="ml-2 text-[9px] font-black">MPH</span></div></div>}
-          <PreviewFooter slide="01" />
+          <PreviewFooter />
         </div>
       ) : (
         <div className="h-[88%]">
           <div className="grid h-[21%] grid-cols-[30%_70%] gap-3 border-b border-white/10 bg-sky-950/25 p-[4%]">
             <div className="overflow-hidden border border-sky-500/60 bg-black/40">{state.headshotUrl ? <img src={state.headshotUrl} alt="" className="h-full w-full object-cover object-top" /> : <div className="flex h-full items-center justify-center text-xl font-black text-white/30">#{state.pitcherNumber}</div>}</div>
-            <div className="flex min-w-0 flex-col justify-center"><span className="text-[9px] font-black tracking-widest text-red-500">PLAYER STATS</span><strong className="mt-1 truncate text-sm">{state.pitcherName}</strong><small className="mt-1 text-[8px] font-black text-sky-300">#{state.pitcherNumber} · PITCHER</small></div>
+            <div className="flex min-w-0 flex-col justify-center"><span className="text-[9px] font-black tracking-widest text-red-500">PLAYER STATS</span><strong className="mt-1 truncate text-sm">{state.teamName}</strong><small className="mt-1 text-[8px] font-black text-sky-300">#{state.pitcherNumber} · PITCHER</small></div>
           </div>
           <div className="grid h-[69%] grid-cols-2 grid-rows-3 gap-2 p-[4%]">
             <PreviewStat label="ERA" value={state.era.toFixed(2)} />
@@ -425,21 +422,25 @@ function PitchKountPreview({ state }: { state: PitchKountState }) {
             <PreviewStat label="INNINGS" value={state.inningsPitched} />
             <PreviewStat label="STRIKEOUTS" value={state.strikeouts} />
             <PreviewStat label="WALKS" value={state.walks} />
-            <PreviewStat label="PITCH TYPE" value={state.pitchType} compact />
+            <PreviewStat label="WHIP" value={state.whip.toFixed(2)} />
           </div>
-          <PreviewFooter slide="02" />
+          <PreviewFooter />
         </div>
       )}
     </div>
   );
 }
 
-function PreviewStat({ label, value, compact = false }: { label: string; value: string | number; compact?: boolean }) {
-  return <div className="flex min-w-0 flex-col items-center justify-center overflow-hidden border border-sky-500/60 bg-black/55"><span className="text-[9px] font-black tracking-wider text-red-500">{label}</span><strong className={`mt-2 max-w-[92%] truncate ${compact ? 'text-sm' : 'text-2xl'}`}>{value}</strong></div>;
+function PreviewPitchMetric({ label, value, unit }: { label: string; value: number; unit?: string }) {
+  return <div className="flex min-w-0 flex-col items-center justify-center border border-sky-500/60 bg-sky-950/20"><span className="text-[9px] font-black text-red-500">{label}</span><div className="mt-1"><strong className="text-xl leading-none">{value}</strong>{unit && <small className="ml-1 text-[6px] font-black text-white/60">{unit}</small>}</div></div>;
 }
 
-function PreviewFooter({ slide }: { slide: string }) {
-  return <div className="flex h-[10%] items-center justify-between border-t border-sky-500/70 bg-gradient-to-r from-black via-sky-950 to-black px-[4%]"><strong className="text-base italic">PITCH<span className="text-sky-500">KOUNT</span></strong><span className="text-[8px] font-black text-white/40">{slide} / 02</span></div>;
+function PreviewStat({ label, value }: { label: string; value: string | number }) {
+  return <div className="flex min-w-0 flex-col items-center justify-center overflow-hidden border border-sky-500/60 bg-black/55"><span className="text-[9px] font-black tracking-wider text-red-500">{label}</span><strong className="mt-2 max-w-[92%] truncate text-2xl">{value}</strong></div>;
+}
+
+function PreviewFooter() {
+  return <div className="flex h-[10%] items-center justify-center border-t border-sky-500/70 bg-gradient-to-r from-black via-sky-950 to-black px-[4%]"><img src="/images/sports/pitchkount-logo.png" alt="PitchKount" className="h-[82%] w-[92%] object-contain drop-shadow-[0_0_4px_rgba(0,139,218,0.45)]" /></div>;
 }
 
 function getPublicMediaUrl(url: string) {
