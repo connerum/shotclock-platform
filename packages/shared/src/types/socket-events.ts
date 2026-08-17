@@ -79,7 +79,7 @@ export type PitchKountPitchType = typeof PITCHKOUNT_PITCH_TYPES[number];
 
 export const PITCHKOUNT_DAILY_LIMIT = 110;
 export const PITCHKOUNT_MAIN_SLIDE_DURATION_MS = 45000;
-export const PITCHKOUNT_STATS_SLIDE_DURATION_MS = 5000;
+export const PITCHKOUNT_STATS_SLIDE_DURATION_MS = 10000;
 
 export interface PitchKountState {
   pitcherName: string;

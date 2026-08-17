@@ -58,7 +58,7 @@ test('PitchKount accepts baseball innings notation and known pitch types', () =>
   assert.equal(state.showPitchSpeed, true);
 });
 
-test('PitchKount uses a long main slide and a short stats slide', () => {
+test('PitchKount uses a 45-second main slide and a 10-second stats slide', () => {
   assert.equal(PITCHKOUNT_MAIN_SLIDE_DURATION_MS, 45_000);
-  assert.equal(PITCHKOUNT_STATS_SLIDE_DURATION_MS, 5_000);
+  assert.equal(PITCHKOUNT_STATS_SLIDE_DURATION_MS, 10_000);
 });
