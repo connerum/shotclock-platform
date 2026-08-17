@@ -40,10 +40,10 @@ export default function PitchKountMode({ pitchKount }: { pitchKount?: PitchKount
                   <strong>{state.pitchCount}</strong>
                 </div>
                 <div className="pitchkount-remaining-card">
-                  <div className="pitchkount-label">REMAINING</div>
-                  <div>
-                    <strong>{pitchesRemaining}</strong>
+                  <div className="pitchkount-remaining-value">
+                    <strong className={pitchesRemaining < 100 ? 'pitchkount-remaining-value--large' : undefined}>{pitchesRemaining}</strong>
                   </div>
+                  <div className="pitchkount-label">REMAINING</div>
                 </div>
               </div>
             </section>
@@ -62,15 +62,14 @@ export default function PitchKountMode({ pitchKount }: { pitchKount?: PitchKount
               <div>
                 <span>PLAYER STATS</span>
                 <strong>{state.teamName}</strong>
-                <small>#{state.pitcherNumber} · PITCHER</small>
               </div>
             </section>
             <section className="pitchkount-stats-grid">
-              <Stat label="ERA" value={state.era.toFixed(2)} featured />
               <Stat label="RECORD" value={`${state.wins}–${state.losses}`} featured />
-              <Stat label="INNINGS" value={state.inningsPitched} />
+              <Stat label="ERA" value={state.era.toFixed(2)} featured />
               <Stat label="STRIKEOUTS" value={state.strikeouts} />
               <Stat label="WALKS" value={state.walks} />
+              <Stat label="INNINGS" value={state.inningsPitched} />
               <Stat label="WHIP" value={state.whip.toFixed(2)} />
             </section>
             <PitchKountFooter />
@@ -98,7 +97,6 @@ function PlayerBanner({ playerName, playerNumber }: { playerName: string; player
   return (
     <header className="pitchkount-school-banner pitchkount-player-banner">
       <div className="pitchkount-player-number">
-        <span>PLAYER</span>
         <strong>#{playerNumber}</strong>
       </div>
       <div className="pitchkount-player-name">

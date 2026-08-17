@@ -217,15 +217,9 @@ html.show-cursor * {
   background: rgba(0, 18, 31, 0.72);
 }
 
-.pitchkount-player-number span {
-  color: rgba(255, 255, 255, 0.48);
-  font-size: clamp(4px, 3.8cqw, 6px);
-  letter-spacing: 0.08em;
-}
-
 .pitchkount-player-number strong {
   width: auto;
-  margin-top: 1cqh;
+  margin-top: 0;
   color: var(--pk-red);
   font-size: clamp(13px, 15cqw, 24px);
   letter-spacing: -0.03em;
@@ -354,8 +348,8 @@ html.show-cursor * {
   display: grid;
   min-width: 0;
   min-height: 0;
-  grid-template-rows: auto 1fr;
-  padding: 1.2cqh 2cqw 0.5cqh;
+  grid-template-rows: 1fr auto;
+  padding: 0.5cqh 2cqw 1.2cqh;
   border: max(1px, 0.55cqw) solid rgba(241, 40, 34, 0.78);
   background: radial-gradient(circle at 50% 44%, rgba(0, 117, 185, 0.22), rgba(0, 0, 0, 0.82) 72%);
 }
@@ -365,10 +359,10 @@ html.show-cursor * {
   text-align: center;
 }
 
-.pitchkount-remaining-card > div:last-child {
+.pitchkount-remaining-value {
   display: flex;
-  align-self: center;
-  align-items: baseline;
+  min-height: 0;
+  align-items: center;
   justify-content: center;
   gap: 2cqw;
 }
@@ -378,6 +372,12 @@ html.show-cursor * {
   font-size: clamp(23px, 27cqw, 43px);
   letter-spacing: -0.035em;
   line-height: 0.84;
+}
+
+.pitchkount-remaining-card .pitchkount-remaining-value--large {
+  font-size: clamp(28px, 33cqw, 53px);
+  letter-spacing: -0.045em;
+  line-height: 0.82;
 }
 
 .pitchkount-results {
@@ -470,15 +470,6 @@ html.show-cursor * {
   line-height: 1;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.pitchkount-stats-player small {
-  margin-top: 1cqh;
-  color: #8dc7e8;
-  font-family: "Arial Narrow", Arial, sans-serif;
-  font-size: clamp(5px, 5cqw, 8px);
-  font-weight: 900;
-  letter-spacing: 0.08em;
 }
 
 .pitchkount-stats-grid {

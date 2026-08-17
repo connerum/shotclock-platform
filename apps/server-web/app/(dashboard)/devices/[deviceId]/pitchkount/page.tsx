@@ -384,8 +384,7 @@ function PitchKountPreview({ state }: { state: PitchKountState }) {
       {slide === 'main' ? (
         <div className="grid h-[16%] grid-cols-[28%_72%] border-b border-sky-500/70 bg-black/55">
           <div className="flex min-w-0 flex-col items-center justify-center border-r border-sky-500/70 bg-black/35">
-            <span className="text-[6px] font-black tracking-wider text-white/45">PLAYER</span>
-            <strong className="mt-1 text-2xl font-black leading-none text-red-500">#{state.pitcherNumber}</strong>
+            <strong className="text-2xl font-black leading-none text-red-500">#{state.pitcherNumber}</strong>
           </div>
           <div className="flex min-w-0 flex-col items-center justify-center px-1">
             <strong className="w-full overflow-hidden whitespace-nowrap text-center font-black leading-none" style={stackedNameStyle}>{firstName}</strong>
@@ -409,9 +408,9 @@ function PitchKountPreview({ state }: { state: PitchKountState }) {
                 <span className="text-[10px] font-black tracking-widest text-red-500">PITCH COUNT</span>
                 <strong className="self-center justify-self-center text-5xl leading-none tracking-tighter">{state.pitchCount}</strong>
               </div>
-              <div className="grid min-h-0 grid-rows-[auto_1fr] border border-red-500/80 bg-black/55 px-2 pt-2">
+              <div className="grid min-h-0 grid-rows-[1fr_auto] border border-red-500/80 bg-black/55 px-2 pb-2">
+                <div className="self-center justify-self-center"><strong className={`${pitchesRemaining < 100 ? 'text-5xl' : 'text-4xl'} leading-none tracking-tighter text-red-500`}>{pitchesRemaining}</strong></div>
                 <span className="text-center text-[10px] font-black tracking-widest text-white">REMAINING</span>
-                <div className="self-center justify-self-center"><strong className="text-4xl leading-none text-red-500">{pitchesRemaining}</strong></div>
               </div>
             </div>
           </div>
@@ -426,14 +425,14 @@ function PitchKountPreview({ state }: { state: PitchKountState }) {
         <div className="h-[88%]">
           <div className="grid h-[21%] grid-cols-[30%_70%] gap-3 border-b border-white/10 bg-sky-950/25 p-[4%]">
             <div className="overflow-hidden border border-sky-500/60 bg-black/40">{state.headshotUrl ? <img src={state.headshotUrl} alt="" className="h-full w-full object-cover object-top" /> : <div className="flex h-full items-center justify-center text-xl font-black text-white/30">#{state.pitcherNumber}</div>}</div>
-            <div className="flex min-w-0 flex-col justify-center"><span className="text-[9px] font-black tracking-widest text-red-500">PLAYER STATS</span><strong className="mt-1 truncate text-sm">{state.teamName}</strong><small className="mt-1 text-[8px] font-black text-sky-300">#{state.pitcherNumber} · PITCHER</small></div>
+            <div className="flex min-w-0 flex-col justify-center"><span className="text-[9px] font-black tracking-widest text-red-500">PLAYER STATS</span><strong className="mt-1 truncate text-sm">{state.teamName}</strong></div>
           </div>
           <div className="grid h-[69%] grid-cols-2 grid-rows-3 gap-2 p-[4%]">
-            <PreviewStat label="ERA" value={state.era.toFixed(2)} />
             <PreviewStat label="RECORD" value={`${state.wins}–${state.losses}`} />
-            <PreviewStat label="INNINGS" value={state.inningsPitched} />
+            <PreviewStat label="ERA" value={state.era.toFixed(2)} />
             <PreviewStat label="STRIKEOUTS" value={state.strikeouts} />
             <PreviewStat label="WALKS" value={state.walks} />
+            <PreviewStat label="INNINGS" value={state.inningsPitched} />
             <PreviewStat label="WHIP" value={state.whip.toFixed(2)} />
           </div>
           <PreviewFooter />
