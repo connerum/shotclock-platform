@@ -7,6 +7,7 @@
   "scripts": {
     "dev": "pnpm -r --parallel dev",
     "build": "pnpm -r build",
+    "pretest": "pnpm --filter @shotclock/shared build",
     "test": "tsx --test tests/*.test.ts",
     "check:secrets": "bash scripts/check-secrets.sh",
     "clean": "pnpm -r --parallel clean && rm -rf node_modules",
