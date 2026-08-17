@@ -93,12 +93,18 @@ function SchoolBanner({ teamName, label = 'SCHOOL' }: { teamName: string; label?
 function PlayerBanner({ playerName, playerNumber }: { playerName: string; playerNumber: string }) {
   const [firstName, ...remainingNames] = playerName.trim().split(/\s+/);
   const lastName = remainingNames.join(' ') || firstName;
-  const firstLine = remainingNames.length > 0 ? `#${playerNumber} · ${firstName}` : `#${playerNumber}`;
+  const nameStyle = fitStackedPlayerName(firstName, lastName);
 
   return (
     <header className="pitchkount-school-banner pitchkount-player-banner">
-      <span style={fitBannerText(firstLine, 5.2, 120)}>{firstLine}</span>
-      <strong style={fitBannerText(lastName)}>{lastName}</strong>
+      <div className="pitchkount-player-number">
+        <span>PLAYER</span>
+        <strong>#{playerNumber}</strong>
+      </div>
+      <div className="pitchkount-player-name">
+        <strong style={nameStyle}>{firstName}</strong>
+        <strong style={nameStyle}>{lastName}</strong>
+      </div>
     </header>
   );
 }
@@ -108,6 +114,15 @@ function fitBannerText(text: string, maximumCqw = 11, widthFactor = 130): CSSPro
   return {
     fontSize: `${fontSize}cqw`,
     letterSpacing: text.length > 16 ? '0.015em' : text.length > 11 ? '0.04em' : undefined,
+  };
+}
+
+function fitStackedPlayerName(firstName: string, lastName: string): CSSProperties {
+  const longestLine = Math.max(firstName.length, lastName.length, 1);
+  const fontSize = Math.max(4.2, Math.min(11, 88 / longestLine));
+  return {
+    fontSize: `${fontSize}cqw`,
+    letterSpacing: longestLine > 12 ? '0.01em' : longestLine > 8 ? '0.035em' : '0.07em',
   };
 }
 

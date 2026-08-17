@@ -367,7 +367,7 @@ function PitchKountPreview({ state }: { state: PitchKountState }) {
   const pitchesRemaining = Math.max(0, PITCHKOUNT_DAILY_LIMIT - state.pitchCount);
   const [firstName, ...remainingNames] = state.pitcherName.trim().split(/\s+/);
   const lastName = remainingNames.join(' ') || firstName;
-  const firstLine = remainingNames.length > 0 ? `#${state.pitcherNumber} · ${firstName}` : `#${state.pitcherNumber}`;
+  const stackedNameStyle = fitPreviewStackedName(firstName, lastName);
 
   useEffect(() => {
     const duration = slide === 'main'
@@ -381,10 +381,23 @@ function PitchKountPreview({ state }: { state: PitchKountState }) {
 
   return (
     <div className="mx-auto aspect-[1/2] w-full max-w-[270px] overflow-hidden border border-sky-500/70 bg-[radial-gradient(circle_at_50%_34%,rgba(0,117,185,0.22),transparent_36%),linear-gradient(145deg,#07121e,#010409_42%,#020910)] font-sans text-white shadow-[inset_0_0_28px_rgba(0,139,218,0.28)]">
-      <div className={`flex flex-col items-center justify-center border-b border-sky-500/70 bg-black/55 ${slide === 'main' ? 'h-[16%]' : 'h-[12%]'}`}>
-        <span className="max-w-[96%] overflow-hidden whitespace-nowrap font-black tracking-[0.16em] text-red-500" style={fitPreviewEyebrowText(slide === 'main' ? firstLine : `PITCHER · #${state.pitcherNumber}`)}>{slide === 'main' ? firstLine : `PITCHER · #${state.pitcherNumber}`}</span>
-        <strong className="mt-1 w-[96%] overflow-hidden whitespace-nowrap text-center font-black" style={fitPreviewBannerText(slide === 'main' ? lastName : state.pitcherName)}>{slide === 'main' ? lastName : state.pitcherName}</strong>
-      </div>
+      {slide === 'main' ? (
+        <div className="grid h-[16%] grid-cols-[28%_72%] border-b border-sky-500/70 bg-black/55">
+          <div className="flex min-w-0 flex-col items-center justify-center border-r border-sky-500/70 bg-black/35">
+            <span className="text-[6px] font-black tracking-wider text-white/45">PLAYER</span>
+            <strong className="mt-1 text-2xl font-black leading-none text-red-500">#{state.pitcherNumber}</strong>
+          </div>
+          <div className="flex min-w-0 flex-col items-center justify-center px-1">
+            <strong className="w-full overflow-hidden whitespace-nowrap text-center font-black leading-none" style={stackedNameStyle}>{firstName}</strong>
+            <strong className="mt-1 w-full overflow-hidden whitespace-nowrap text-center font-black leading-none" style={stackedNameStyle}>{lastName}</strong>
+          </div>
+        </div>
+      ) : (
+        <div className="flex h-[12%] flex-col items-center justify-center border-b border-sky-500/70 bg-black/55">
+          <span className="max-w-[96%] overflow-hidden whitespace-nowrap font-black tracking-[0.16em] text-red-500" style={fitPreviewEyebrowText(`PITCHER · #${state.pitcherNumber}`)}>PITCHER · #{state.pitcherNumber}</span>
+          <strong className="mt-1 w-[96%] overflow-hidden whitespace-nowrap text-center font-black" style={fitPreviewBannerText(state.pitcherName)}>{state.pitcherName}</strong>
+        </div>
+      )}
       {slide === 'main' ? (
         <div className="h-[84%]">
           <div className="grid h-[64%] grid-cols-[43%_57%] px-[4%] py-[3%]">
@@ -396,8 +409,8 @@ function PitchKountPreview({ state }: { state: PitchKountState }) {
                 <span className="text-[10px] font-black tracking-widest text-red-500">PITCH COUNT</span>
                 <strong className="self-center justify-self-center text-5xl leading-none tracking-tighter">{state.pitchCount}</strong>
               </div>
-              <div className="grid min-h-0 grid-rows-[auto_1fr] border border-sky-500/70 bg-black/55 px-2 pt-2">
-                <span className="text-[10px] font-black tracking-widest text-red-500">REMAINING</span>
+              <div className="grid min-h-0 grid-rows-[auto_1fr] border border-red-500/80 bg-black/55 px-2 pt-2">
+                <span className="text-center text-[10px] font-black tracking-widest text-white">REMAINING</span>
                 <div className="self-center justify-self-center"><strong className="text-4xl leading-none text-red-500">{pitchesRemaining}</strong></div>
               </div>
             </div>
@@ -452,6 +465,15 @@ function fitPreviewBannerText(text: string): CSSProperties {
 
 function fitPreviewEyebrowText(text: string): CSSProperties {
   return { fontSize: `${Math.max(5, Math.min(8, 165 / Math.max(text.length, 1)))}px` };
+}
+
+function fitPreviewStackedName(firstName: string, lastName: string): CSSProperties {
+  const longestLine = Math.max(firstName.length, lastName.length, 1);
+  const fontSize = Math.max(9, Math.min(16, 185 / longestLine));
+  return {
+    fontSize: `${fontSize}px`,
+    letterSpacing: longestLine > 12 ? '0.005em' : longestLine > 8 ? '0.025em' : '0.06em',
+  };
 }
 
 function getPublicMediaUrl(url: string) {
