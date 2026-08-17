@@ -7,6 +7,7 @@ import type {
   PresentationOverlayType,
   TimerState,
 } from '@shotclock/shared/types';
+import { normalizePitchKountState } from '@shotclock/shared/types';
 
 export const COMMAND_ACK_TIMEOUT_MS = 2500;
 
@@ -17,6 +18,36 @@ export type DeviceCommandResult = {
   success: boolean;
   error?: string;
 };
+
+const DEVICE_MODE_TYPES = new Set<DeviceMode['type']>([
+  'setup',
+  'pairing',
+  'offline',
+  'basketball',
+  'wrestling',
+  'volleyball',
+  'practice-board',
+  'pitchkount',
+  'shot-clock',
+  'media',
+  'calibration',
+  'blank',
+]);
+
+export function normalizeDeviceMode(value: unknown): DeviceMode | null {
+  if (!value || typeof value !== 'object') return null;
+  const mode = value as Partial<DeviceMode>;
+  if (!mode.type || !DEVICE_MODE_TYPES.has(mode.type)) return null;
+
+  if (mode.type === 'pitchkount') {
+    return {
+      type: 'pitchkount',
+      pitchKount: normalizePitchKountState(mode.pitchKount),
+    };
+  }
+
+  return mode as DeviceMode;
+}
 
 export function getDeviceRoom(deviceId: string): string {
   return `device:${deviceId}`;

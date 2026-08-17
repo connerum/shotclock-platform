@@ -27,7 +27,7 @@ export async function registerPairingCodeWithServer(
         deviceName: identity.deviceName,
         firmwareVersion: identity.firmwareVersion,
         controllerType: identity.controllerType,
-        capabilities: ['shot-clock', 'scoreboard', 'timer', 'media'],
+        capabilities: ['shot-clock', 'scoreboard', 'timer', 'media', 'pitchkount'],
         displayProfile: state.displayProfile,
         pairingCode: pairingCode.code,
         pairingCodeExpiresAt: pairingCode.expiresAt,

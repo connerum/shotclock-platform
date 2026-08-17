@@ -12,10 +12,11 @@ import MediaMode from './modes/MediaMode';
 import CalibrationMode from './modes/CalibrationMode';
 import BlankMode from './modes/BlankMode';
 import PracticeBoardMode from './modes/PracticeBoardMode';
+import PitchKountMode from './modes/PitchKountMode';
 import ViewportCanvas from './components/ViewportCanvas';
 import PresentationOverlay from './components/PresentationOverlay';
 
-type KioskMode = 'setup' | 'pairing' | 'offline' | 'basketball' | 'wrestling' | 'volleyball' | 'practice-board' | 'shot-clock' | 'media' | 'calibration' | 'blank';
+type KioskMode = 'setup' | 'pairing' | 'offline' | 'basketball' | 'wrestling' | 'volleyball' | 'practice-board' | 'pitchkount' | 'shot-clock' | 'media' | 'calibration' | 'blank';
 
 interface ShotClockState {
   mode?: DeviceMode;
@@ -74,6 +75,8 @@ export default function App() {
         return <VolleyballMode state={state as ShotClockState | undefined} />;
       case 'practice-board':
         return <PracticeBoardMode board={state?.mode?.practiceBoard} />;
+      case 'pitchkount':
+        return <PitchKountMode pitchKount={state?.mode?.pitchKount} />;
       case 'shot-clock':
         return <ShotClockMode state={state as ShotClockState | undefined} />;
       case 'media':

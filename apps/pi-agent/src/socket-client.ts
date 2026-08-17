@@ -248,7 +248,7 @@ function sendHello(identity: DeviceIdentity): void {
     deviceName: currentIdentity.deviceName,
     firmwareVersion: currentIdentity.firmwareVersion,
     controllerType: currentIdentity.controllerType,
-    capabilities: ['basketball', 'wrestling', 'volleyball', 'shot-clock', 'scoreboard', 'timer', 'media', 'presentation'],
+    capabilities: ['basketball', 'wrestling', 'volleyball', 'pitchkount', 'shot-clock', 'scoreboard', 'timer', 'media', 'presentation'],
     displayProfile: state.displayProfile,
     pairingCode: pairingCode?.code,
     pairingCodeExpiresAt: pairingCode?.expiresAt,

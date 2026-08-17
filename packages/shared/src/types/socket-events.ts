@@ -61,6 +61,106 @@ export interface PracticeBoardState {
   weather?: PracticeBoardWeather;
 }
 
+export const PITCHKOUNT_PITCH_TYPES = [
+  'Fastball',
+  'Four-Seam',
+  'Two-Seam',
+  'Sinker',
+  'Cutter',
+  'Slider',
+  'Curveball',
+  'Changeup',
+  'Splitter',
+  'Knuckleball',
+  'Other',
+] as const;
+
+export type PitchKountPitchType = typeof PITCHKOUNT_PITCH_TYPES[number];
+
+export interface PitchKountState {
+  pitcherName: string;
+  pitcherNumber: string;
+  teamName: string;
+  pitchCount: number;
+  pitchSpeedMph: number;
+  pitchType: PitchKountPitchType;
+  strikes: number;
+  balls: number;
+  era: number;
+  wins: number;
+  losses: number;
+  inningsPitched: string;
+  strikeouts: number;
+  walks: number;
+}
+
+export const DEFAULT_PITCHKOUNT_STATE: PitchKountState = {
+  pitcherName: 'PITCHER NAME',
+  pitcherNumber: '00',
+  teamName: 'HOME',
+  pitchCount: 0,
+  pitchSpeedMph: 0,
+  pitchType: 'Fastball',
+  strikes: 0,
+  balls: 0,
+  era: 0,
+  wins: 0,
+  losses: 0,
+  inningsPitched: '0.0',
+  strikeouts: 0,
+  walks: 0,
+};
+
+export function normalizePitchKountState(value: unknown): PitchKountState {
+  const state = value && typeof value === 'object' ? value as Partial<PitchKountState> : {};
+  const pitchType = PITCHKOUNT_PITCH_TYPES.includes(state.pitchType as PitchKountPitchType)
+    ? state.pitchType as PitchKountPitchType
+    : DEFAULT_PITCHKOUNT_STATE.pitchType;
+  const inningsPitched = typeof state.inningsPitched === 'string' && /^\d{1,3}(?:\.[012])?$/.test(state.inningsPitched.trim())
+    ? state.inningsPitched.trim()
+    : DEFAULT_PITCHKOUNT_STATE.inningsPitched;
+
+  return {
+    pitcherName: normalizePitchKountText(state.pitcherName, DEFAULT_PITCHKOUNT_STATE.pitcherName, 28),
+    pitcherNumber: normalizePitcherNumber(state.pitcherNumber),
+    teamName: normalizePitchKountText(state.teamName, DEFAULT_PITCHKOUNT_STATE.teamName, 20),
+    pitchCount: normalizePitchKountInteger(state.pitchCount, 999),
+    pitchSpeedMph: normalizePitchKountInteger(state.pitchSpeedMph, 120),
+    pitchType,
+    strikes: normalizePitchKountInteger(state.strikes, 999),
+    balls: normalizePitchKountInteger(state.balls, 999),
+    era: normalizePitchKountDecimal(state.era, 99.99),
+    wins: normalizePitchKountInteger(state.wins, 99),
+    losses: normalizePitchKountInteger(state.losses, 99),
+    inningsPitched,
+    strikeouts: normalizePitchKountInteger(state.strikeouts, 999),
+    walks: normalizePitchKountInteger(state.walks, 999),
+  };
+}
+
+function normalizePitchKountText(value: unknown, fallback: string, maxLength: number): string {
+  if (typeof value !== 'string') return fallback;
+  const normalized = value.trim().replace(/\s+/g, ' ').slice(0, maxLength);
+  return normalized || fallback;
+}
+
+function normalizePitcherNumber(value: unknown): string {
+  if (typeof value !== 'string' && typeof value !== 'number') return DEFAULT_PITCHKOUNT_STATE.pitcherNumber;
+  return String(value).replace(/[^0-9A-Za-z-]/g, '').slice(0, 3) || DEFAULT_PITCHKOUNT_STATE.pitcherNumber;
+}
+
+function normalizePitchKountInteger(value: unknown, maximum: number): number {
+  const number = Number(value);
+  if (!Number.isFinite(number)) return 0;
+  return Math.max(0, Math.min(maximum, Math.round(number)));
+}
+
+function normalizePitchKountDecimal(value: unknown, maximum: number): number {
+  const number = Number(value);
+  if (!Number.isFinite(number)) return 0;
+  return Math.max(0, Math.min(maximum, Math.round(number * 100) / 100));
+}
+
 export interface TimerState {
   mode: TimerMode;
   homeScore: number;
@@ -154,6 +254,7 @@ export type ModeType =
   | 'wrestling'
   | 'volleyball'
   | 'practice-board'
+  | 'pitchkount'
   | 'shot-clock' 
   | 'media' 
   | 'calibration' 
@@ -164,6 +265,7 @@ export interface DeviceMode {
   subMode?: string;
   scoreboardBranding?: ScoreboardBranding;
   practiceBoard?: PracticeBoardState;
+  pitchKount?: PitchKountState;
 }
 
 export interface ScoreboardBranding {

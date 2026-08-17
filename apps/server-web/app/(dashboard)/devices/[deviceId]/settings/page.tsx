@@ -35,7 +35,7 @@ interface DeviceMediaAsset {
   createdAt: string;
 }
 
-const DEVICE_MODES = ['setup', 'pairing', 'offline', 'basketball', 'wrestling', 'volleyball', 'practice-board', 'media', 'calibration', 'blank'];
+const DEVICE_MODES = ['setup', 'pairing', 'offline', 'basketball', 'wrestling', 'volleyball', 'practice-board', 'pitchkount', 'media', 'calibration', 'blank'];
 const MEDIA_SLOT_CONFIG: Array<{
   slot: MediaSlot;
   title: string;

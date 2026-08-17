@@ -23,6 +23,7 @@ The application runs as the non-login `courtcast` user. Caddy terminates TLS and
 NODE_ENV=production
 SERVER_PORT=3000
 COREPACK_HOME=/opt/courtcast/shared/corepack
+COURTCAST_MEDIA_DIR=/opt/courtcast/shared/media
 SERVER_URL=https://courtcast.safety-linq.com
 NEXT_PUBLIC_SERVER_URL=https://courtcast.safety-linq.com
 DATABASE_URL=file:/opt/courtcast/data/prod.db

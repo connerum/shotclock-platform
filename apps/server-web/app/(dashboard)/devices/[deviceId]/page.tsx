@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
-import type { DeviceMode, ModeType, SportType } from '@shotclock/shared/types';
+import { DEFAULT_PITCHKOUNT_STATE, type DeviceMode, type ModeType, type SportType } from '@shotclock/shared/types';
 import { SyncTargetBanner, useDeviceCommandDispatcher } from '../../SelectedDevicesProvider';
 
 interface Device {
@@ -15,7 +15,7 @@ interface Device {
 }
 
 const SPORTS: Array<{
-  id: SportType | 'practice-board' | 'settings';
+  id: SportType | 'practice-board' | 'pitchkount' | 'settings';
   title: string;
   description: string;
   href: string;
@@ -49,6 +49,13 @@ const SPORTS: Array<{
     description: 'Build, time, and run a football practice plan.',
     href: 'practice-board',
     imageSrc: '/images/sports/practice-board.png',
+  },
+  {
+    id: 'pitchkount',
+    title: 'PitchKount',
+    description: 'Live baseball pitch count, velocity, pitch type, outcomes, and pitcher stats.',
+    href: 'pitchkount',
+    imageSrc: '/images/sports/pitchkount.svg',
   },
   {
     id: 'settings',
@@ -86,7 +93,7 @@ export default function DeviceSportPage() {
     void fetchDevice();
   }, [deviceId]);
 
-  const openSport = async (sport: SportType | 'practice-board' | 'settings', href: string, mode?: ModeType) => {
+  const openSport = async (sport: SportType | 'practice-board' | 'pitchkount' | 'settings', href: string, mode?: ModeType) => {
     setSelectingSport(sport === 'settings' ? null : sport);
     setCommandError(null);
 
@@ -95,7 +102,9 @@ export default function DeviceSportPage() {
       return;
     }
 
-    const modePayload: DeviceMode = { type: mode };
+    const modePayload: DeviceMode = mode === 'pitchkount'
+      ? { type: 'pitchkount', pitchKount: DEFAULT_PITCHKOUNT_STATE }
+      : { type: mode };
 
     try {
       const { response, data } = await sendCommand('set_mode', { mode: modePayload });
@@ -158,7 +167,7 @@ export default function DeviceSportPage() {
 
       <SyncTargetBanner deviceId={deviceId} />
 
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-5">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6">
         {SPORTS.map((sport) => (
           <button
             key={sport.id}

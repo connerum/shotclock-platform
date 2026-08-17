@@ -36,3 +36,9 @@ test('Pi management does not use shell interpolation and stays loopback-only', a
   assert.match(localApi, /localApiHost: process\.env\.AGENT_LOCAL_API_HOST \|\| '127\.0\.0\.1'/);
   assert.doesNotMatch(kiosk, /--no-sandbox/);
 });
+
+test('the local update API reports updater failures', async () => {
+  const localApi = await readFile(new URL('../apps/pi-agent/src/local-api.ts', import.meta.url), 'utf8');
+  assert.match(localApi, /const result = await updateManager\.installUpdate\(version\)/);
+  assert.match(localApi, /if \(!result\.success\)/);
+});

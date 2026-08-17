@@ -230,7 +230,11 @@ export function startLocalApi(
         return;
       }
       
-      await updateManager.installUpdate(version);
+      const result = await updateManager.installUpdate(version);
+      if (!result.success) {
+        res.status(500).json({ error: result.error || 'Update installation failed' });
+        return;
+      }
       res.json({ success: true, message: 'Update installation started' });
     } catch (error) {
       res.status(500).json({ error: 'Update installation failed' });

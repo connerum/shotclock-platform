@@ -11,6 +11,7 @@ import {
   emitDeviceCommandToDevice,
   getConnectedDeviceSocketCount,
   markDeviceOffline,
+  normalizeDeviceMode,
   normalizePresentationOverlay,
   persistDisplayMode,
   persistPresentationOverlay,
@@ -19,7 +20,7 @@ import {
 } from '@/lib/device-command';
 
 const GAME_COMMAND_TYPES = new Set<GameCommandType>(['set_mode', 'set_timer', 'presentation']);
-const SYNC_MODE_TYPES = new Set(['basketball', 'wrestling', 'volleyball', 'practice-board', 'shot-clock']);
+const SYNC_MODE_TYPES = new Set(['basketball', 'wrestling', 'volleyball', 'practice-board', 'pitchkount', 'shot-clock']);
 
 export async function POST(request: NextRequest) {
   try {
@@ -236,10 +237,9 @@ function isGameCommandType(value: unknown): value is GameCommandType {
 }
 
 function getSyncDeviceMode(value: unknown): DeviceMode | null {
-  if (!value || typeof value !== 'object') return null;
-  const mode = value as Partial<DeviceMode>;
-  if (typeof mode.type !== 'string' || !SYNC_MODE_TYPES.has(mode.type)) return null;
-  return mode as DeviceMode;
+  const mode = normalizeDeviceMode(value);
+  if (!mode || !SYNC_MODE_TYPES.has(mode.type)) return null;
+  return mode;
 }
 
 function emitToTargets(

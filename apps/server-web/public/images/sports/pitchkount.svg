@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 320" role="img" aria-labelledby="title desc">
+  <title id="title">PitchKount</title>
+  <desc id="desc">A dark blue and red baseball pitch count display.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#071a2b"/>
+      <stop offset="0.55" stop-color="#01050a"/>
+      <stop offset="1" stop-color="#03111d"/>
+    </linearGradient>
+    <radialGradient id="glow">
+      <stop offset="0" stop-color="#058bd3" stop-opacity=".36"/>
+      <stop offset="1" stop-color="#058bd3" stop-opacity="0"/>
+    </radialGradient>
+    <pattern id="grid" width="24" height="24" patternUnits="userSpaceOnUse">
+      <path d="M24 0H0v24" fill="none" stroke="#058bd3" stroke-opacity=".12"/>
+    </pattern>
+  </defs>
+  <rect width="640" height="320" fill="url(#bg)"/>
+  <rect width="640" height="320" fill="url(#grid)"/>
+  <circle cx="430" cy="160" r="210" fill="url(#glow)"/>
+  <path d="M35 38h150M455 282h150" stroke="#f12822" stroke-width="6"/>
+  <path d="M38 64h564v192H38z" fill="#010408" fill-opacity=".72" stroke="#058bd3" stroke-width="3"/>
+  <text x="64" y="116" fill="#f12822" font-family="Arial, sans-serif" font-weight="900" font-size="24" letter-spacing="5">PITCH COUNT</text>
+  <text x="60" y="222" fill="#fff" font-family="Impact, Arial Black, sans-serif" font-size="134" letter-spacing="-4">68</text>
+  <path d="M332 77h240v74H332zM332 169h240v74H332z" fill="#02070c" stroke="#058bd3" stroke-width="2"/>
+  <text x="352" y="104" fill="#f12822" font-family="Arial, sans-serif" font-weight="900" font-size="18">PITCH SPEED</text>
+  <text x="350" y="140" fill="#fff" font-family="Impact, Arial Black, sans-serif" font-size="38">89</text>
+  <text x="410" y="140" fill="#fff" font-family="Arial, sans-serif" font-weight="800" font-size="15">MPH</text>
+  <text x="352" y="196" fill="#f12822" font-family="Arial, sans-serif" font-weight="900" font-size="18">PITCH TYPE</text>
+  <text x="350" y="229" fill="#fff" font-family="Impact, Arial Black, sans-serif" font-size="27">FASTBALL</text>
+  <text x="64" y="286" fill="#fff" font-family="Impact, Arial Black, sans-serif" font-style="italic" font-size="34">PITCH<tspan fill="#058bd3">KOUNT</tspan></text>
+</svg>

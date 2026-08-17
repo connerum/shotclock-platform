@@ -6,7 +6,7 @@
 import 'next/dist/server/node-environment';
 
 import { createServer, IncomingMessage, ServerResponse } from 'http';
-import { createReadStream, existsSync } from 'fs';
+import { createReadStream } from 'fs';
 import { stat } from 'fs/promises';
 import { extname, join, normalize, sep } from 'path';
 import next from 'next';
@@ -15,6 +15,7 @@ import { DeviceToServerEvents, ServerToDeviceEvents } from '@shotclock/shared/so
 import { setupSocketServer, TypedServer } from './socket/server';
 import { setServerIO } from './lib/socket';
 import { prisma } from './lib/prisma';
+import { resolveMediaRoot } from './lib/media-path';
 
 const dev = process.env.NODE_ENV !== 'production';
 const hostname = process.env.HOSTNAME || 'localhost';
@@ -134,12 +135,11 @@ async function serveUploadedMedia(req: IncomingMessage, res: ServerResponse) {
 }
 
 function getMediaRoot() {
-  const cwd = process.cwd();
-  const packageMediaRoot = join(cwd, 'public', 'media');
-  const repoMediaRoot = join(cwd, 'apps', 'server-web', 'public', 'media');
-
-  if (existsSync(packageMediaRoot)) return packageMediaRoot;
-  return repoMediaRoot;
+  return resolveMediaRoot({
+    configuredRoot: process.env.COURTCAST_MEDIA_DIR,
+    cwd: process.cwd(),
+    production: !dev,
+  });
 }
 
 function parseRangeHeader(rangeHeader: string | undefined, fileSize: number) {

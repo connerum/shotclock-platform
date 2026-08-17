@@ -11,6 +11,7 @@ import {
   getConnectedDeviceSocketCount,
   getDeviceRoom,
   markDeviceOffline,
+  normalizeDeviceMode,
   normalizePresentationOverlay,
   persistDisplayMode,
   persistPresentationOverlay,
@@ -102,7 +103,13 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     // Route commands to device via Socket.IO
     switch (type) {
       case 'set_mode': {
-        const mode: DeviceMode = payload?.mode || { type: 'setup' };
+        const mode = normalizeDeviceMode(payload?.mode);
+        if (!mode) {
+          return NextResponse.json(
+            { error: 'Missing or invalid display mode' },
+            { status: 400 }
+          );
+        }
         const ack = await emitDeviceCommand(deviceNamespace, room, 'mode:set', mode);
         if (!ack.success) {
           return commandAckError(ack);
