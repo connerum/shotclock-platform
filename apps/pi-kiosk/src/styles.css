@@ -530,7 +530,7 @@ html.show-cursor * {
   justify-content: center;
   padding: 0 1cqw;
   border-top: max(1px, 0.55cqw) solid rgba(0, 139, 218, 0.7);
-  background: linear-gradient(90deg, #010306, #002c49 50%, #010306);
+  background: #010306;
 }
 
 .pitchkount-logo {

@@ -451,7 +451,7 @@ function PreviewStat({ label, value }: { label: string; value: string | number }
 }
 
 function PreviewFooter() {
-  return <div className="flex h-[10%] items-center justify-center border-t border-sky-500/70 bg-gradient-to-r from-black via-sky-950 to-black px-[1%]"><img src="/images/sports/pitchkount-logo.png" alt="PitchKount" className="h-[92%] w-full object-fill drop-shadow-[0_0_4px_rgba(0,139,218,0.45)]" /></div>;
+  return <div className="flex h-[10%] items-center justify-center border-t border-sky-500/70 bg-black px-[1%]"><img src="/images/sports/pitchkount-logo.png" alt="PitchKount" className="h-[92%] w-full object-fill drop-shadow-[0_0_4px_rgba(0,139,218,0.45)]" /></div>;
 }
 
 function fitPreviewBannerText(text: string): CSSProperties {
