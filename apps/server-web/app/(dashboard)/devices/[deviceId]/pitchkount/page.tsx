@@ -10,6 +10,7 @@ import {
   PITCHKOUNT_STATS_SLIDE_DURATION_MS,
   normalizePitchKountState,
   type DeviceMode,
+  type PitchKountSavedPlayer,
   type PitchKountState,
 } from '@shotclock/shared/types';
 import { SyncTargetBanner, useDeviceCommandDispatcher } from '../../../SelectedDevicesProvider';
@@ -22,6 +23,14 @@ type DeviceResponse = {
   };
 };
 
+type PlayerPayloadResponse = {
+  player: PitchKountSavedPlayer;
+};
+
+type PlayersPayloadResponse = {
+  players: PitchKountSavedPlayer[];
+};
+
 export default function PitchKountPage() {
   const { deviceId } = useParams<{ deviceId: string }>();
   const { sendCommand } = useDeviceCommandDispatcher(deviceId);
@@ -30,6 +39,11 @@ export default function PitchKountPage() {
   const [pitchKount, setPitchKount] = useState<PitchKountState>(DEFAULT_PITCHKOUNT_STATE);
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
+  const [savingPlayer, setSavingPlayer] = useState(false);
+  const [playerActionId, setPlayerActionId] = useState<string | null>(null);
+  const [playersLoading, setPlayersLoading] = useState(true);
+  const [pitchKountPlayers, setPitchKountPlayers] = useState<PitchKountSavedPlayer[]>([]);
+  const [activePlayerId, setActivePlayerId] = useState<string | null>(null);
   const [uploadingHeadshot, setUploadingHeadshot] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -53,8 +67,29 @@ export default function PitchKountPage() {
     void load();
   }, [deviceId]);
 
+  const loadSavedPlayers = async () => {
+    setPlayersLoading(true);
+    try {
+      const response = await fetch(`/api/devices/${deviceId}/pitchkount/players`, { cache: 'no-store' });
+      if (!response.ok) throw new Error('Unable to load saved players.');
+      const data = await response.json() as PlayersPayloadResponse;
+      setPitchKountPlayers(Array.isArray(data.players) ? data.players : []);
+    } catch (playersError) {
+      setError(playersError instanceof Error ? playersError.message : 'Unable to load saved players.');
+    } finally {
+      setPlayersLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    void loadSavedPlayers();
+  }, [deviceId]);
+
   const updateDraft = <Key extends keyof PitchKountState>(key: Key, value: PitchKountState[Key]) => {
     setPitchKount((current) => ({ ...current, [key]: value }));
+    if (activePlayerId) {
+      setActivePlayerId(null);
+    }
     setNotice(null);
   };
 
@@ -79,6 +114,78 @@ export default function PitchKountPage() {
       return false;
     } finally {
       setSending(false);
+    }
+  };
+
+  const loadPlayer = (player: PitchKountSavedPlayer) => {
+    setPitchKount(player.state);
+    setActivePlayerId(player.id);
+    setNotice(`Loaded ${player.state.pitcherName} as active profile.`);
+  };
+
+  const syncPlayer = async (player?: PitchKountSavedPlayer) => {
+    const source = player?.state || pitchKount;
+    setPlayerActionId(player?.id ?? null);
+    const success = await sendState(source, `${source.pitcherName} applied to display.`);
+    setPlayerActionId(null);
+    if (!success) return;
+    setActivePlayerId(player?.id || null);
+  };
+
+  const savePlayer = async () => {
+    setSavingPlayer(true);
+    setNotice(null);
+    setError(null);
+    try {
+      const url = activePlayerId
+        ? `/api/devices/${deviceId}/pitchkount/players/${activePlayerId}`
+        : `/api/devices/${deviceId}/pitchkount/players`;
+      const method = activePlayerId ? 'PUT' : 'POST';
+      const response = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ state: pitchKount }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(
+          data?.error || `Unable to ${activePlayerId ? 'update' : 'save'} player profile.`
+        );
+      }
+
+      const saved = (data as PlayerPayloadResponse).player;
+      setActivePlayerId(saved?.id ?? activePlayerId);
+      setNotice(activePlayerId ? 'Player profile updated.' : 'Player profile saved.');
+      await loadSavedPlayers();
+    } catch (playerError) {
+      setError(playerError instanceof Error ? playerError.message : 'Unable to save player profile.');
+    } finally {
+      setSavingPlayer(false);
+    }
+  };
+
+  const deletePlayer = async (playerId: string) => {
+    if (!window.confirm('Delete this saved player profile?')) return;
+    setPlayerActionId(playerId);
+    setError(null);
+    try {
+      const response = await fetch(`/api/devices/${deviceId}/pitchkount/players/${playerId}`, {
+        method: 'DELETE',
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(data?.error || 'Unable to delete player profile.');
+      }
+
+      if (activePlayerId === playerId) {
+        setActivePlayerId(null);
+      }
+      setNotice('Player profile deleted.');
+      await loadSavedPlayers();
+    } catch (deleteError) {
+      setError(deleteError instanceof Error ? deleteError.message : 'Unable to delete player profile.');
+    } finally {
+      setPlayerActionId(null);
     }
   };
 
@@ -299,6 +406,103 @@ export default function PitchKountPage() {
                 </button>
               </div>
             </div>
+
+            <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              <button
+                type="button"
+                disabled={savingPlayer}
+                onClick={() => void savePlayer()}
+                className="cc-btn cc-btn-primary w-full px-4 py-3 disabled:opacity-50"
+              >
+                {savingPlayer
+                  ? activePlayerId
+                    ? 'Updating profile...'
+                    : 'Saving profile...'
+                  : activePlayerId
+                    ? 'Update player profile'
+                    : 'Save player profile'}
+              </button>
+              <button
+                type="button"
+                disabled={sending}
+                onClick={() => void syncPlayer()}
+                className="cc-btn w-full px-4 py-3 disabled:opacity-50"
+              >
+                {sending ? 'Applying...' : 'Apply this profile'}
+              </button>
+              <button
+                type="button"
+                disabled={savingPlayer}
+                onClick={() => {
+                  setPitchKount(DEFAULT_PITCHKOUNT_STATE);
+                  setActivePlayerId(null);
+                  setNotice('Profile cleared for a new pitcher.');
+                }}
+                className="rounded-lg border border-white/15 bg-white/5 px-4 py-3 font-bold text-white/80 hover:bg-white/10 disabled:opacity-50"
+              >
+                New profile
+              </button>
+            </div>
+          </section>
+
+          <section className="cc-card p-5">
+            <div className="mb-4 flex items-start justify-between gap-3">
+              <div>
+                <div className="text-xs font-black uppercase tracking-[0.18em] text-purple-300">Saved players</div>
+                <p className="mt-1 text-sm text-white/50">Profiles are persisted per device and can be reloaded anytime.</p>
+              </div>
+            </div>
+
+            {playersLoading ? (
+              <div className="rounded border border-white/10 bg-black/20 px-4 py-6 text-sm text-white/60">Loading saved players...</div>
+            ) : pitchKountPlayers.length === 0 ? (
+              <div className="rounded border border-white/10 bg-black/20 px-4 py-6 text-sm text-white/60">No saved players yet.</div>
+            ) : (
+              <div className="space-y-2">
+                {pitchKountPlayers.map((player) => {
+                  const isActive = activePlayerId === player.id;
+                  const isBusy = playerActionId === player.id;
+                  return (
+                    <div
+                      key={player.id}
+                      className={`rounded-lg border px-3 py-3 ${isActive ? 'border-sky-500/50 bg-sky-950/25' : 'border-white/10 bg-black/20'}`}
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <div className="font-bold">{player.state.pitcherName}</div>
+                          <div className="text-sm text-white/65">#{player.state.pitcherNumber} · {player.state.teamName}</div>
+                        </div>
+                        <div className="flex shrink-0 gap-2">
+                          <button
+                            type="button"
+                            onClick={() => loadPlayer(player)}
+                            className="rounded bg-white/10 px-2 py-1 text-xs font-semibold hover:bg-white/15"
+                          >
+                            Load
+                          </button>
+                          <button
+                            type="button"
+                            disabled={isBusy}
+                            onClick={() => void syncPlayer(player)}
+                            className="rounded bg-sky-600 px-2 py-1 text-xs font-semibold hover:bg-sky-500 disabled:opacity-50"
+                          >
+                            {isBusy ? 'Applying...' : 'Apply'}
+                          </button>
+                          <button
+                            type="button"
+                            disabled={isBusy}
+                            onClick={() => void deletePlayer(player.id)}
+                            className="rounded bg-red-600 px-2 py-1 text-xs font-semibold hover:bg-red-500 disabled:opacity-50"
+                          >
+                            {isBusy ? 'Deleting...' : 'Delete'}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </section>
         </div>
 
@@ -306,7 +510,9 @@ export default function PitchKountPage() {
           <div className="mb-4 flex items-start justify-between gap-3">
             <div>
               <div className="text-xs font-black uppercase tracking-[0.18em] text-white/40">Display preview</div>
-              <div className="mt-1 text-sm text-white/60">1:2 portrait · 45s main / 5s stats</div>
+              <div className="mt-1 text-sm text-white/60">
+                1:2 portrait · {PITCHKOUNT_MAIN_SLIDE_DURATION_MS / 1000}s main / {PITCHKOUNT_STATS_SLIDE_DURATION_MS / 1000}s stats
+              </div>
             </div>
             <span className="rounded bg-sky-500/15 px-2 py-1 text-xs font-bold text-sky-300">LIVE DATA</span>
           </div>

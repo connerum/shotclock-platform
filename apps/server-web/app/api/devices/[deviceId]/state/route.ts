@@ -7,6 +7,7 @@ import { getServerIO } from '@/lib/socket';
 import { TimerState } from '@shotclock/shared/types';
 import { DEFAULT_GAME_CLOCK_SECONDS, DEFAULT_SHOT_CLOCK_SECONDS } from '@shotclock/shared/timer';
 import { canAccessDevice, requireApiUser } from '@/lib/auth';
+import { parsePitchKountDisplayState, serializePitchKountDisplayState } from '@/lib/pitchkount-players';
 
 interface RouteParams {
   params: Promise<{ deviceId: string }>;
@@ -60,9 +61,7 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
       },
     });
     const state = deviceWithState?.state;
-    const cachedDisplayState = deviceWithState?.displayState
-      ? JSON.parse(deviceWithState.displayState)
-      : null;
+    const cachedDisplayState = parsePitchKountDisplayState(deviceWithState?.displayState);
 
     if (!state && !cachedDisplayState) {
       return NextResponse.json(
@@ -79,7 +78,7 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
 
     const timerState = getNewestTimerState(
       state?.timerState ? JSON.parse(state.timerState) : null,
-      cachedDisplayState?.timerState
+        cachedDisplayState?.timerState
     );
 
     return NextResponse.json(
@@ -91,9 +90,9 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
             }
           : {
               deviceId,
-              mode: cachedDisplayState.mode || 'setup',
+              mode: cachedDisplayState?.mode || 'setup',
               timerState,
-              mediaAssetId: cachedDisplayState.mediaAssetId || null,
+              mediaAssetId: cachedDisplayState?.mediaAssetId || null,
             },
       },
       { headers: { 'Cache-Control': 'no-store, max-age=0' } }
@@ -134,6 +133,18 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       return NextResponse.json({ error: 'Device not found' }, { status: 404 });
     }
 
+    const deviceRecord = await prisma.device.findUnique({
+      where: { deviceId },
+      select: { displayState: true },
+    });
+    const existingDisplayState = parsePitchKountDisplayState(deviceRecord?.displayState);
+    const nextDisplayState = serializePitchKountDisplayState({
+      ...(existingDisplayState ?? {}),
+      mode,
+      timerState: timerStatePayload,
+      mediaAssetId: mediaAssetId || null,
+    });
+
     // Upsert the display state
     const state = await prisma.displayState.upsert({
       where: { deviceId },
@@ -154,7 +165,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     await prisma.device.update({
       where: { deviceId },
       data: {
-        displayState: JSON.stringify({ mode, timerState: timerStatePayload, mediaAssetId }),
+        displayState: nextDisplayState,
         mode,
       },
     });

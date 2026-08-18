@@ -101,6 +101,13 @@ export interface PitchKountState {
   whip: number;
 }
 
+export interface PitchKountSavedPlayer {
+  id: string;
+  state: PitchKountState;
+  createdAt: number;
+  updatedAt: number;
+}
+
 export const DEFAULT_PITCHKOUNT_STATE: PitchKountState = {
   pitcherName: 'PITCHER NAME',
   pitcherNumber: '00',

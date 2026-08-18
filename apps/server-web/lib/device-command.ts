@@ -220,7 +220,19 @@ export async function persistTimerCommand(
   displayState: { mode: string; deviceMode: DeviceMode; timerState: TimerState; mediaAssetId: null }
 ): Promise<void> {
   const serializedTimerState = JSON.stringify(displayState.timerState);
-  const serializedDisplayState = JSON.stringify(displayState);
+  const device = await prisma.device.findUnique({
+    where: { deviceId },
+    select: { displayState: true },
+  });
+  const previousDisplayState = parseDisplayState(device?.displayState);
+  const mergedDisplayState = {
+    ...previousDisplayState,
+    mode: displayState.mode,
+    deviceMode: displayState.deviceMode,
+    timerState: displayState.timerState,
+    mediaAssetId: displayState.mediaAssetId,
+  };
+  const serializedDisplayState = JSON.stringify(mergedDisplayState);
   const results = await Promise.allSettled([
     prisma.device.update({
       where: { deviceId },
@@ -303,6 +315,16 @@ export async function resetDeviceRecordAfterFactoryReset(deviceId: string): Prom
   ]).catch((error) => {
     console.warn(`Unable to remove server device record for ${deviceId}`, error);
   });
+}
+
+function parseDisplayState(raw: string | null | undefined): Record<string, unknown> {
+  if (!raw) return {};
+  try {
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed as Record<string, unknown> : {};
+  } catch {
+    return {};
+  }
 }
 
 export async function resolveTimerCommandState(_deviceId: string, incomingState: TimerState): Promise<TimerState> {
