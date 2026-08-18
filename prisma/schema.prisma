@@ -163,6 +163,34 @@ model User {
 
   organization Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
   devices      Device[]
+  pitchKountProfiles    SavedPitchKountProfile[]
+  practiceBoardPreloads SavedPracticeBoardPreload[]
+}
+
+model SavedPitchKountProfile {
+  id           String   @id @default(uuid())
+  ownerUserId  String
+  name         String
+  state        String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  ownerUser User @relation(fields: [ownerUserId], references: [id], onDelete: Cascade)
+
+  @@index([ownerUserId])
+}
+
+model SavedPracticeBoardPreload {
+  id          String   @id @default(uuid())
+  ownerUserId String
+  name        String
+  board       String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  ownerUser User @relation(fields: [ownerUserId], references: [id], onDelete: Cascade)
+
+  @@index([ownerUserId])
 }
 
 model AuditLog {

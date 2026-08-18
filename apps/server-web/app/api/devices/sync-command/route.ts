@@ -21,6 +21,10 @@ import {
 
 const GAME_COMMAND_TYPES = new Set<GameCommandType>(['set_mode', 'set_timer', 'presentation']);
 const SYNC_MODE_TYPES = new Set(['basketball', 'wrestling', 'volleyball', 'practice-board', 'pitchkount', 'shot-clock']);
+type SyncDevice = {
+  deviceId: string;
+  ownerUserId: string | null;
+};
 
 export async function POST(request: NextRequest) {
   try {
@@ -68,10 +72,10 @@ export async function POST(request: NextRequest) {
       where: { deviceId: { in: targetDeviceIds } },
       select: { deviceId: true, ownerUserId: true },
     });
-    const foundDeviceIds = new Set(devices.map((device) => device.deviceId));
+    const foundDeviceIds = new Set(devices.map((device: SyncDevice) => device.deviceId));
     const missingDeviceIds = targetDeviceIds.filter((deviceId) => !foundDeviceIds.has(deviceId));
 
-    if (missingDeviceIds.length > 0 || devices.some((device) => !canAccessDevice(auth, device))) {
+    if (missingDeviceIds.length > 0 || devices.some((device: SyncDevice) => !canAccessDevice(auth, device))) {
       return NextResponse.json(
         {
           success: false,

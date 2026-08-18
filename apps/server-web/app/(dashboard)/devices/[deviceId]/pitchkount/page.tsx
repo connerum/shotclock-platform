@@ -449,7 +449,7 @@ export default function PitchKountPage() {
             <div className="mb-4 flex items-start justify-between gap-3">
               <div>
                 <div className="text-xs font-black uppercase tracking-[0.18em] text-purple-300">Saved players</div>
-                <p className="mt-1 text-sm text-white/50">Profiles are persisted per device and can be reloaded anytime.</p>
+              <p className="mt-1 text-sm text-white/50">Profiles are saved to your logged-in account and can be reloaded anytime.</p>
               </div>
             </div>
 

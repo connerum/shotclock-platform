@@ -11,6 +11,7 @@ import type {
   PracticeBoardState,
   PracticeBoardUnit,
   PracticeBoardWeather,
+  PracticeBoardSavedPreload,
 } from '@shotclock/shared/types';
 import { SyncTargetBanner, useDeviceCommandDispatcher } from '../../../SelectedDevicesProvider';
 import { PracticeBoardPreview } from './PracticeBoardPreview';
@@ -28,6 +29,14 @@ type DeviceResponse = {
     name: string;
     displayState?: { deviceMode?: DeviceMode };
   };
+};
+
+type PreloadsResponse = {
+  preloads: PracticeBoardSavedPreload[];
+};
+
+type PreloadResponse = {
+  preload: PracticeBoardSavedPreload;
 };
 
 const MAX_DRILLS_PER_UNIT = 12;
@@ -48,6 +57,12 @@ export default function PracticeBoardPage() {
   const [location, setLocation] = useState('');
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
+  const [preloadsLoading, setPreloadsLoading] = useState(true);
+  const [practiceBoardPreloads, setPracticeBoardPreloads] = useState<PracticeBoardSavedPreload[]>([]);
+  const [activePreloadId, setActivePreloadId] = useState<string | null>(null);
+  const [preloadActionId, setPreloadActionId] = useState<string | null>(null);
+  const [savingPreload, setSavingPreload] = useState(false);
+  const [preloadName, setPreloadName] = useState('');
   const [weatherLoading, setWeatherLoading] = useState(false);
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const [dirty, setDirty] = useState(false);
@@ -83,6 +98,28 @@ export default function PracticeBoardPage() {
     return () => {
       if (noticeTimer.current) clearTimeout(noticeTimer.current);
     };
+  }, [deviceId]);
+
+  const loadPreloads = async () => {
+    setPreloadsLoading(true);
+    try {
+      const response = await fetch(`/api/devices/${deviceId}/practice-board/preloads`, { cache: 'no-store' });
+      if (!response.ok) throw new Error('Unable to load saved preloads.');
+      const data = await response.json() as PreloadsResponse;
+      const preloads = Array.isArray(data.preloads) ? data.preloads : [];
+      setPracticeBoardPreloads(preloads);
+      if (!activePreloadId) {
+        setPreloadName('');
+      }
+    } catch (preloadError) {
+      setError(preloadError instanceof Error ? preloadError.message : 'Unable to load saved preloads.');
+    } finally {
+      setPreloadsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    void loadPreloads();
   }, [deviceId]);
 
   useEffect(() => {
@@ -163,6 +200,90 @@ export default function PracticeBoardPage() {
       next.remainingSeconds = active?.durationSeconds || 0;
     }
     void dispatchBoard(next, 'Practice board updated.');
+  };
+
+  const loadPreload = (preload: PracticeBoardSavedPreload) => {
+    const next = normalizeBoard(preload.board);
+    setBoard(next);
+    setNow(Date.now());
+    setDrills(next.drills.map(toEditableDrill));
+    setLocation(next.weather?.locationLabel || '');
+    setActivePreloadId(preload.id);
+    setPreloadName(preload.name);
+    setDirty(false);
+    showNotice(`Loaded ${preload.name}.`);
+  };
+
+  const syncPreloadToDisplay = async (preload: PracticeBoardSavedPreload) => {
+    const next = normalizeBoard(preload.board);
+    setBoard(next);
+    setDrills(next.drills.map(toEditableDrill));
+    setLocation(next.weather?.locationLabel || '');
+    setActivePreloadId(preload.id);
+    setPreloadName(preload.name);
+    setDirty(false);
+    await dispatchBoard(next, `${preload.name} sent to display.`);
+  };
+
+  const savePreload = async () => {
+    setSavingPreload(true);
+    setNotice(null);
+    setError(null);
+    try {
+      const next = boardWithCurrentDrills();
+      const outgoing = snapshotBoard(next);
+      const url = activePreloadId
+        ? `/api/devices/${deviceId}/practice-board/preloads/${activePreloadId}`
+        : `/api/devices/${deviceId}/practice-board/preloads`;
+      const method = activePreloadId ? 'PUT' : 'POST';
+
+      const response = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ board: outgoing, name: preloadName.trim() || undefined }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(data?.error || `Unable to ${activePreloadId ? 'update' : 'save'} practice board preload.`);
+      }
+
+      const saved = (data as PreloadResponse).preload;
+      setActivePreloadId(saved?.id ?? activePreloadId);
+      setPreloadName(saved?.name || preloadName.trim() || 'Practice preload');
+      setNotice(activePreloadId ? 'Practice preload updated.' : 'Practice preload saved.');
+      await loadPreloads();
+    } catch (preloadError) {
+      setError(preloadError instanceof Error ? preloadError.message : 'Unable to save practice board preload.');
+    } finally {
+      setSavingPreload(false);
+    }
+  };
+
+  const deletePreload = async (preloadId: string) => {
+    if (!window.confirm('Delete this saved practice preload?')) return;
+
+    setPreloadActionId(preloadId);
+    setError(null);
+    try {
+      const response = await fetch(`/api/devices/${deviceId}/practice-board/preloads/${preloadId}`, {
+        method: 'DELETE',
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(data?.error || 'Unable to delete preload.');
+      }
+
+      if (activePreloadId === preloadId) {
+        setActivePreloadId(null);
+        setPreloadName('');
+      }
+      setNotice('Practice preload deleted.');
+      await loadPreloads();
+    } catch (deleteError) {
+      setError(deleteError instanceof Error ? deleteError.message : 'Unable to delete practice preload.');
+    } finally {
+      setPreloadActionId(null);
+    }
   };
 
   const addDrill = () => {
@@ -699,6 +820,104 @@ export default function PracticeBoardPage() {
             <button type="button" onClick={() => advanceDrill(1)} disabled={sending || (activeDrill ? activeUnitDrills.length === 0 : unitDrills.length === 0)} className="rounded-lg border border-white/10 px-4 py-2.5 font-bold text-white/70 hover:bg-white/5 disabled:opacity-30">Complete & next</button>
           </div>
         </div>
+      </section>
+
+      <section className="cc-card mb-5 p-5">
+        <div className="mb-4">
+          <div className="text-xs font-black uppercase tracking-[0.16em] text-purple-300">Saved preloads</div>
+          <p className="mt-1 text-sm text-white/50">Saved to your account and shared across your devices when you are logged in.</p>
+        </div>
+
+        <div className="mb-4 grid gap-3 sm:grid-cols-[1fr_130px_130px]">
+          <label className="block">
+            <span className="text-xs font-black uppercase tracking-[0.12em] text-white/50">Preload name</span>
+            <input
+              value={preloadName}
+              onChange={(event) => setPreloadName(event.target.value)}
+              maxLength={64}
+              placeholder={activePreloadId ? 'Saved preload name' : 'Name this preload'}
+              className="mt-2 w-full rounded-lg px-4 py-3"
+            />
+          </label>
+          <button
+            type="button"
+            disabled={savingPreload || sending}
+            onClick={() => void savePreload()}
+            className="rounded-lg border border-green-500/35 bg-green-950/30 px-4 py-3 text-sm font-bold text-green-200 hover:bg-green-900/40 disabled:opacity-50"
+          >
+            {savingPreload
+              ? activePreloadId
+                ? 'Updating preload...'
+                : 'Saving preload...'
+              : activePreloadId
+                ? 'Update preload'
+                : 'Save preload'}
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setActivePreloadId(null);
+              setPreloadName('');
+              setDirty(false);
+            }}
+            className="rounded-lg border border-white/15 bg-white/5 px-4 py-3 text-sm font-bold text-white/80 hover:bg-white/10 disabled:opacity-50"
+          >
+            Start new preload
+          </button>
+        </div>
+
+        {preloadsLoading ? (
+          <div className="rounded border border-white/10 bg-black/20 px-4 py-6 text-sm text-white/60">Loading saved preloads...</div>
+        ) : practiceBoardPreloads.length === 0 ? (
+          <div className="rounded border border-white/10 bg-black/20 px-4 py-6 text-sm text-white/60">No saved preloads yet.</div>
+        ) : (
+          <div className="space-y-2">
+            {practiceBoardPreloads.map((preload) => {
+              const isActive = activePreloadId === preload.id;
+              const isBusy = preloadActionId === preload.id;
+              return (
+                <div
+                  key={preload.id}
+                  className={`rounded-lg border px-3 py-3 ${isActive ? 'border-violet-500/50 bg-violet-950/25' : 'border-white/10 bg-black/20'}`}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <div className="font-black">{preload.name}</div>
+                      <div className="text-sm text-white/65">
+                        {preload.board.drills.length} period{preload.board.drills.length === 1 ? '' : 's'}
+                      </div>
+                    </div>
+                    <div className="flex shrink-0 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => void loadPreload(preload)}
+                        className="rounded bg-white/10 px-2 py-1 text-xs font-semibold hover:bg-white/15"
+                      >
+                        Load
+                      </button>
+                      <button
+                        type="button"
+                        disabled={isBusy}
+                        onClick={() => void syncPreloadToDisplay(preload)}
+                        className="rounded bg-violet-600 px-2 py-1 text-xs font-semibold hover:bg-violet-500 disabled:opacity-50"
+                      >
+                        {isBusy ? 'Applying...' : 'Apply'}
+                      </button>
+                      <button
+                        type="button"
+                        disabled={isBusy}
+                        onClick={() => void deletePreload(preload.id)}
+                        className="rounded bg-red-600 px-2 py-1 text-xs font-semibold hover:bg-red-500 disabled:opacity-50"
+                      >
+                        {isBusy ? 'Deleting...' : 'Delete'}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </section>
 
       <div className="sticky bottom-4 mt-5 flex justify-end">

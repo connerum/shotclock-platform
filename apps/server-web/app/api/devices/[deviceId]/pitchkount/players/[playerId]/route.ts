@@ -2,12 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { canAccessDevice, requireApiUser } from '@/lib/auth';
 import {
-  clampPitchKountPlayers,
-  mergePitchKountDisplayState,
-  normalizePitchKountSavedPlayers,
-  parsePitchKountDisplayState,
-  serializePitchKountDisplayState,
-  PITCHKOUNT_PLAYERS_STORAGE_KEY,
+  buildPitchKountPlayerPayload,
+  PITCHKOUNT_PLAYERS_LIMIT,
 } from '@/lib/pitchkount-players';
 import { normalizePitchKountState, type PitchKountState } from '@shotclock/shared/types';
 
@@ -37,7 +33,7 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
 
     const device = await prisma.device.findUnique({
       where: { deviceId },
-      select: { ownerUserId: true, displayState: true },
+      select: { ownerUserId: true },
     });
 
     if (!device || !canAccessDevice(auth, device)) {
@@ -49,34 +45,35 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
       return NextResponse.json({ error: 'Missing or invalid pitcher state' }, { status: 400 });
     }
 
-    const players = normalizePitchKountSavedPlayers(device.displayState ? parsePitchKountDisplayState(device.displayState)?.[PITCHKOUNT_PLAYERS_STORAGE_KEY] : null, Date.now());
-    const now = Date.now();
-    const playerIndex = players.findIndex((player) => player.id === playerIdValue);
+    const updatedProfile = await prisma.savedPitchKountProfile.findUnique({
+      where: { id: playerIdValue },
+      select: { ownerUserId: true },
+    });
 
-    if (playerIndex === -1) {
+    if (!updatedProfile || updatedProfile.ownerUserId !== auth.id) {
       return NextResponse.json({ error: 'Player not found' }, { status: 404 });
     }
 
-    const updatedPlayer = {
-      ...players[playerIndex],
-      state: normalizedState,
-      updatedAt: now,
-    };
-    players[playerIndex] = updatedPlayer;
-
-    const nextDisplayState = mergePitchKountDisplayState(
-      parsePitchKountDisplayState(device.displayState),
-      { [PITCHKOUNT_PLAYERS_STORAGE_KEY]: clampPitchKountPlayers(players) }
-    );
-
-    await prisma.device.update({
-      where: { deviceId },
+    const payload = buildPitchKountPlayerPayload(normalizedState, Date.now(), playerIdValue);
+    const profile = await prisma.savedPitchKountProfile.update({
+      where: { id: playerIdValue },
       data: {
-        displayState: serializePitchKountDisplayState(nextDisplayState),
+        name: `${payload.state.pitcherName || 'Pitcher'} #${payload.state.pitcherNumber}`.trim().slice(0, 64),
+        state: JSON.stringify(payload.state),
       },
     });
 
-    return NextResponse.json({ success: true, player: updatedPlayer });
+    await prunePitchKountProfiles(auth.id);
+
+    return NextResponse.json({
+      success: true,
+      player: {
+        id: profile.id,
+        state: payload.state,
+        createdAt: profile.createdAt.getTime(),
+        updatedAt: profile.updatedAt.getTime(),
+      },
+    });
   } catch (error) {
     console.error('Error updating PitchKount player:', error);
     return NextResponse.json({ error: 'Failed to update PitchKount player' }, { status: 500 });
@@ -97,34 +94,23 @@ export async function DELETE(_request: NextRequest, { params }: RouteParams) {
 
     const device = await prisma.device.findUnique({
       where: { deviceId },
-      select: { ownerUserId: true, displayState: true },
+      select: { ownerUserId: true },
     });
 
     if (!device || !canAccessDevice(auth, device)) {
       return NextResponse.json({ error: 'Device not found' }, { status: 404 });
     }
 
-    const players = normalizePitchKountSavedPlayers(
-      parsePitchKountDisplayState(device.displayState)?.[PITCHKOUNT_PLAYERS_STORAGE_KEY],
-      Date.now()
-    );
-    const nextPlayers = players.filter((player) => player.id !== playerIdValue);
-
-    if (nextPlayers.length === players.length) {
-      return NextResponse.json({ error: 'Player not found' }, { status: 404 });
-    }
-
-    const nextDisplayState = mergePitchKountDisplayState(
-      parsePitchKountDisplayState(device.displayState),
-      { [PITCHKOUNT_PLAYERS_STORAGE_KEY]: nextPlayers }
-    );
-
-    await prisma.device.update({
-      where: { deviceId },
-      data: {
-        displayState: serializePitchKountDisplayState(nextDisplayState),
+    const removed = await prisma.savedPitchKountProfile.deleteMany({
+      where: {
+        id: playerIdValue,
+        ownerUserId: auth.id,
       },
     });
+
+    if (removed.count === 0) {
+      return NextResponse.json({ error: 'Player not found' }, { status: 404 });
+    }
 
     return NextResponse.json({ success: true, removedPlayerId: playerIdValue });
   } catch (error) {
@@ -141,4 +127,22 @@ function parsePlayerPayloadState(rawBody: { [key: string]: unknown }): PitchKoun
 function normalizePlayerId(value: string): string | null {
   const normalized = value.trim();
   return normalized.length > 0 && normalized.length <= 128 ? normalized : null;
+}
+
+async function prunePitchKountProfiles(ownerUserId: string) {
+  const excess = await prisma.savedPitchKountProfile.findMany({
+    where: { ownerUserId },
+    select: { id: true },
+    orderBy: { updatedAt: 'desc' },
+    skip: PITCHKOUNT_PLAYERS_LIMIT,
+  });
+
+  if (!excess.length) return;
+
+  await prisma.savedPitchKountProfile.deleteMany({
+    where: {
+      ownerUserId,
+      id: { in: excess.map((entry: { id: string }) => entry.id) },
+    },
+  });
 }

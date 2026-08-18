@@ -61,6 +61,14 @@ export interface PracticeBoardState {
   weather?: PracticeBoardWeather;
 }
 
+export interface PracticeBoardSavedPreload {
+  id: string;
+  name: string;
+  board: PracticeBoardState;
+  createdAt: number;
+  updatedAt: number;
+}
+
 export const PITCHKOUNT_PITCH_TYPES = [
   'Fastball',
   'Four-Seam',

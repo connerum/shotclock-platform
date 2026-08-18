@@ -6,6 +6,13 @@ import { prisma } from '@/lib/prisma';
 import { requireApiUser, scopedDeviceWhere } from '@/lib/auth';
 
 export async function GET() {
+  type DeviceRecord = Record<string, unknown> & {
+    displayProfile: string | null;
+    displayState: string | null;
+    calibrationData: string | null;
+    capabilities: string | null;
+  };
+
   try {
     const auth = await requireApiUser();
     if (auth instanceof Response) return auth;
@@ -23,12 +30,18 @@ export async function GET() {
     });
 
     // Parse JSON fields
-    const parsedDevices = devices.map(device => ({
+    const parsedDevices = devices.map((device: DeviceRecord) => ({
       ...device,
-      displayProfile: device.displayProfile ? JSON.parse(device.displayProfile) : null,
-      displayState: device.displayState ? JSON.parse(device.displayState) : null,
-      calibrationData: device.calibrationData ? JSON.parse(device.calibrationData) : null,
-      capabilities: JSON.parse(device.capabilities || '[]'),
+      displayProfile: typeof device.displayProfile === 'string' && device.displayProfile
+        ? JSON.parse(device.displayProfile)
+        : null,
+      displayState: typeof device.displayState === 'string' && device.displayState
+        ? JSON.parse(device.displayState)
+        : null,
+      calibrationData: typeof device.calibrationData === 'string' && device.calibrationData
+        ? JSON.parse(device.calibrationData)
+        : null,
+      capabilities: JSON.parse(typeof device.capabilities === 'string' ? device.capabilities : '[]'),
     }));
 
     return NextResponse.json({ devices: parsedDevices });
