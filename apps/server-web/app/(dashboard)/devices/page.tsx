@@ -211,7 +211,64 @@ export default function DevicesPage() {
             >
               <div className="flex justify-between items-start mb-4">
                 <div className="min-w-0 pr-3">
-                  <h3 className="break-words text-lg font-semibold">{device.name}</h3>
+                  {renamingDeviceId === device.deviceId ? (
+                    <form onSubmit={(event) => void saveRename(event, device.deviceId)}>
+                      <div className="flex items-center gap-1.5">
+                        <input
+                          id={`device-name-${device.deviceId}`}
+                          aria-label="Device name"
+                          value={renameValue}
+                          onChange={(event) => setRenameValue(event.target.value)}
+                          onKeyDown={(event) => {
+                            if (event.key === 'Escape' && !renameSaving) cancelRename();
+                          }}
+                          maxLength={64}
+                          autoFocus
+                          disabled={renameSaving}
+                          className="min-w-0 flex-1 rounded border border-blue-400/60 bg-black/35 px-2 py-1 text-lg font-semibold text-white outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-500/30 disabled:opacity-60"
+                        />
+                        <button
+                          type="submit"
+                          aria-label={`Save name for ${device.name}`}
+                          title="Save name"
+                          disabled={renameSaving || !renameValue.trim()}
+                          className="rounded-md p-1.5 text-green-300 transition-colors hover:bg-green-500/15 hover:text-green-200 focus:outline-none focus:ring-2 focus:ring-green-400/60 disabled:opacity-40"
+                        >
+                          <svg aria-hidden="true" viewBox="0 0 24 24" className="h-4 w-4 fill-none stroke-current stroke-2.5">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="m5 12 4 4L19 6" />
+                          </svg>
+                        </button>
+                        <button
+                          type="button"
+                          aria-label="Cancel renaming"
+                          title="Cancel"
+                          onClick={cancelRename}
+                          disabled={renameSaving}
+                          className="rounded-md p-1.5 text-gray-400 transition-colors hover:bg-white/10 hover:text-white focus:outline-none focus:ring-2 focus:ring-white/40 disabled:opacity-40"
+                        >
+                          <svg aria-hidden="true" viewBox="0 0 24 24" className="h-4 w-4 fill-none stroke-current stroke-2.5">
+                            <path strokeLinecap="round" d="M6 6 18 18M18 6 6 18" />
+                          </svg>
+                        </button>
+                      </div>
+                      {renameError && <p className="mt-1 text-xs text-red-300">{renameError}</p>}
+                    </form>
+                  ) : (
+                    <div className="flex items-start gap-1.5">
+                      <h3 className="break-words text-lg font-semibold">{device.name}</h3>
+                      <button
+                        type="button"
+                        onClick={() => beginRename(device)}
+                        aria-label={`Edit device name for ${device.name}`}
+                        title="Edit device name"
+                        className="mt-0.5 shrink-0 rounded-md p-1 text-gray-400 transition-colors hover:bg-white/10 hover:text-white focus:outline-none focus:ring-2 focus:ring-blue-400/60"
+                      >
+                        <svg aria-hidden="true" viewBox="0 0 24 24" className="h-4 w-4 fill-none stroke-current stroke-2">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="m15.2 5.2 3.6 3.6M4 20l4.4-1 10.4-10.4a2.55 2.55 0 0 0-3.6-3.6L4.8 15.4 4 20Z" />
+                        </svg>
+                      </button>
+                    </div>
+                  )}
                   <p className="text-sm text-gray-400 font-mono">{device.deviceId}</p>
                 </div>
                 <span
@@ -221,49 +278,6 @@ export default function DevicesPage() {
                   {device.status}
                 </span>
               </div>
-
-              {renamingDeviceId === device.deviceId ? (
-                <form onSubmit={(event) => void saveRename(event, device.deviceId)} className="mb-4 rounded-lg border border-blue-500/30 bg-blue-950/25 p-3">
-                  <label htmlFor={`device-name-${device.deviceId}`} className="mb-1 block text-xs font-semibold uppercase tracking-wide text-blue-200">
-                    Device name
-                  </label>
-                  <input
-                    id={`device-name-${device.deviceId}`}
-                    value={renameValue}
-                    onChange={(event) => setRenameValue(event.target.value)}
-                    maxLength={64}
-                    autoFocus
-                    disabled={renameSaving}
-                    className="w-full rounded border border-white/15 bg-black/35 px-3 py-2 text-sm text-white outline-none focus:border-blue-400 disabled:opacity-60"
-                  />
-                  {renameError && <p className="mt-2 text-xs text-red-300">{renameError}</p>}
-                  <div className="mt-3 flex gap-2">
-                    <button
-                      type="submit"
-                      disabled={renameSaving || !renameValue.trim()}
-                      className="cc-btn cc-btn-primary flex-1 px-3 py-2 text-sm disabled:opacity-50"
-                    >
-                      {renameSaving ? 'Saving...' : 'Save Name'}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={cancelRename}
-                      disabled={renameSaving}
-                      className="cc-btn cc-btn-secondary px-3 py-2 text-sm disabled:opacity-50"
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                </form>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => beginRename(device)}
-                  className="cc-btn cc-btn-secondary mb-4 w-full px-3 py-2 text-sm"
-                >
-                  Rename Device
-                </button>
-              )}
 
               <label className="mb-4 flex cursor-pointer items-center gap-3 rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2">
                 <input
