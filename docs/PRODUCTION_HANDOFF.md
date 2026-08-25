@@ -40,7 +40,7 @@ sudo journalctl -u shotclock-agent -u shotclock-kiosk --since today
 
 ## Recovery when normal WiFi is unavailable
 
-The display preserves saved NetworkManager profiles. After two minutes without a usable WiFi address it starts `Shotclock-Setup-aa8f34`; its unique password is in `maintenance-ap-password.txt` in the handoff vault. A nearby operator can join that network without opening the LED panel, browse to `http://192.168.4.1:8080`, and select replacement WiFi. While connected to the maintenance AP, SSH is also available at `192.168.4.1` with the vaulted Pi key. SSH password login is disabled on both production machines; the old bootstrap password is not a remote access path.
+The display preserves saved NetworkManager profiles. After two minutes without a usable WiFi address it starts `Shotclock-Setup-aa8f34`; its unique 12-character password is in `maintenance-ap-password.txt` in the handoff vault. A nearby operator can join that network without opening the LED panel, browse to `http://192.168.4.1:8080`, and select replacement WiFi. While connected to the maintenance AP, SSH is also available at `192.168.4.1` with the vaulted Pi key. SSH password login is disabled on both production machines; the old bootstrap password is not a remote access path.
 
 No remote software can connect to a device that has no radio, wired, or cellular path at all. The maintenance AP removes the need to touch or open the embedded Pi, while the reverse tunnel removes router/port-forwarding dependencies whenever any Internet path is present.
 

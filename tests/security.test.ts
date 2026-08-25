@@ -1,9 +1,15 @@
 import assert from 'node:assert/strict';
-import { readFile } from 'node:fs/promises';
+import { mkdtemp, readFile, writeFile } from 'node:fs/promises';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import test from 'node:test';
 import { hashDeviceToken, hashPassword, verifyDeviceToken, verifyPassword } from '../apps/server-web/lib/auth';
 import { getBearerToken, tokenMatchesHash } from '../apps/server-web/lib/device-auth';
 import { normalizeChecksum } from '../apps/pi-agent/src/update-manager';
+
+const execFileAsync = promisify(execFile);
 
 test('password hashes are salted and verifiable', async () => {
   const first = await hashPassword('a-long-production-password');
@@ -41,4 +47,32 @@ test('the local update API reports updater failures', async () => {
   const localApi = await readFile(new URL('../apps/pi-agent/src/local-api.ts', import.meta.url), 'utf8');
   assert.match(localApi, /const result = await updateManager\.installUpdate\(version\)/);
   assert.match(localApi, /if \(!result\.success\)/);
+});
+
+test('Pi maintenance passwords are short, secure, and migrated without changing custom values', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'shotclock-secrets-'));
+  const envFile = join(directory, '.env');
+  const script = new URL('../scripts/manage-device-secrets.sh', import.meta.url);
+
+  await writeFile(envFile, 'SETUP_AP_PASSWORD=replace-with-unique-maintenance-password\nDEVICE_AUTH_TOKEN=replace-with-device-token\n');
+  await execFileAsync('bash', [script.pathname, '--env-file', envFile]);
+
+  const generated = await readFile(envFile, 'utf8');
+  const generatedApPassword = generated.match(/^SETUP_AP_PASSWORD=(.+)$/m)?.[1];
+  const generatedDeviceToken = generated.match(/^DEVICE_AUTH_TOKEN=(.+)$/m)?.[1];
+  assert.match(generatedApPassword || '', /^[0-9a-f]{12}$/);
+  assert.match(generatedDeviceToken || '', /^[0-9a-f]{64}$/);
+
+  await execFileAsync('bash', [script.pathname, '--env-file', envFile, '--migrate-legacy-ap-password']);
+  assert.equal(await readFile(envFile, 'utf8'), generated);
+
+  await writeFile(envFile, `SETUP_AP_PASSWORD=${'a'.repeat(32)}\nDEVICE_AUTH_TOKEN=${generatedDeviceToken}\n`);
+  await execFileAsync('bash', [script.pathname, '--env-file', envFile, '--migrate-legacy-ap-password']);
+  const migrated = await readFile(envFile, 'utf8');
+  assert.match(migrated.match(/^SETUP_AP_PASSWORD=(.+)$/m)?.[1] || '', /^[0-9a-f]{12}$/);
+  assert.match(migrated, new RegExp(`^DEVICE_AUTH_TOKEN=${generatedDeviceToken}$`, 'm'));
+
+  await writeFile(envFile, `SETUP_AP_PASSWORD=custom-field-password\nDEVICE_AUTH_TOKEN=${generatedDeviceToken}\n`);
+  await execFileAsync('bash', [script.pathname, '--env-file', envFile, '--migrate-legacy-ap-password']);
+  assert.match(await readFile(envFile, 'utf8'), /^SETUP_AP_PASSWORD=custom-field-password$/m);
 });
