@@ -14,6 +14,7 @@ WorkingDirectory=/opt/shotclock/current
 Environment=NODE_ENV=production
 Environment=HOME=/home/shotclock
 EnvironmentFile=/opt/shotclock/shared/.env
+ExecStartPre=/bin/bash /opt/shotclock/current/scripts/manage-device-secrets.sh --env-file /opt/shotclock/shared/.env --migrate-legacy-ap-password
 ExecStartPre=/bin/bash /opt/shotclock/current/scripts/wait-for-network.sh
 ExecStart=/usr/bin/node /opt/shotclock/current/apps/pi-agent/dist/index.js
 Restart=always
