@@ -7,9 +7,12 @@ This document is the operational source of truth for the production server and e
 | Component | Address | Service |
 | --- | --- | --- |
 | Dashboard/API | `https://courtcast.safety-linq.com` | `courtcast.service` on `5.161.109.106` |
+| Display 40091 | device `shotclock-1e4b353c` | `shotclock-agent`, `shotclock-kiosk` |
+| Display 40091 support tunnel | server loopback `127.0.0.1:44094` | `shotclock-remote-support` |
 | Display 40092 | device `shotclock-aa8f34d0` | `shotclock-agent`, `shotclock-kiosk` |
-| Display support tunnel | server loopback `127.0.0.1:44092` | `shotclock-remote-support` |
-| Display maintenance AP | `Shotclock-Setup-aa8f34` | portal at `http://192.168.4.1:8080` |
+| Display 40092 support tunnel | server loopback `127.0.0.1:44092` | `shotclock-remote-support` |
+| Display 40100 | device `shotclock-95e17086` | `shotclock-agent`, `shotclock-kiosk` |
+| Display 40100 support tunnel | server loopback `127.0.0.1:44100` | `shotclock-remote-support` |
 
 ## Routine health checks
 
@@ -32,7 +35,7 @@ sudo systemctl start courtcast-backup
 Display checks, using the outbound support tunnel (works whenever the display has Internet access):
 
 ```bash
-ssh -F .handoff-vault/ssh-config display-40092-via-server
+ssh -F .handoff-vault/ssh-config display-40100-via-server
 sudo systemctl status shotclock-agent shotclock-kiosk shotclock-remote-support shotclock-backup.timer
 curl -fsS http://127.0.0.1:3001/local/health
 sudo journalctl -u shotclock-agent -u shotclock-kiosk --since today
@@ -40,7 +43,7 @@ sudo journalctl -u shotclock-agent -u shotclock-kiosk --since today
 
 ## Recovery when normal WiFi is unavailable
 
-The display preserves saved NetworkManager profiles. After two minutes without a usable WiFi address it starts `Shotclock-Setup-aa8f34`; its unique 12-character password is in `maintenance-ap-password.txt` in the handoff vault. A nearby operator can join that network without opening the LED panel, browse to `http://192.168.4.1:8080`, and select replacement WiFi. While connected to the maintenance AP, SSH is also available at `192.168.4.1` with the vaulted Pi key. SSH password login is disabled on both production machines; the old bootstrap password is not a remote access path.
+Each display preserves saved NetworkManager profiles. After two minutes without a usable WiFi address it starts its maintenance network: `Shotclock-Setup-1e4b35` for 40091, `Shotclock-Setup-aa8f34` for 40092, or `Shotclock-Setup-95e170` for 40100. Each unique 12-character password is in the corresponding maintenance-AP password file in the handoff vault. A nearby operator can join that network without opening the LED panel, browse to `http://192.168.4.1:8080`, and select replacement WiFi. While connected to the maintenance AP, SSH is also available at `192.168.4.1` with the vaulted Pi key. SSH password login is disabled on all production machines; old bootstrap passwords are not remote access paths.
 
 No remote software can connect to a device that has no radio, wired, or cellular path at all. The maintenance AP removes the need to touch or open the embedded Pi, while the reverse tunnel removes router/port-forwarding dependencies whenever any Internet path is present.
 
@@ -48,7 +51,7 @@ No remote software can connect to a device that has no radio, wired, or cellular
 
 - Server: daily SQLite-consistent database, environment, Caddy, service, and media archives under `/var/backups/courtcast`, retained 30 days. Readiness fails if the last successful backup is older than 36 hours.
 - Display: daily state, WiFi profile, configuration, and service archives under `/opt/shotclock/backups`, retained 14 days.
-- Initial verified recovery archives are also in `.handoff-vault/backups` off the two machines.
+- Initial verified recovery archives are also in `.handoff-vault/backups` off the production machines.
 - Server releases are immutable under `/opt/courtcast/releases`; `/opt/courtcast/current` is the active atomic symlink.
 - Display releases are immutable under `/opt/shotclock/releases`; its updater automatically restores the previous symlink if the agent, kiosk, or local health check fails.
 
