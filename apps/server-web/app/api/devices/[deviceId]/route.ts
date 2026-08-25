@@ -4,6 +4,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { canAccessDevice, requireApiUser } from '@/lib/auth';
+import { getRequestIp, writeAuditLog } from '@/lib/audit';
+import { normalizeDeviceLabel } from '@/lib/device-label';
+import { enforceRateLimit, requireJson } from '@/lib/request-security';
 
 interface RouteParams {
   params: Promise<{ deviceId: string }>;
@@ -73,12 +76,26 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     const auth = await requireApiUser();
     if (auth instanceof Response) return auth;
 
+    const limited = enforceRateLimit(request, 'device-update', 60, 60 * 1000);
+    if (limited) return limited;
+    const invalidContentType = requireJson(request);
+    if (invalidContentType) return invalidContentType;
+
     const { deviceId } = await params;
     const body = await request.json();
 
     const updateData: any = {};
-    
-    if (body.name !== undefined) updateData.name = body.name;
+
+    if (body.name !== undefined) {
+      try {
+        updateData.name = normalizeDeviceLabel(body.name);
+      } catch (error) {
+        return NextResponse.json(
+          { error: error instanceof Error ? error.message : 'Invalid device name' },
+          { status: 400 }
+        );
+      }
+    }
     if (body.venueId !== undefined) updateData.venueId = body.venueId;
     if (body.organizationId !== undefined) updateData.organizationId = body.organizationId;
     if (body.controllerType !== undefined) updateData.controllerType = body.controllerType;
@@ -88,7 +105,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
 
     const existingDevice = await prisma.device.findUnique({
       where: { deviceId },
-      select: { ownerUserId: true },
+      select: { ownerUserId: true, name: true },
     });
 
     if (!existingDevice || !canAccessDevice(auth, existingDevice)) {
@@ -103,6 +120,17 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
         venue: true,
       },
     });
+
+    if (updateData.name !== undefined && updateData.name !== existingDevice.name) {
+      await writeAuditLog({
+        actor: auth,
+        action: 'device.renamed',
+        targetType: 'Device',
+        targetId: deviceId,
+        details: { previousName: existingDevice.name, name: updateData.name },
+        ipAddress: getRequestIp(request),
+      });
+    }
 
     return NextResponse.json({ device });
   } catch (error) {

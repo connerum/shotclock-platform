@@ -2,7 +2,7 @@
 
 // Device list page with real data fetching
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import Link from 'next/link';
 import { useSelectedDevices } from '../SelectedDevicesProvider';
 
@@ -22,6 +22,10 @@ export default function DevicesPage() {
   const [devices, setDevices] = useState<Device[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [renamingDeviceId, setRenamingDeviceId] = useState<string | null>(null);
+  const [renameValue, setRenameValue] = useState('');
+  const [renameError, setRenameError] = useState<string | null>(null);
+  const [renameSaving, setRenameSaving] = useState(false);
   const {
     selectedDeviceIds,
     isHydrated,
@@ -71,6 +75,45 @@ export default function DevicesPage() {
     if (minutes < 60) return `${minutes}m ago`;
     if (minutes < 1440) return `${Math.floor(minutes / 60)}h ago`;
     return date.toLocaleDateString();
+  };
+
+  const beginRename = (device: Device) => {
+    setRenamingDeviceId(device.deviceId);
+    setRenameValue(device.name);
+    setRenameError(null);
+  };
+
+  const cancelRename = () => {
+    setRenamingDeviceId(null);
+    setRenameValue('');
+    setRenameError(null);
+  };
+
+  const saveRename = async (event: FormEvent<HTMLFormElement>, deviceId: string) => {
+    event.preventDefault();
+    setRenameSaving(true);
+    setRenameError(null);
+
+    try {
+      const response = await fetch(`/api/devices/${deviceId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: renameValue }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(data.error || `Rename failed with HTTP ${response.status}`);
+      }
+
+      setDevices((current) => current.map((device) => (
+        device.deviceId === deviceId ? { ...device, name: data.device.name } : device
+      )));
+      cancelRename();
+    } catch (renameFailure) {
+      setRenameError(renameFailure instanceof Error ? renameFailure.message : 'Failed to rename device');
+    } finally {
+      setRenameSaving(false);
+    }
   };
 
   const selectedDeviceDetails = selectedDeviceIds.map((deviceId) => {
@@ -167,8 +210,8 @@ export default function DevicesPage() {
               className={`cc-card p-6 ${isSelected(device.deviceId) ? 'ring-2 ring-blue-500/60' : ''}`}
             >
               <div className="flex justify-between items-start mb-4">
-                <div>
-                  <h3 className="text-lg font-semibold">{device.name}</h3>
+                <div className="min-w-0 pr-3">
+                  <h3 className="break-words text-lg font-semibold">{device.name}</h3>
                   <p className="text-sm text-gray-400 font-mono">{device.deviceId}</p>
                 </div>
                 <span
@@ -178,6 +221,49 @@ export default function DevicesPage() {
                   {device.status}
                 </span>
               </div>
+
+              {renamingDeviceId === device.deviceId ? (
+                <form onSubmit={(event) => void saveRename(event, device.deviceId)} className="mb-4 rounded-lg border border-blue-500/30 bg-blue-950/25 p-3">
+                  <label htmlFor={`device-name-${device.deviceId}`} className="mb-1 block text-xs font-semibold uppercase tracking-wide text-blue-200">
+                    Device name
+                  </label>
+                  <input
+                    id={`device-name-${device.deviceId}`}
+                    value={renameValue}
+                    onChange={(event) => setRenameValue(event.target.value)}
+                    maxLength={64}
+                    autoFocus
+                    disabled={renameSaving}
+                    className="w-full rounded border border-white/15 bg-black/35 px-3 py-2 text-sm text-white outline-none focus:border-blue-400 disabled:opacity-60"
+                  />
+                  {renameError && <p className="mt-2 text-xs text-red-300">{renameError}</p>}
+                  <div className="mt-3 flex gap-2">
+                    <button
+                      type="submit"
+                      disabled={renameSaving || !renameValue.trim()}
+                      className="cc-btn cc-btn-primary flex-1 px-3 py-2 text-sm disabled:opacity-50"
+                    >
+                      {renameSaving ? 'Saving...' : 'Save Name'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={cancelRename}
+                      disabled={renameSaving}
+                      className="cc-btn cc-btn-secondary px-3 py-2 text-sm disabled:opacity-50"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </form>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => beginRename(device)}
+                  className="cc-btn cc-btn-secondary mb-4 w-full px-3 py-2 text-sm"
+                >
+                  Rename Device
+                </button>
+              )}
 
               <label className="mb-4 flex cursor-pointer items-center gap-3 rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2">
                 <input

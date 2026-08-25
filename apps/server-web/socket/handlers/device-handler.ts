@@ -3,6 +3,7 @@
 import type { TypedSocket, TypedServer } from '../server.js';
 import type { DeviceMode, HelloPayload, HeartbeatPayload, UpdateStatusPayload } from '@shotclock/shared/types';
 import { PrismaClient } from '@prisma/client';
+import { resolveAuthoritativeDeviceLabel } from '../../lib/device-label.js';
 
 const prisma = new PrismaClient();
 
@@ -23,6 +24,7 @@ export function setupDeviceHandlers(socket: TypedSocket, io: TypedServer): void 
       const shouldAcceptPairingCode = Boolean(data.pairingCode) &&
         (!existingDevice?.ownerUserId || existingDevice.status !== 'paired');
       const isPaired = isDevicePaired(existingDevice) && !shouldAcceptPairingCode;
+      const deviceName = resolveAuthoritativeDeviceLabel(data.deviceName, existingDevice?.name, isPaired);
       const storedDisplayProfile = parseJsonField(existingDevice?.displayProfile);
       const storedCalibrationData = parseJsonField(existingDevice?.calibrationData);
       const storedDisplayState = parseJsonField(existingDevice?.displayState);
@@ -38,7 +40,9 @@ export function setupDeviceHandlers(socket: TypedSocket, io: TypedServer): void 
       const device = await prisma.device.upsert({
         where: { deviceId: data.deviceId },
         update: {
-          name: data.deviceName,
+          // Once paired, the account label is authoritative. The Pi may still
+          // report its factory name and must not undo a user rename on reconnect.
+          name: deviceName,
           firmwareVersion: data.firmwareVersion,
           controllerType: data.controllerType,
           capabilities: JSON.stringify(data.capabilities || []),
@@ -76,7 +80,7 @@ export function setupDeviceHandlers(socket: TypedSocket, io: TypedServer): void 
       // Join device room for targeted messaging
       socket.join(`device:${data.deviceId}`);
       socket.data.deviceId = data.deviceId;
-      socket.data.deviceName = data.deviceName;
+      socket.data.deviceName = device.name;
       socket.data.firmwareVersion = data.firmwareVersion;
       
       // Send initial config to device after hello
