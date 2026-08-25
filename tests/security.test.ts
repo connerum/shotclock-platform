@@ -76,3 +76,11 @@ test('Pi maintenance passwords are short, secure, and migrated without changing 
   await execFileAsync('bash', [script.pathname, '--env-file', envFile, '--migrate-legacy-ap-password']);
   assert.match(await readFile(envFile, 'utf8'), /^SETUP_AP_PASSWORD=custom-field-password$/m);
 });
+
+test('the Pi agent migrates legacy maintenance credentials before startup', async () => {
+  const service = await readFile(new URL('../systemd/shotclock-agent.service', import.meta.url), 'utf8');
+  assert.match(
+    service,
+    /ExecStartPre=\/bin\/bash \/opt\/shotclock\/current\/scripts\/manage-device-secrets\.sh --env-file \/opt\/shotclock\/shared\/\.env --migrate-legacy-ap-password/
+  );
+});
