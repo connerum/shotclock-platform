@@ -43,6 +43,13 @@ test ! -e "$destination"
 mv "$source_dir" "$destination"
 chmod 755 "$destination/scripts/"*.sh
 
+# Fresh installs and older production boards used a 32-character generated AP
+# password. Keep custom values intact, but make the recognizable legacy format
+# practical to type during field recovery before the new services are started.
+bash "$destination/scripts/manage-device-secrets.sh" \
+  --env-file /opt/shotclock/shared/.env \
+  --migrate-legacy-ap-password
+
 previous="$(readlink -f "$current_link")"
 ln -s "$destination" "${current_link}.next"
 mv -Tf "${current_link}.next" "$current_link"

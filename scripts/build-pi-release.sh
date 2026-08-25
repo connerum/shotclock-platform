@@ -28,7 +28,7 @@ for package in shared display-core sports-core; do
   cp "packages/$package/package.json" "$stage/packages/$package/package.json"
 done
 cp package.json pnpm-lock.yaml pnpm-workspace.yaml "$stage/"
-cp scripts/launch-kiosk.sh scripts/wait-for-network.sh scripts/apply-pi-update.sh scripts/backup-pi.sh scripts/install-pi.sh "$stage/scripts/"
+cp scripts/launch-kiosk.sh scripts/wait-for-network.sh scripts/apply-pi-update.sh scripts/backup-pi.sh scripts/install-pi.sh scripts/manage-device-secrets.sh "$stage/scripts/"
 cp systemd/shotclock-agent.service systemd/shotclock-kiosk.service systemd/shotclock-backup.service systemd/shotclock-backup.timer systemd/shotclock-remote-support.service "$stage/systemd/"
 printf '%s\n' "$version" > "$stage/VERSION"
 

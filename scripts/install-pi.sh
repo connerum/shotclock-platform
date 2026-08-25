@@ -146,28 +146,7 @@ ensure_env_default "KIOSK_HIDE_CURSOR" "true"
 ensure_env_default "PI5_PSU_MAX_CURRENT" "5000"
 ensure_env_default "PI5_AUTO_BOOT_ON_POWER" "true"
 
-ensure_generated_secret() {
-  local key="$1"
-  local bytes="$2"
-  local env_file="/opt/shotclock/shared/.env"
-  local current=""
-
-  current="$(grep "^${key}=" "$env_file" 2>/dev/null | tail -n 1 | cut -d= -f2- || true)"
-  if [ -z "$current" ] || [[ "$current" == replace-* ]] || [[ "$current" == development-* ]]; then
-    if ! command -v openssl >/dev/null 2>&1; then
-      apt-get install -y openssl
-    fi
-    sed -i "/^${key}=/d" "$env_file"
-    printf '%s=%s\n' "$key" "$(openssl rand -hex "$bytes")" >> "$env_file"
-    echo "Generated unique ${key}"
-  else
-    echo "${key} already has a device-specific value"
-  fi
-}
-
-ensure_generated_secret "SETUP_AP_PASSWORD" 16
-ensure_generated_secret "DEVICE_AUTH_TOKEN" 32
-chmod 600 /opt/shotclock/shared/.env
+bash "${SCRIPT_DIR}/manage-device-secrets.sh" --env-file /opt/shotclock/shared/.env
 
 echo ""
 echo "[8/${TOTAL_STEPS}] Configuring Raspberry Pi 5 embedded power override..."
