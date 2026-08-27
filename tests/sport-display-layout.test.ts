@@ -257,19 +257,19 @@ test('three-panel indices support offset, mirrored, and reset-driven behavior', 
     playlistLength: 2,
     timedCursor: 99,
     primaryResetSequence: 0,
-  }), { firstIndex: 0, secondIndex: 1 });
+  }), { firstIndex: 0, secondIndex: 0 });
   assert.deepEqual(getThreePanelAdIndices({
     adMode: 'offset-on-timer-reset',
     playlistLength: 2,
     timedCursor: 99,
     primaryResetSequence: 1,
-  }), { firstIndex: 1, secondIndex: 0 });
+  }), { firstIndex: 1, secondIndex: 1 });
   assert.deepEqual(getThreePanelAdIndices({
     adMode: 'offset-on-timer-reset',
     playlistLength: 3,
     timedCursor: 0,
     primaryResetSequence: 4,
-  }), { firstIndex: 1, secondIndex: 2 });
+  }), { firstIndex: 1, secondIndex: 1 });
   assert.deepEqual(getThreePanelAdIndices({
     adMode: 'mirrored-timed',
     playlistLength: 1,

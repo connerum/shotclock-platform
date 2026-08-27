@@ -31,9 +31,9 @@ export function getThreePanelAdIndices({
 
   return {
     firstIndex: baseIndex,
-    secondIndex: adMode === 'mirrored-timed'
-      ? baseIndex
-      : (baseIndex + 1) % playlistLength,
+    secondIndex: adMode === 'offset-timed'
+      ? (baseIndex + 1) % playlistLength
+      : baseIndex,
   };
 }
 

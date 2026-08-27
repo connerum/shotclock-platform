@@ -40,8 +40,8 @@ const AD_MODE_OPTIONS: Array<{
   },
   {
     value: 'offset-on-timer-reset',
-    label: 'Two Ads · On Reset',
-    description: 'Two ads stay fixed and advance once when the sport timer is reset.',
+    label: 'Mirrored · On Reset',
+    description: 'The same ad stays fixed on both outer panels and advances once when the sport timer is reset.',
     requiresAdvancedCapability: true,
   },
 ];
@@ -218,7 +218,7 @@ function getAdSummary(
     return `${activeAdCount} active ads · mirrored and rotating together every ${SPORT_AD_ROTATION_INTERVAL_MS / 1000} seconds`;
   }
   if (adMode === 'offset-on-timer-reset') {
-    return `${activeAdCount} active ads · two stay fixed and advance once per timer reset`;
+    return `${activeAdCount} active ads · mirrored and advancing once per timer reset`;
   }
   return `${activeAdCount} active ads · two rotate every ${SPORT_AD_ROTATION_INTERVAL_MS / 1000} seconds`;
 }
