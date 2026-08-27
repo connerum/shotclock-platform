@@ -5,7 +5,7 @@ version="${1:?usage: scripts/build-pi-release.sh X.Y.Z}"
 [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 output_dir="$repo_root/releases"
-stage_root="$(mktemp -d)"
+stage_root="$(mktemp -d "${TMPDIR:-/tmp}/shotclock-pi-release.XXXXXX")"
 stage="$stage_root/$version"
 trap 'rm -rf "$stage_root"' EXIT
 
