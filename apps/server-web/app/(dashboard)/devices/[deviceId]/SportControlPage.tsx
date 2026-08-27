@@ -222,7 +222,7 @@ export default function SportControlPage({ deviceId, config }: { deviceId: strin
   });
 
   const resolveSportDisplayLayout = (
-    layoutType = sportDisplayLayoutType,
+    layoutType: SportDisplayLayout['type'] | null = sportDisplayLayoutType ?? null,
     adMode = sportDisplayAdMode,
     adPosition = sportDisplayAdPosition
   ): SportDisplayLayout | undefined => {
@@ -245,7 +245,7 @@ export default function SportControlPage({ deviceId, config }: { deviceId: strin
   };
 
   const buildSportMode = (
-    layoutType = sportDisplayLayoutType,
+    layoutType: SportDisplayLayout['type'] | null = sportDisplayLayoutType ?? null,
     adMode = sportDisplayAdMode,
     adPosition = sportDisplayAdPosition
   ): DeviceMode => {
@@ -291,7 +291,7 @@ export default function SportControlPage({ deviceId, config }: { deviceId: strin
     }
     setSportDisplayLayoutType(layoutType);
     setLayoutSaving(true);
-    const mode = buildSportMode(layoutType);
+    const mode = buildSportMode(layoutType ?? null);
     const success = await sendCommand('set_mode', { mode });
     if (!success) {
       setSportDisplayLayoutType(previousValue);

@@ -423,7 +423,7 @@ export default function BasketballPage() {
   });
 
   const resolveSportDisplayLayout = (
-    layoutType = sportDisplayLayoutType,
+    layoutType: SportDisplayLayout['type'] | null = sportDisplayLayoutType ?? null,
     adMode = sportDisplayAdMode,
     adPosition = sportDisplayAdPosition
   ): SportDisplayLayout | undefined => {
@@ -447,7 +447,7 @@ export default function BasketballPage() {
 
   const buildBasketballMode = (
     mode: BasketballPreviewMode = previewMode,
-    layoutType = sportDisplayLayoutType,
+    layoutType: SportDisplayLayout['type'] | null = sportDisplayLayoutType ?? null,
     adMode = sportDisplayAdMode,
     adPosition = sportDisplayAdPosition
   ): DeviceMode => {
@@ -470,7 +470,7 @@ export default function BasketballPage() {
     }
     setSportDisplayLayoutType(layoutType);
     setLayoutSaving(true);
-    const mode = buildBasketballMode(previewMode, layoutType);
+    const mode = buildBasketballMode(previewMode, layoutType ?? null);
     const success = await sendCommand('set_mode', { mode });
     if (!success) {
       setSportDisplayLayoutType(previousValue);
