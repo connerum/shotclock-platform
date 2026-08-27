@@ -10,12 +10,14 @@ import {
   runSerializedDeviceCommand,
   runSerializedDeviceCommands,
   runSerializedDevicePersistence,
+  sportDisplayLayoutRotatesOnTimerReset,
   sportDisplayLayoutUsesAdvancedBehavior,
   stripPrimaryResetMetadata,
 } from '../apps/server-web/lib/device-command';
 import { createDefaultTimerState, normalizeTimerState } from '../packages/shared/src/timer/index';
 import {
   THREE_PANEL_SPORTS_ADS_CAPABILITY,
+  TWO_PANEL_RESET_ADS_CAPABILITY,
   TWO_PANEL_SPORTS_AD_CAPABILITY,
 } from '../packages/shared/src/types/index';
 import { getThreePanelAdIndices } from '../apps/pi-kiosk/src/components/three-panel-ad-behavior';
@@ -140,9 +142,13 @@ test('display capabilities are parsed defensively for rollout gating', () => {
   assert.equal(deviceSupportsCapability(['timer'], 'three-panel-sports-ads'), false);
   assert.equal(deviceSupportsCapability('{bad json', 'three-panel-sports-ads'), false);
   assert.equal(deviceSupportsSportDisplayLayout(
-    [TWO_PANEL_SPORTS_AD_CAPABILITY],
+    [TWO_PANEL_SPORTS_AD_CAPABILITY, TWO_PANEL_RESET_ADS_CAPABILITY],
     { type: 'two-panel', adPlaylist: [] }
   ), true);
+  assert.equal(deviceSupportsSportDisplayLayout(
+    [TWO_PANEL_SPORTS_AD_CAPABILITY],
+    { type: 'two-panel', adPlaylist: [] }
+  ), false);
   assert.equal(deviceSupportsSportDisplayLayout(
     [THREE_PANEL_SPORTS_ADS_CAPABILITY],
     { type: 'two-panel', adPlaylist: [] }
@@ -307,6 +313,13 @@ test('three-panel ad behaviors are normalized and advanced modes are capability-
   assert.equal(sportDisplayLayoutUsesAdvancedBehavior(mirrored ?? undefined), true);
   assert.equal(sportDisplayLayoutUsesAdvancedBehavior(resetDriven ?? undefined), true);
   assert.equal(sportDisplayLayoutUsesAdvancedBehavior(invalid ?? undefined), false);
+  assert.equal(sportDisplayLayoutRotatesOnTimerReset({
+    type: 'two-panel',
+    adPosition: 'end',
+    adPlaylist: [],
+  }), true);
+  assert.equal(sportDisplayLayoutRotatesOnTimerReset(resetDriven ?? undefined), true);
+  assert.equal(sportDisplayLayoutRotatesOnTimerReset(mirrored ?? undefined), false);
 });
 
 test('three-panel indices support offset, mirrored, and reset-driven behavior', () => {

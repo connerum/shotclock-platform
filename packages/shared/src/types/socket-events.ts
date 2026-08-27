@@ -10,6 +10,7 @@ export type SportType = 'basketball' | 'wrestling' | 'volleyball';
 export const THREE_PANEL_SPORTS_ADS_CAPABILITY = 'three-panel-sports-ads';
 export const THREE_PANEL_AD_BEHAVIORS_CAPABILITY = 'three-panel-ad-behaviors';
 export const TWO_PANEL_SPORTS_AD_CAPABILITY = 'two-panel-sports-ad';
+export const TWO_PANEL_RESET_ADS_CAPABILITY = 'two-panel-reset-ads';
 
 export type PracticeBoardUnit = 'offense' | 'defense';
 

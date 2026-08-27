@@ -16,7 +16,7 @@ test('two-panel ad position defaults to the logical end edge', () => {
   assert.deepEqual(getTwoPanelOrder(undefined), ['game', 'ad']);
 });
 
-test('two-panel timed ad cursor wraps through the playlist', () => {
+test('two-panel reset sequence selects and wraps the active ad', () => {
   assert.equal(getTwoPanelAdIndex(0, 3), 0);
   assert.equal(getTwoPanelAdIndex(4, 3), 1);
   assert.equal(getTwoPanelAdIndex(9, 3), 0);

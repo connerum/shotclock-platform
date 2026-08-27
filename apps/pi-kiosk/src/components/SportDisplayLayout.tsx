@@ -16,7 +16,10 @@ export default function SportDisplayLayout({
 }: SportDisplayLayoutProps) {
   if (layout.type === 'two-panel') {
     return (
-      <TwoPanelSportLayout layout={layout}>
+      <TwoPanelSportLayout
+        layout={layout}
+        primaryResetSequence={primaryResetSequence}
+      >
         {children}
       </TwoPanelSportLayout>
     );
@@ -31,4 +34,3 @@ export default function SportDisplayLayout({
     </ThreePanelSportLayout>
   );
 }
-

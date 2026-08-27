@@ -12,6 +12,7 @@ import {
   resolvePrimaryResetMetadata,
   runSerializedDeviceCommand,
   runSerializedDevicePersistence,
+  sportDisplayLayoutRotatesOnTimerReset,
 } from '@/lib/device-command';
 import { parsePitchKountDisplayState, serializePitchKountDisplayState } from '@/lib/pitchkount-players';
 
@@ -161,9 +162,9 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
                 timerStatePayload,
                 cachedTimerState,
                 relationalTimerState,
-                existingMode?.sportDisplayLayout?.adMode === 'offset-on-timer-reset'
-                  ? timerAction
-                  : undefined
+              sportDisplayLayoutRotatesOnTimerReset(existingMode?.sportDisplayLayout)
+                ? timerAction
+                : undefined
               ),
             }
           : null;

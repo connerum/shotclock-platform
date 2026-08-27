@@ -3,6 +3,7 @@ import test from 'node:test';
 import {
   THREE_PANEL_AD_BEHAVIORS_CAPABILITY,
   THREE_PANEL_SPORTS_ADS_CAPABILITY,
+  TWO_PANEL_RESET_ADS_CAPABILITY,
   TWO_PANEL_SPORTS_AD_CAPABILITY,
   type DeviceMode,
 } from '../packages/shared/src/types/index';
@@ -86,6 +87,7 @@ test('reconnect leaves modes without a three-panel layout unchanged', () => {
 test('reconnect preserves two-panel position when the display supports that layout', () => {
   assert.equal(resolveReconnectDeviceMode(TWO_PANEL_MODE, [
     TWO_PANEL_SPORTS_AD_CAPABILITY,
+    TWO_PANEL_RESET_ADS_CAPABILITY,
   ]), TWO_PANEL_MODE);
 });
 
@@ -93,6 +95,7 @@ test('reconnect drops a two-panel layout when its capability is missing', () => 
   assert.deepEqual(resolveReconnectDeviceMode(TWO_PANEL_MODE, [
     THREE_PANEL_SPORTS_ADS_CAPABILITY,
     THREE_PANEL_AD_BEHAVIORS_CAPABILITY,
+    TWO_PANEL_SPORTS_AD_CAPABILITY,
   ]), {
     type: 'volleyball',
   });

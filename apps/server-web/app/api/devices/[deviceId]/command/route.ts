@@ -27,6 +27,7 @@ import {
   runSerializedDeviceCommand,
   resolveTimerCommandMode,
   resolveTimerCommandState,
+  sportDisplayLayoutRotatesOnTimerReset,
   sportDisplayLayoutUsesAdvancedBehavior,
 } from '@/lib/device-command';
 import { getRequestIp, writeAuditLog } from '@/lib/audit';
@@ -191,7 +192,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
           const timerState = await resolveTimerCommandState(
             deviceId,
             rawTimerState,
-            displayMode.sportDisplayLayout?.adMode === 'offset-on-timer-reset'
+            sportDisplayLayoutRotatesOnTimerReset(displayMode.sportDisplayLayout)
               ? payload?.timerAction
               : undefined
           );

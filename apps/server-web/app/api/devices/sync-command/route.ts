@@ -25,6 +25,7 @@ import {
   runSerializedDeviceCommands,
   resolveTimerCommandMode,
   resolveTimerCommandState,
+  sportDisplayLayoutRotatesOnTimerReset,
   sportDisplayLayoutUsesAdvancedBehavior,
   stripPrimaryResetMetadata,
 } from '@/lib/device-command';
@@ -188,7 +189,7 @@ export async function POST(request: NextRequest) {
           if (unsupportedBehaviorDeviceIds.length > 0) {
             return unsupportedAdBehaviorResponse(unsupportedBehaviorDeviceIds);
           }
-          const timerAction = displayMode.sportDisplayLayout?.adMode === 'offset-on-timer-reset'
+          const timerAction = sportDisplayLayoutRotatesOnTimerReset(displayMode.sportDisplayLayout)
             ? (payload as any)?.timerAction
             : undefined;
           const timerStateWithoutResetMetadata = stripPrimaryResetMetadata(rawTimerState);

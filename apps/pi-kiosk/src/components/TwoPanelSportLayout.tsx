@@ -7,38 +7,23 @@ import {
 
 interface TwoPanelSportLayoutProps {
   layout: SportDisplayLayout;
+  primaryResetSequence?: number;
   children: ReactNode;
 }
 
 export default function TwoPanelSportLayout({
   layout,
+  primaryResetSequence,
   children,
 }: TwoPanelSportLayoutProps) {
   const adPlaylist = useMemo(
     () => (Array.isArray(layout.adPlaylist) ? layout.adPlaylist : []).filter(isVisualMedia),
     [layout.adPlaylist]
   );
-  const playlistKey = adPlaylist
-    .map((item) => `${item.mediaUrl}\u0000${item.mediaMimeType}`)
-    .join('\u0001');
   const panelOrder = getTwoPanelOrder(layout.adPosition);
-  const [timedCursor, setTimedCursor] = useState(0);
-
-  useEffect(() => {
-    setTimedCursor(0);
-  }, [playlistKey]);
-
-  useEffect(() => {
-    if (adPlaylist.length <= 1) return;
-
-    const interval = setInterval(() => {
-      setTimedCursor((index) => (index + 1) % adPlaylist.length);
-    }, normalizeRotationInterval(layout.rotationIntervalMs));
-
-    return () => clearInterval(interval);
-  }, [adPlaylist.length, layout.rotationIntervalMs, playlistKey]);
-
-  const activeAd = adPlaylist[getTwoPanelAdIndex(timedCursor, adPlaylist.length)] || null;
+  const activeAd = adPlaylist[
+    getTwoPanelAdIndex(primaryResetSequence ?? 0, adPlaylist.length)
+  ] || null;
 
   return (
     <div className="sport-two-panel-stage">
@@ -95,11 +80,6 @@ function SportAdPanel({
       ) : null}
     </div>
   );
-}
-
-function normalizeRotationInterval(value: number | undefined): number {
-  if (!Number.isFinite(value)) return 8000;
-  return Math.max(1000, Math.min(60000, Math.round(value!)));
 }
 
 function isVisualMedia(media: SportDisplayMedia): boolean {

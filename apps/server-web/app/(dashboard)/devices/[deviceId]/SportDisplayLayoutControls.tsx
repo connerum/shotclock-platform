@@ -5,7 +5,7 @@ import {
   DEFAULT_SPORT_DISPLAY_AD_POSITION,
   THREE_PANEL_AD_BEHAVIORS_CAPABILITY,
   THREE_PANEL_SPORTS_ADS_CAPABILITY,
-  TWO_PANEL_SPORTS_AD_CAPABILITY,
+  TWO_PANEL_RESET_ADS_CAPABILITY,
   type PrimaryClockResetAction,
   type SportDisplayAdMode,
   type SportDisplayAdPosition,
@@ -69,7 +69,6 @@ export function buildTwoPanelSportLayout(
   return {
     type: 'two-panel',
     adPlaylist: getActiveSportAdPlaylist(mediaAssets),
-    rotationIntervalMs: SPORT_AD_ROTATION_INTERVAL_MS,
     adPosition,
   };
 }
@@ -130,7 +129,7 @@ export default function SportDisplayLayoutControls({
   onAdPositionChange: (adPosition: SportDisplayAdPosition) => void | Promise<void>;
 }) {
   const threePanelSupported = capabilities?.includes(THREE_PANEL_SPORTS_ADS_CAPABILITY) === true;
-  const twoPanelSupported = capabilities?.includes(TWO_PANEL_SPORTS_AD_CAPABILITY) === true;
+  const twoPanelSupported = capabilities?.includes(TWO_PANEL_RESET_ADS_CAPABILITY) === true;
   const advancedBehaviorsSupported = capabilities?.includes(THREE_PANEL_AD_BEHAVIORS_CAPABILITY) === true;
   const adSummary = getAdSummary(
     activeAdCount,
@@ -261,6 +260,7 @@ export default function SportDisplayLayoutControls({
           <div className="text-xs font-bold uppercase tracking-[0.18em] text-gray-500">Ad Position</div>
           <p className="mt-1 text-xs text-gray-400">
             Position names adapt to the board: top and bottom when vertical, left and right when horizontal.
+            The ad stays fixed and advances only when the sport timer is reset.
           </p>
           <div className="mt-2 grid gap-2 md:grid-cols-2">
             {([
@@ -316,7 +316,7 @@ function getAdSummary(
   if (layoutType === 'two-panel') {
     const positionLabel = adPosition === 'start' ? 'Top / Left' : 'Bottom / Right';
     if (activeAdCount === 1) return `1 active ad · static in the ${positionLabel} panel`;
-    return `${activeAdCount} active ads · rotating every ${SPORT_AD_ROTATION_INTERVAL_MS / 1000} seconds · ${positionLabel} panel`;
+    return `${activeAdCount} active ads · advancing once per timer reset · ${positionLabel} panel`;
   }
   if (activeAdCount === 1) return '1 active ad · static on both outer sections';
   if (adMode === 'mirrored-timed') {

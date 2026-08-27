@@ -15,7 +15,7 @@ import {
   DEFAULT_SPORT_DISPLAY_AD_POSITION,
   normalizePitchKountState,
   THREE_PANEL_SPORTS_ADS_CAPABILITY,
-  TWO_PANEL_SPORTS_AD_CAPABILITY,
+  TWO_PANEL_RESET_ADS_CAPABILITY,
 } from '@shotclock/shared/types';
 
 export const COMMAND_ACK_TIMEOUT_MS = 2500;
@@ -126,6 +126,15 @@ export function sportDisplayLayoutUsesAdvancedBehavior(layout: SportDisplayLayou
   );
 }
 
+export function sportDisplayLayoutRotatesOnTimerReset(
+  layout: SportDisplayLayout | undefined
+): boolean {
+  return Boolean(
+    layout?.type === 'two-panel' ||
+    (layout?.type === 'three-panel' && layout.adMode === 'offset-on-timer-reset')
+  );
+}
+
 function isPrimarySportMode(mode: DeviceMode['type']): mode is 'basketball' | 'wrestling' | 'volleyball' {
   return mode === 'basketball' || mode === 'wrestling' || mode === 'volleyball';
 }
@@ -155,7 +164,7 @@ export function deviceSupportsSportDisplayLayout(
 ): boolean {
   if (!layout) return true;
   const requiredCapability = layout.type === 'two-panel'
-    ? TWO_PANEL_SPORTS_AD_CAPABILITY
+    ? TWO_PANEL_RESET_ADS_CAPABILITY
     : THREE_PANEL_SPORTS_ADS_CAPABILITY;
   return deviceSupportsCapability(capabilities, requiredCapability);
 }
