@@ -4,6 +4,7 @@ import type { TypedSocket, TypedServer } from '../server.js';
 import type { DeviceMode, HelloPayload, HeartbeatPayload, UpdateStatusPayload } from '@shotclock/shared/types';
 import { PrismaClient } from '@prisma/client';
 import { resolveAuthoritativeDeviceLabel } from '../../lib/device-label.js';
+import { normalizeDeviceMode } from '../../lib/device-command.js';
 
 const prisma = new PrismaClient();
 
@@ -260,9 +261,7 @@ function parseJsonField(value: string | null | undefined): any | null {
 
 function getStoredDeviceMode(displayState: any): DeviceMode | null {
   const mode = displayState?.deviceMode;
-  return mode && typeof mode === 'object' && typeof mode.type === 'string'
-    ? mode as DeviceMode
-    : null;
+  return normalizeDeviceMode(mode);
 }
 
 function withDefaultColorCorrection<T extends Record<string, any> | null>(displayProfile: T): T {

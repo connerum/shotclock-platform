@@ -5,6 +5,10 @@ import type { PointerEvent as ReactPointerEvent } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { DeviceMode, DisplayProfile, CalibrationData } from '@shotclock/shared/types';
+import {
+  buildThreePanelSportLayout,
+  getActiveSportAdPlaylist,
+} from '../SportDisplayLayoutControls';
 
 interface Device {
   id: string;
@@ -20,6 +24,10 @@ interface Device {
   venue?: { name: string } | null;
   displayProfile?: DisplayProfile | null;
   calibrationData?: Partial<CalibrationData> | null;
+  displayState?: {
+    deviceMode?: DeviceMode;
+    sportDisplayLayoutPreference?: DeviceMode['sportDisplayLayout'] | null;
+  } | null;
 }
 
 type MediaSlot = 'ads' | 'logo' | 'sponsor' | 'team-intro' | 'music';
@@ -46,7 +54,7 @@ const MEDIA_SLOT_CONFIG: Array<{
   {
     slot: 'ads',
     title: 'Ads',
-    description: 'Images or videos shown by the Run Ads button.',
+    description: 'Images or videos shown by Run Ads and the outer sections of 3-section sport layouts.',
     accept: 'image/*,video/*',
     allowMultipleActive: true,
   },
@@ -222,10 +230,13 @@ export default function DeviceDetailPage() {
       const res = await fetch(`/api/devices/${deviceId}/media`);
       if (!res.ok) throw new Error('Failed to load media');
       const data = await res.json();
-      setMediaAssets(data.mediaAssets || []);
+      const nextMediaAssets = data.mediaAssets || [];
+      setMediaAssets(nextMediaAssets);
       setMediaError(null);
+      return nextMediaAssets as DeviceMediaAsset[];
     } catch (err) {
       setMediaError(err instanceof Error ? err.message : 'Failed to load media');
+      return null;
     } finally {
       setMediaLoading(false);
     }
@@ -257,10 +268,30 @@ export default function DeviceDetailPage() {
 
   const setMode = async (mode: string) => {
     setSaving(true);
-    const modePayload: DeviceMode = { type: mode as any };
+    const type = mode as DeviceMode['type'];
+    const savedSportDisplayLayout = device?.displayState?.deviceMode?.sportDisplayLayout
+      || device?.displayState?.sportDisplayLayoutPreference;
+    const modePayload: DeviceMode = {
+      type,
+      ...(isPrimarySportMode(type) && savedSportDisplayLayout
+        ? { sportDisplayLayout: savedSportDisplayLayout }
+        : {}),
+    };
     const success = await sendCommand('set_mode', { mode: modePayload });
     if (success) {
-      setDevice(prev => prev ? { ...prev, mode } : null);
+      setDevice(prev => prev ? {
+        ...prev,
+        mode,
+        displayState: {
+          ...prev.displayState,
+          deviceMode: modePayload,
+          sportDisplayLayoutPreference: isPrimarySportMode(type)
+            ? modePayload.sportDisplayLayout ?? null
+            : prev.displayState?.sportDisplayLayoutPreference
+              || prev.displayState?.deviceMode?.sportDisplayLayout
+              || null,
+        },
+      } : null);
     }
     setSaving(false);
   };
@@ -578,7 +609,8 @@ export default function DeviceDetailPage() {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data?.error || `Upload failed with HTTP ${res.status}`);
-      await fetchMediaAssets();
+      const nextMediaAssets = await fetchMediaAssets();
+      if (slot === 'ads' && nextMediaAssets) await reconcileActiveThreePanelAds(nextMediaAssets);
     } catch (err) {
       setMediaError(err instanceof Error ? err.message : 'Upload failed');
     } finally {
@@ -596,7 +628,8 @@ export default function DeviceDetailPage() {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data?.error || `Update failed with HTTP ${res.status}`);
-      await fetchMediaAssets();
+      const nextMediaAssets = await fetchMediaAssets();
+      if (asset.slot === 'ads' && nextMediaAssets) await reconcileActiveThreePanelAds(nextMediaAssets);
     } catch (err) {
       setMediaError(err instanceof Error ? err.message : 'Update failed');
     }
@@ -613,10 +646,57 @@ export default function DeviceDetailPage() {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data?.error || `Delete failed with HTTP ${res.status}`);
-      await fetchMediaAssets();
+      const nextMediaAssets = await fetchMediaAssets();
+      if (asset.slot === 'ads' && nextMediaAssets) await reconcileActiveThreePanelAds(nextMediaAssets);
     } catch (err) {
       setMediaError(err instanceof Error ? err.message : 'Delete failed');
     }
+  };
+
+  const reconcileActiveThreePanelAds = async (nextMediaAssets: DeviceMediaAsset[]) => {
+    const currentMode = device?.displayState?.deviceMode;
+    const savedLayout = currentMode?.sportDisplayLayout
+      || device?.displayState?.sportDisplayLayoutPreference;
+    if (savedLayout?.type !== 'three-panel') {
+      return;
+    }
+
+    const nextLayout = buildThreePanelSportLayout(nextMediaAssets);
+    const nextSavedLayout = getActiveSportAdPlaylist(nextMediaAssets).length > 0
+      ? nextLayout
+      : null;
+    let nextMode: DeviceMode | null = null;
+    if (currentMode && isPrimarySportMode(currentMode.type) && currentMode.sportDisplayLayout?.type === 'three-panel') {
+      const { sportDisplayLayout: _previousLayout, ...modeWithoutLayout } = currentMode;
+      nextMode = {
+        ...modeWithoutLayout,
+        ...(nextSavedLayout ? { sportDisplayLayout: nextSavedLayout } : {}),
+      } as DeviceMode;
+    }
+
+    try {
+      const res = await fetch(`/api/devices/${deviceId}/sport-display-layout`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sportDisplayLayout: nextSavedLayout }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error || `Layout update failed with HTTP ${res.status}`);
+
+      setDevice((previous) => previous ? {
+        ...previous,
+        displayState: {
+          ...previous.displayState,
+          ...(nextMode ? { deviceMode: nextMode } : {}),
+          sportDisplayLayoutPreference: nextSavedLayout,
+        },
+      } : null);
+    } catch (err) {
+      setMediaError(err instanceof Error ? err.message : 'Failed to update saved board layout');
+      return;
+    }
+
+    if (nextMode) await sendCommand('set_mode', { mode: nextMode });
   };
 
   if (loading) {
@@ -716,7 +796,7 @@ export default function DeviceDetailPage() {
         </div>
 
         {/* Media Management */}
-        <div className="rounded-lg bg-gray-900 p-5 lg:col-span-2">
+        <div id="presentation-media" className="scroll-mt-6 rounded-lg bg-gray-900 p-5 lg:col-span-2">
           <div className="mb-4 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
             <div>
               <h2 className="text-lg font-semibold">Presentation Media</h2>
@@ -1066,4 +1146,8 @@ export default function DeviceDetailPage() {
       </div>
     </div>
   );
+}
+
+function isPrimarySportMode(mode: DeviceMode['type']): boolean {
+  return mode === 'basketball' || mode === 'wrestling' || mode === 'volleyball';
 }

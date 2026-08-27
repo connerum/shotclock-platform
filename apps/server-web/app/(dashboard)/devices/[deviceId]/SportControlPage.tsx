@@ -1,8 +1,8 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import type { DeviceMode, ScoreboardBranding, SportType, TimerState } from '@shotclock/shared/types';
+import type { DeviceMode, ScoreboardBranding, SportDisplayLayout, SportType, TimerState } from '@shotclock/shared/types';
 import {
   createDefaultTimerState,
   pauseTimerState,
@@ -11,6 +11,10 @@ import {
   stopTimerState,
 } from '@shotclock/shared/timer';
 import GamePresentationControls from './GamePresentationControls';
+import SportDisplayLayoutControls, {
+  buildThreePanelSportLayout,
+  getActiveSportAdPlaylist,
+} from './SportDisplayLayoutControls';
 import { SyncTargetBanner, useDeviceCommandDispatcher } from '../../SelectedDevicesProvider';
 
 const DEFAULT_HOME_COLOR = '#ef4444';
@@ -44,11 +48,14 @@ interface Device {
   timerState?: TimerState | null;
   displayState?: {
     deviceMode?: DeviceMode;
+    sportDisplayLayoutPreference?: SportDisplayLayout | null;
   } | null;
+  capabilities?: string[];
 }
 
 export default function SportControlPage({ deviceId, config }: { deviceId: string; config: SportConfig }) {
   const [device, setDevice] = useState<Device | null>(null);
+  const [loadedSport, setLoadedSport] = useState<SportType | null>(null);
   const [loading, setLoading] = useState(true);
   const [commandError, setCommandError] = useState<string | null>(null);
   const [timerState, setTimerState] = useState<TimerState>(() => ({
@@ -64,12 +71,29 @@ export default function SportControlPage({ deviceId, config }: { deviceId: strin
   const [awayColor, setAwayColor] = useState(() => getDefaultAwayColor(config.sport));
   const [volleyballTopDisplay, setVolleyballTopDisplay] = useState<VolleyballTopDisplay>('empty');
   const [mediaAssets, setMediaAssets] = useState<DeviceMediaAsset[]>([]);
-  const { sendCommand: dispatchCommand } = useDeviceCommandDispatcher(deviceId);
+  const [mediaLoading, setMediaLoading] = useState(true);
+  const [mediaError, setMediaError] = useState<string | null>(null);
+  const [threePanelEnabled, setThreePanelEnabled] = useState(false);
+  const [hydratedSportDisplayLayout, setHydratedSportDisplayLayout] = useState<SportDisplayLayout | undefined>();
+  const [layoutSaving, setLayoutSaving] = useState(false);
+  const modeUpdateTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const { isSyncActive, sendCommand: dispatchCommand } = useDeviceCommandDispatcher(deviceId);
 
   useEffect(() => {
+    const controller = new AbortController();
+    setLoading(true);
+    setCommandError(null);
+    setDevice(null);
+    setLoadedSport(null);
+    setThreePanelEnabled(false);
+    setHydratedSportDisplayLayout(undefined);
+
     const fetchDevice = async () => {
       try {
-        const response = await fetch(`/api/devices/${deviceId}`, { cache: 'no-store' });
+        const response = await fetch(`/api/devices/${deviceId}`, {
+          cache: 'no-store',
+          signal: controller.signal,
+        });
         if (!response.ok) throw new Error('Device not found');
         const data = await response.json();
         const loadedMode = data.device.displayState?.deviceMode as DeviceMode | undefined;
@@ -90,41 +114,74 @@ export default function SportControlPage({ deviceId, config }: { deviceId: strin
             ? loadedBranding.volleyballTopDisplay
             : 'empty');
         }
+        const savedLayoutPreference = data.device.displayState?.sportDisplayLayoutPreference as SportDisplayLayout | undefined;
+        const loadedSportDisplayLayout = loadedMode?.sportDisplayLayout?.type === 'three-panel'
+          ? loadedMode.sportDisplayLayout
+          : savedLayoutPreference?.type === 'three-panel'
+            ? savedLayoutPreference
+            : undefined;
+        setHydratedSportDisplayLayout(loadedSportDisplayLayout);
+        setThreePanelEnabled(Boolean(loadedSportDisplayLayout));
         setDevice(data.device);
+        setLoadedSport(config.sport);
+      } catch (error) {
+        if (!controller.signal.aborted) {
+          setCommandError(error instanceof Error ? error.message : 'Unable to load display');
+        }
       } finally {
-        setLoading(false);
+        if (!controller.signal.aborted) setLoading(false);
       }
     };
 
     void fetchDevice();
+    return () => controller.abort();
   }, [deviceId, config.sport]);
 
   useEffect(() => {
-    if (config.sport !== 'volleyball') return;
+    const controller = new AbortController();
+    setMediaAssets([]);
+    setMediaLoading(true);
+    setMediaError(null);
 
     const fetchMediaAssets = async () => {
       try {
-        const response = await fetch(`/api/devices/${deviceId}/media`);
-        if (!response.ok) return;
+        const response = await fetch(`/api/devices/${deviceId}/media`, { signal: controller.signal });
+        if (!response.ok) throw new Error('Unable to load active ads');
         const data = await response.json();
         setMediaAssets(data.mediaAssets || []);
-      } catch {
-        setMediaAssets([]);
+      } catch (error) {
+        if (!controller.signal.aborted) {
+          setMediaError(error instanceof Error ? error.message : 'Unable to load active ads');
+        }
+      } finally {
+        if (!controller.signal.aborted) setMediaLoading(false);
       }
     };
 
     void fetchMediaAssets();
-  }, [deviceId, config.sport]);
+    return () => controller.abort();
+  }, [deviceId]);
 
   useEffect(() => {
-    if (!device) return;
+    if (
+      device?.deviceId !== deviceId ||
+      loadedSport !== config.sport ||
+      mediaLoading ||
+      (threePanelEnabled && mediaError && !hydratedSportDisplayLayout)
+    ) return;
 
+    if (modeUpdateTimeoutRef.current) clearTimeout(modeUpdateTimeoutRef.current);
     const timeout = setTimeout(() => {
+      modeUpdateTimeoutRef.current = null;
       void setSportMode();
     }, 250);
+    modeUpdateTimeoutRef.current = timeout;
 
-    return () => clearTimeout(timeout);
-  }, [device?.deviceId, config.sport, brandingEnabled, homeLabel, awayLabel, homeColor, awayColor, volleyballTopDisplay, mediaAssets]);
+    return () => {
+      clearTimeout(timeout);
+      if (modeUpdateTimeoutRef.current === timeout) modeUpdateTimeoutRef.current = null;
+    };
+  }, [device?.deviceId, loadedSport, config.sport, brandingEnabled, homeLabel, awayLabel, homeColor, awayColor, volleyballTopDisplay, mediaAssets, mediaError, mediaLoading]);
 
   useEffect(() => {
     if (!timerState.isRunning) return;
@@ -143,10 +200,23 @@ export default function SportControlPage({ deviceId, config }: { deviceId: strin
     ...(config.sport === 'volleyball' ? buildVolleyballTopMediaPayload(volleyballTopDisplay, mediaAssets) : {}),
   });
 
-  const buildSportMode = (): DeviceMode => ({
-    type: config.sport,
-    ...(supportsTeamBranding(config.sport) ? { scoreboardBranding: buildTeamBranding() } : {}),
-  });
+  const resolveSportDisplayLayout = (enabled = threePanelEnabled): SportDisplayLayout | undefined => {
+    if (!enabled) return undefined;
+    if (mediaLoading || mediaError) return hydratedSportDisplayLayout;
+    const localLayout = buildThreePanelSportLayout(mediaAssets);
+    return localLayout.adPlaylist.length === 0 && hydratedSportDisplayLayout?.adPlaylist.length
+      ? hydratedSportDisplayLayout
+      : localLayout;
+  };
+
+  const buildSportMode = (layoutEnabled = threePanelEnabled): DeviceMode => {
+    const sportDisplayLayout = resolveSportDisplayLayout(layoutEnabled);
+    return {
+      type: config.sport,
+      ...(supportsTeamBranding(config.sport) ? { scoreboardBranding: buildTeamBranding() } : {}),
+      ...(sportDisplayLayout ? { sportDisplayLayout } : {}),
+    };
+  };
 
   const setSportMode = async () => {
     const mode = buildSportMode();
@@ -155,12 +225,32 @@ export default function SportControlPage({ deviceId, config }: { deviceId: strin
 
   const sendCommand = async (type: string, payload?: unknown) => {
     setCommandError(null);
-    const { response, data } = await dispatchCommand(type, payload);
-    if (!response.ok) {
-      setCommandError(data?.error || `Command failed with HTTP ${response.status}`);
+    try {
+      const { response, data } = await dispatchCommand(type, payload);
+      if (!response.ok) {
+        setCommandError(data?.error || `Command failed with HTTP ${response.status}`);
+        return false;
+      }
+      return true;
+    } catch (error) {
+      setCommandError(error instanceof Error ? error.message : 'Command failed');
       return false;
     }
-    return true;
+  };
+
+  const changeThreePanelLayout = async (enabled: boolean) => {
+    if (enabled === threePanelEnabled || layoutSaving) return;
+
+    const previousValue = threePanelEnabled;
+    if (modeUpdateTimeoutRef.current) {
+      clearTimeout(modeUpdateTimeoutRef.current);
+      modeUpdateTimeoutRef.current = null;
+    }
+    setThreePanelEnabled(enabled);
+    setLayoutSaving(true);
+    const success = await sendCommand('set_mode', { mode: buildSportMode(enabled) });
+    if (!success) setThreePanelEnabled(previousValue);
+    setLayoutSaving(false);
   };
 
   const sendTimerState = async (nextState: TimerState) => {
@@ -243,6 +333,20 @@ export default function SportControlPage({ deviceId, config }: { deviceId: strin
       )}
 
       <SyncTargetBanner deviceId={deviceId} />
+
+      <SportDisplayLayoutControls
+        deviceId={deviceId}
+        enabled={threePanelEnabled}
+        activeAdCount={threePanelEnabled
+          ? resolveSportDisplayLayout()?.adPlaylist.length ?? 0
+          : getActiveSportAdPlaylist(mediaAssets).length}
+        mediaLoading={mediaLoading}
+        mediaError={mediaError}
+        capabilities={device?.capabilities}
+        isSyncActive={isSyncActive}
+        layoutSaving={layoutSaving}
+        onEnabledChange={changeThreePanelLayout}
+      />
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <div className="cc-card p-5">

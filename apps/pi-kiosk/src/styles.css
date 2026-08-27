@@ -43,6 +43,47 @@ html.show-cursor * {
   animation: shotclock-red-white-strobe 0.42s steps(2, end) infinite;
 }
 
+/* Three equal sections follow the logical, post-rotation board orientation. */
+.sport-three-panel-stage {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  container-type: size;
+  background: #000;
+}
+
+.sport-three-panel-grid {
+  display: grid;
+  width: 100%;
+  height: 100%;
+  grid-template-rows: repeat(3, minmax(0, 1fr));
+  overflow: hidden;
+}
+
+.sport-three-panel-cell {
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  background: #000;
+}
+
+.sport-three-panel-main {
+  box-shadow: inset 0 0 0 1px rgba(75, 85, 99, 0.8);
+}
+
+.sport-three-panel-ad {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+@container (min-aspect-ratio: 1 / 1) {
+  .sport-three-panel-grid {
+    grid-template-rows: minmax(0, 1fr);
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
 /* PitchKount uses container-relative sizing so the same composition is legible
    at the native 128x256 LED resolution and in larger browser previews. */
 @keyframes pitchkount-slide-in {

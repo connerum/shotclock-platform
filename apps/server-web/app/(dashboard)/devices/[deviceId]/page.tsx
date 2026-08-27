@@ -12,6 +12,10 @@ interface Device {
   status: string;
   isOnline: boolean;
   lastSeen: string | null;
+  displayState?: {
+    deviceMode?: DeviceMode;
+    sportDisplayLayoutPreference?: DeviceMode['sportDisplayLayout'] | null;
+  } | null;
 }
 
 const SPORTS: Array<{
@@ -102,9 +106,19 @@ export default function DeviceSportPage() {
       return;
     }
 
+    const storedMode = device?.displayState?.deviceMode;
+    const storedSportDisplayLayout = storedMode?.sportDisplayLayout
+      || device?.displayState?.sportDisplayLayoutPreference;
     const modePayload: DeviceMode = mode === 'pitchkount'
       ? { type: 'pitchkount', pitchKount: DEFAULT_PITCHKOUNT_STATE }
-      : { type: mode };
+      : storedMode?.type === mode
+        ? storedMode
+        : {
+            type: mode,
+            ...(isPrimarySportMode(mode) && storedSportDisplayLayout
+              ? { sportDisplayLayout: storedSportDisplayLayout }
+              : {}),
+          };
 
     try {
       const { response, data } = await sendCommand('set_mode', { mode: modePayload });
@@ -197,4 +211,8 @@ export default function DeviceSportPage() {
       </div>
     </div>
   );
+}
+
+function isPrimarySportMode(mode: ModeType): mode is SportType {
+  return mode === 'basketball' || mode === 'wrestling' || mode === 'volleyball';
 }

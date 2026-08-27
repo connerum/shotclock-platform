@@ -7,6 +7,8 @@ export type TimerMode = 'stop' | 'run' | 'pause';
 
 export type SportType = 'basketball' | 'wrestling' | 'volleyball';
 
+export const THREE_PANEL_SPORTS_ADS_CAPABILITY = 'three-panel-sports-ads';
+
 export type PracticeBoardUnit = 'offense' | 'defense';
 
 export type PracticeBoardPosition =
@@ -299,8 +301,20 @@ export interface DeviceMode {
   type: ModeType;
   subMode?: string;
   scoreboardBranding?: ScoreboardBranding;
+  sportDisplayLayout?: SportDisplayLayout;
   practiceBoard?: PracticeBoardState;
   pitchKount?: PitchKountState;
+}
+
+export interface SportDisplayMedia {
+  mediaUrl: string;
+  mediaMimeType: string;
+}
+
+export interface SportDisplayLayout {
+  type: 'three-panel';
+  adPlaylist: SportDisplayMedia[];
+  rotationIntervalMs?: number;
 }
 
 export interface ScoreboardBranding {

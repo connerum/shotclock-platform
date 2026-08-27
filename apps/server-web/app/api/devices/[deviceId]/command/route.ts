@@ -4,10 +4,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getServerIO } from '@/lib/socket';
-import type { DeviceCommandAck, DeviceMode, TimerState } from '@shotclock/shared/types';
+import {
+  THREE_PANEL_SPORTS_ADS_CAPABILITY,
+  type DeviceCommandAck,
+  type DeviceMode,
+  type TimerState,
+} from '@shotclock/shared/types';
 import { canAccessDevice, requireApiUser } from '@/lib/auth';
 import {
   emitDeviceCommand,
+  deviceSupportsCapability,
   getConnectedDeviceSocketCount,
   getDeviceRoom,
   markDeviceOffline,
@@ -17,6 +23,7 @@ import {
   persistPresentationOverlay,
   persistTimerCommand,
   resetDeviceRecordAfterFactoryReset,
+  resolveTimerCommandMode,
   resolveTimerCommandState,
 } from '@/lib/device-command';
 import { getRequestIp, writeAuditLog } from '@/lib/audit';
@@ -53,7 +60,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
     const device = await prisma.device.findUnique({
       where: { deviceId },
-      select: { deviceId: true, ownerUserId: true },
+      select: { deviceId: true, ownerUserId: true, capabilities: true },
     });
 
     if (!device) {
@@ -110,6 +117,15 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
             { status: 400 }
           );
         }
+        if (
+          mode.sportDisplayLayout &&
+          !deviceSupportsCapability(device.capabilities, THREE_PANEL_SPORTS_ADS_CAPABILITY)
+        ) {
+          return NextResponse.json(
+            { error: 'Display software update required for 3-section layouts' },
+            { status: 409 }
+          );
+        }
         const ack = await emitDeviceCommand(deviceNamespace, room, 'mode:set', mode);
         if (!ack.success) {
           return commandAckError(ack);
@@ -140,7 +156,22 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
           );
         }
 
-        const displayMode: DeviceMode = payload?.mode || { type: 'basketball' };
+        const displayMode: DeviceMode | null = await resolveTimerCommandMode(deviceId, payload?.mode);
+        if (!displayMode) {
+          return NextResponse.json(
+            { error: 'Invalid display mode for set_timer command' },
+            { status: 400 }
+          );
+        }
+        if (
+          displayMode.sportDisplayLayout &&
+          !deviceSupportsCapability(device.capabilities, THREE_PANEL_SPORTS_ADS_CAPABILITY)
+        ) {
+          return NextResponse.json(
+            { error: 'Display software update required for 3-section layouts' },
+            { status: 409 }
+          );
+        }
         const timerState = await resolveTimerCommandState(deviceId, rawTimerState);
         const modeAck = await emitDeviceCommand(deviceNamespace, room, 'mode:set', displayMode);
         if (!modeAck.success) {

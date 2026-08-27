@@ -2,6 +2,7 @@
 
 import type { TypedServer } from '../server.js';
 import { Socket } from 'socket.io';
+import { normalizeDeviceMode } from '../../lib/device-command.js';
 import { 
   emitStateUpdate, 
   emitConfigUpdate, 
@@ -48,7 +49,8 @@ export function setupAdminHandlers(socket: Socket, io: TypedServer): void {
         success = emitConfigUpdate(io, data.deviceId, data.payload);
         break;
       case 'mode:set':
-        success = emitModeSet(io, data.deviceId, data.payload);
+        const mode = normalizeDeviceMode(data.payload);
+        success = mode ? emitModeSet(io, data.deviceId, mode) : false;
         break;
       case 'update:check':
         success = emitUpdateCheck(io, data.deviceId);

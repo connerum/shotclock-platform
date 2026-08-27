@@ -5,9 +5,14 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getServerIO } from '@/lib/socket';
 import { canAccessDevice, requireApiUser } from '@/lib/auth';
-import type { DeviceMode, TimerState } from '@shotclock/shared/types';
+import {
+  THREE_PANEL_SPORTS_ADS_CAPABILITY,
+  type DeviceMode,
+  type TimerState,
+} from '@shotclock/shared/types';
 import type { DeviceCommandResult, GameCommandType } from '@/lib/device-command';
 import {
+  deviceSupportsCapability,
   emitDeviceCommandToDevice,
   getConnectedDeviceSocketCount,
   markDeviceOffline,
@@ -16,6 +21,7 @@ import {
   persistDisplayMode,
   persistPresentationOverlay,
   persistTimerCommand,
+  resolveTimerCommandMode,
   resolveTimerCommandState,
 } from '@/lib/device-command';
 
@@ -24,6 +30,7 @@ const SYNC_MODE_TYPES = new Set(['basketball', 'wrestling', 'volleyball', 'pract
 type SyncDevice = {
   deviceId: string;
   ownerUserId: string | null;
+  capabilities: string;
 };
 
 export async function POST(request: NextRequest) {
@@ -70,7 +77,7 @@ export async function POST(request: NextRequest) {
 
     const devices = await prisma.device.findMany({
       where: { deviceId: { in: targetDeviceIds } },
-      select: { deviceId: true, ownerUserId: true },
+      select: { deviceId: true, ownerUserId: true, capabilities: true },
     });
     const foundDeviceIds = new Set(devices.map((device: SyncDevice) => device.deviceId));
     const missingDeviceIds = targetDeviceIds.filter((deviceId) => !foundDeviceIds.has(deviceId));
@@ -127,6 +134,10 @@ export async function POST(request: NextRequest) {
             { status: 400 }
           );
         }
+        const unsupportedDeviceIds = getUnsupportedThreePanelDeviceIds(devices, mode);
+        if (unsupportedDeviceIds.length > 0) {
+          return unsupportedThreePanelResponse(unsupportedDeviceIds);
+        }
 
         const results = await emitToTargets(deviceNamespace, targetDeviceIds, 'mode:set', mode);
         await persistDisplayModesForSuccessfulResults(results, mode);
@@ -147,7 +158,17 @@ export async function POST(request: NextRequest) {
           );
         }
 
-        const displayMode = getSyncDeviceMode((payload as any)?.mode) || { type: 'basketball' };
+        const displayMode = await resolveTimerCommandMode(primaryDeviceId, (payload as any)?.mode);
+        if (!displayMode || !SYNC_MODE_TYPES.has(displayMode.type)) {
+          return NextResponse.json(
+            { success: false, error: 'Invalid game mode for synchronized set_timer command' },
+            { status: 400 }
+          );
+        }
+        const unsupportedDeviceIds = getUnsupportedThreePanelDeviceIds(devices, displayMode);
+        if (unsupportedDeviceIds.length > 0) {
+          return unsupportedThreePanelResponse(unsupportedDeviceIds);
+        }
         const timerState = await resolveTimerCommandState(primaryDeviceId, rawTimerState);
         const modeResults = await emitToTargets(deviceNamespace, targetDeviceIds, 'mode:set', displayMode);
         await persistDisplayModesForSuccessfulResults(modeResults, displayMode);
@@ -244,6 +265,24 @@ function getSyncDeviceMode(value: unknown): DeviceMode | null {
   const mode = normalizeDeviceMode(value);
   if (!mode || !SYNC_MODE_TYPES.has(mode.type)) return null;
   return mode;
+}
+
+function getUnsupportedThreePanelDeviceIds(devices: SyncDevice[], mode: DeviceMode): string[] {
+  if (!mode.sportDisplayLayout) return [];
+  return devices
+    .filter((device) => !deviceSupportsCapability(device.capabilities, THREE_PANEL_SPORTS_ADS_CAPABILITY))
+    .map((device) => device.deviceId);
+}
+
+function unsupportedThreePanelResponse(unsupportedDeviceIds: string[]) {
+  return NextResponse.json(
+    {
+      success: false,
+      error: 'One or more displays require a software update for 3-section layouts',
+      unsupportedDeviceIds,
+    },
+    { status: 409 }
+  );
 }
 
 function emitToTargets(

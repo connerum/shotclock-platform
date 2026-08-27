@@ -5,11 +5,14 @@ import type {
   PresentationOverlay,
   PresentationOverlayAccent,
   PresentationOverlayType,
+  SportDisplayLayout,
   TimerState,
 } from '@shotclock/shared/types';
 import { normalizePitchKountState } from '@shotclock/shared/types';
 
 export const COMMAND_ACK_TIMEOUT_MS = 2500;
+
+const devicePersistenceQueues = new Map<string, Promise<void>>();
 
 export type GameCommandType = 'set_mode' | 'set_timer' | 'presentation';
 
@@ -46,11 +49,70 @@ export function normalizeDeviceMode(value: unknown): DeviceMode | null {
     };
   }
 
-  return mode as DeviceMode;
+  const { sportDisplayLayout: rawSportDisplayLayout, ...modeWithoutSportDisplayLayout } = mode;
+  const sportDisplayLayout = isPrimarySportMode(mode.type)
+    ? normalizeSportDisplayLayout(rawSportDisplayLayout)
+    : null;
+
+  return {
+    ...modeWithoutSportDisplayLayout,
+    ...(sportDisplayLayout ? { sportDisplayLayout } : {}),
+  } as DeviceMode;
+}
+
+export function normalizeSportDisplayLayout(value: unknown): SportDisplayLayout | null {
+  if (!value || typeof value !== 'object') return null;
+
+  const layout = value as Partial<SportDisplayLayout>;
+  if (layout.type !== 'three-panel') return null;
+
+  const adPlaylist = Array.isArray(layout.adPlaylist)
+    ? layout.adPlaylist
+        .map((item) => {
+          const mediaUrl = typeof item?.mediaUrl === 'string'
+            ? item.mediaUrl.trim().slice(0, 512)
+            : '';
+          const mediaMimeType = typeof item?.mediaMimeType === 'string'
+            ? item.mediaMimeType.trim().slice(0, 80)
+            : '';
+
+          return { mediaUrl, mediaMimeType };
+        })
+        .filter((item) => isAllowedSportDisplayMedia(item.mediaUrl, item.mediaMimeType))
+        .slice(0, 50)
+    : [];
+  const rotationIntervalMs = typeof layout.rotationIntervalMs === 'number'
+    ? Math.max(1000, Math.min(60000, Math.round(layout.rotationIntervalMs)))
+    : undefined;
+
+  return {
+    type: 'three-panel',
+    adPlaylist,
+    ...(rotationIntervalMs ? { rotationIntervalMs } : {}),
+  };
+}
+
+function isPrimarySportMode(mode: DeviceMode['type']): mode is 'basketball' | 'wrestling' | 'volleyball' {
+  return mode === 'basketball' || mode === 'wrestling' || mode === 'volleyball';
+}
+
+function isAllowedSportDisplayMedia(mediaUrl: string, mediaMimeType: string): boolean {
+  const isVisualMedia = mediaMimeType.startsWith('image/') || mediaMimeType.startsWith('video/');
+  const isAllowedUrl = /^https?:\/\/[^\s]+$/i.test(mediaUrl);
+  return Boolean(mediaUrl && mediaMimeType && isVisualMedia && isAllowedUrl);
 }
 
 export function getDeviceRoom(deviceId: string): string {
   return `device:${deviceId}`;
+}
+
+export function deviceSupportsCapability(value: unknown, capability: string): boolean {
+  try {
+    const capabilities = typeof value === 'string' ? JSON.parse(value) : value;
+    return Array.isArray(capabilities) && capabilities.includes(capability);
+  } catch {
+    return false;
+  }
 }
 
 export function getConnectedDeviceSocketCount(deviceNamespace: any, deviceId: string): number {
@@ -189,30 +251,30 @@ export function normalizePresentationOverlay(raw: unknown): PresentationOverlay 
 }
 
 export async function persistPresentationOverlay(deviceId: string, overlay: PresentationOverlay): Promise<void> {
-  try {
-    const device = await prisma.device.findUnique({
-      where: { deviceId },
-      select: { displayState: true, mode: true },
-    });
+  await runSerializedDevicePersistence(deviceId, async () => {
+    try {
+      const device = await prisma.device.findUnique({
+        where: { deviceId },
+        select: { displayState: true, mode: true },
+      });
 
-    const existingDisplayState = device?.displayState
-      ? JSON.parse(device.displayState)
-      : {};
-    const nextDisplayState = {
-      ...existingDisplayState,
-      mode: existingDisplayState.mode || device?.mode || 'shot-clock',
-      presentationOverlay: overlay,
-    };
+      const existingDisplayState = parseDisplayState(device?.displayState);
+      const nextDisplayState = {
+        ...existingDisplayState,
+        mode: existingDisplayState.mode || device?.mode || 'shot-clock',
+        presentationOverlay: overlay,
+      };
 
-    await prisma.device.update({
-      where: { deviceId },
-      data: {
-        displayState: JSON.stringify(nextDisplayState),
-      },
-    });
-  } catch (error) {
-    console.warn(`Unable to persist presentation overlay for ${deviceId}; live command was still dispatched`, error);
-  }
+      await prisma.device.update({
+        where: { deviceId },
+        data: {
+          displayState: JSON.stringify(nextDisplayState),
+        },
+      });
+    } catch (error) {
+      console.warn(`Unable to persist presentation overlay for ${deviceId}; live command was still dispatched`, error);
+    }
+  });
 }
 
 export async function persistTimerCommand(
@@ -220,73 +282,128 @@ export async function persistTimerCommand(
   displayState: { mode: string; deviceMode: DeviceMode; timerState: TimerState; mediaAssetId: null }
 ): Promise<void> {
   const serializedTimerState = JSON.stringify(displayState.timerState);
-  const device = await prisma.device.findUnique({
-    where: { deviceId },
-    select: { displayState: true },
-  });
-  const previousDisplayState = parseDisplayState(device?.displayState);
-  const mergedDisplayState = {
-    ...previousDisplayState,
-    mode: displayState.mode,
-    deviceMode: displayState.deviceMode,
-    timerState: displayState.timerState,
-    mediaAssetId: displayState.mediaAssetId,
-  };
-  const serializedDisplayState = JSON.stringify(mergedDisplayState);
-  const results = await Promise.allSettled([
-    prisma.device.update({
-      where: { deviceId },
-      data: {
-        mode: displayState.mode,
-        displayState: serializedDisplayState,
-      },
-    }),
-    prisma.displayState.upsert({
-      where: { deviceId },
-      update: {
-        mode: displayState.mode,
-        timerState: serializedTimerState,
-        mediaAssetId: null,
-      },
-      create: {
-        deviceId,
-        mode: displayState.mode,
-        timerState: serializedTimerState,
-        mediaAssetId: null,
-      },
-    }),
-  ]);
-
-  results.forEach((result, index) => {
-    if (result.status === 'rejected') {
-      const target = index === 0 ? 'Device displayState' : 'DisplayState';
-      console.warn(`Unable to persist ${target} for ${deviceId}; live command was already acknowledged`, result.reason);
-    }
-  });
-}
-
-export async function persistDisplayMode(deviceId: string, mode: DeviceMode): Promise<void> {
-  try {
+  await runSerializedDevicePersistence(deviceId, async () => {
     const device = await prisma.device.findUnique({
       where: { deviceId },
       select: { displayState: true },
     });
-    const existingDisplayState = device?.displayState ? JSON.parse(device.displayState) : {};
+    const previousDisplayState = parseDisplayState(device?.displayState);
+    const mergedDisplayState = {
+      ...previousDisplayState,
+      mode: displayState.mode,
+      deviceMode: displayState.deviceMode,
+      timerState: displayState.timerState,
+      mediaAssetId: displayState.mediaAssetId,
+      ...getSportDisplayLayoutPreferenceUpdate(displayState.deviceMode, previousDisplayState),
+    };
+    const serializedDisplayState = JSON.stringify(mergedDisplayState);
+    const results = await Promise.allSettled([
+      prisma.device.update({
+        where: { deviceId },
+        data: {
+          mode: displayState.mode,
+          displayState: serializedDisplayState,
+        },
+      }),
+      prisma.displayState.upsert({
+        where: { deviceId },
+        update: {
+          mode: displayState.mode,
+          timerState: serializedTimerState,
+          mediaAssetId: null,
+        },
+        create: {
+          deviceId,
+          mode: displayState.mode,
+          timerState: serializedTimerState,
+          mediaAssetId: null,
+        },
+      }),
+    ]);
+
+    results.forEach((result, index) => {
+      if (result.status === 'rejected') {
+        const target = index === 0 ? 'Device displayState' : 'DisplayState';
+        console.warn(`Unable to persist ${target} for ${deviceId}; live command was already acknowledged`, result.reason);
+      }
+    });
+  });
+}
+
+export async function persistDisplayMode(deviceId: string, mode: DeviceMode): Promise<void> {
+  await runSerializedDevicePersistence(deviceId, async () => {
+    try {
+      const device = await prisma.device.findUnique({
+        where: { deviceId },
+        select: { displayState: true },
+      });
+      const existingDisplayState = parseDisplayState(device?.displayState);
+
+      await prisma.device.update({
+        where: { deviceId },
+        data: {
+          mode: mode.type,
+          displayState: JSON.stringify({
+            ...existingDisplayState,
+            mode: mode.type,
+            deviceMode: mode,
+            ...getSportDisplayLayoutPreferenceUpdate(mode, existingDisplayState),
+          }),
+        },
+      });
+    } catch (error) {
+      console.warn(`Unable to persist display mode for ${deviceId}; live command was still dispatched`, error);
+    }
+  });
+}
+
+export async function persistSportDisplayLayoutPreference(
+  deviceId: string,
+  sportDisplayLayout: SportDisplayLayout | null
+): Promise<void> {
+  await runSerializedDevicePersistence(deviceId, async () => {
+    const device = await prisma.device.findUnique({
+      where: { deviceId },
+      select: { displayState: true },
+    });
+    const existingDisplayState = parseDisplayState(device?.displayState);
+    const nextDisplayState = reconcileSportDisplayLayoutPreference(
+      existingDisplayState,
+      sportDisplayLayout
+    );
 
     await prisma.device.update({
       where: { deviceId },
       data: {
-        mode: mode.type,
-        displayState: JSON.stringify({
-          ...existingDisplayState,
-          mode: mode.type,
-          deviceMode: mode,
-        }),
+        displayState: JSON.stringify(nextDisplayState),
       },
     });
-  } catch (error) {
-    console.warn(`Unable to persist display mode for ${deviceId}; live command was still dispatched`, error);
+  });
+}
+
+export function reconcileSportDisplayLayoutPreference(
+  existingDisplayState: Record<string, unknown>,
+  sportDisplayLayout: SportDisplayLayout | null
+): Record<string, unknown> {
+  const currentMode = normalizeDeviceMode(existingDisplayState.deviceMode);
+  if (!currentMode || !isPrimarySportMode(currentMode.type) || !currentMode.sportDisplayLayout) {
+    return {
+      ...existingDisplayState,
+      sportDisplayLayoutPreference: sportDisplayLayout,
+    };
   }
+
+  const { sportDisplayLayout: _previousLayout, ...modeWithoutLayout } = currentMode;
+  const nextMode = {
+    ...modeWithoutLayout,
+    ...(sportDisplayLayout ? { sportDisplayLayout } : {}),
+  } as DeviceMode;
+
+  return {
+    ...existingDisplayState,
+    deviceMode: nextMode,
+    sportDisplayLayoutPreference: sportDisplayLayout,
+  };
 }
 
 export async function resetDeviceRecordAfterFactoryReset(deviceId: string): Promise<void> {
@@ -327,8 +444,64 @@ function parseDisplayState(raw: string | null | undefined): Record<string, unkno
   }
 }
 
+export async function runSerializedDevicePersistence<T>(
+  deviceId: string,
+  operation: () => Promise<T>
+): Promise<T> {
+  const previous = devicePersistenceQueues.get(deviceId) ?? Promise.resolve();
+  const current = previous.then(operation, operation);
+  const settled = current.then(() => undefined, () => undefined);
+
+  devicePersistenceQueues.set(deviceId, settled);
+
+  try {
+    return await current;
+  } finally {
+    if (devicePersistenceQueues.get(deviceId) === settled) {
+      devicePersistenceQueues.delete(deviceId);
+    }
+  }
+}
+
 export async function resolveTimerCommandState(_deviceId: string, incomingState: TimerState): Promise<TimerState> {
   return rebaseTimerStateToLocalClock(incomingState);
+}
+
+export async function resolveTimerCommandMode(deviceId: string, incomingMode: unknown): Promise<DeviceMode | null> {
+  if (incomingMode !== undefined) return normalizeDeviceMode(incomingMode);
+
+  const device = await prisma.device.findUnique({
+    where: { deviceId },
+    select: { displayState: true },
+  });
+  const displayState = parseDisplayState(device?.displayState);
+  const storedMode = normalizeDeviceMode(displayState.deviceMode);
+  const storedSportDisplayLayout = normalizeSportDisplayLayout(displayState.sportDisplayLayoutPreference);
+
+  return storedMode && isPrimarySportMode(storedMode.type)
+    ? storedMode
+    : {
+        type: 'basketball',
+        ...(storedSportDisplayLayout ? { sportDisplayLayout: storedSportDisplayLayout } : {}),
+      };
+}
+
+function getSportDisplayLayoutPreferenceUpdate(
+  mode: DeviceMode,
+  previousDisplayState: Record<string, unknown>
+): {
+  sportDisplayLayoutPreference?: SportDisplayLayout | null;
+} {
+  if (isPrimarySportMode(mode.type)) {
+    return { sportDisplayLayoutPreference: mode.sportDisplayLayout ?? null };
+  }
+
+  if (Object.prototype.hasOwnProperty.call(previousDisplayState, 'sportDisplayLayoutPreference')) return {};
+
+  const previousMode = normalizeDeviceMode(previousDisplayState.deviceMode);
+  return previousMode && isPrimarySportMode(previousMode.type) && previousMode.sportDisplayLayout
+    ? { sportDisplayLayoutPreference: previousMode.sportDisplayLayout }
+    : {};
 }
 
 function rebaseTimerStateToLocalClock(state: TimerState, now = Date.now()): TimerState {
