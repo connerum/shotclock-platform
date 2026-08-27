@@ -15,7 +15,7 @@ import PracticeBoardMode from './modes/PracticeBoardMode';
 import PitchKountMode from './modes/PitchKountMode';
 import ViewportCanvas from './components/ViewportCanvas';
 import PresentationOverlay from './components/PresentationOverlay';
-import ThreePanelSportLayout from './components/ThreePanelSportLayout';
+import SportDisplayLayout from './components/SportDisplayLayout';
 
 type KioskMode = 'setup' | 'pairing' | 'offline' | 'basketball' | 'wrestling' | 'volleyball' | 'practice-board' | 'pitchkount' | 'shot-clock' | 'media' | 'calibration' | 'blank';
 
@@ -94,14 +94,14 @@ export default function App() {
 
   const modeDisplay = renderMode();
   const sportDisplayLayout = state?.mode?.sportDisplayLayout;
-  const activeDisplay = isPrimarySportMode(currentMode) && sportDisplayLayout?.type === 'three-panel'
+  const activeDisplay = isPrimarySportMode(currentMode) && isSportPanelLayout(sportDisplayLayout?.type)
     ? (
-        <ThreePanelSportLayout
+        <SportDisplayLayout
           layout={sportDisplayLayout}
           primaryResetSequence={state?.timerState?.primaryResetSequence}
         >
           {modeDisplay}
-        </ThreePanelSportLayout>
+        </SportDisplayLayout>
       )
     : modeDisplay;
 
@@ -117,4 +117,8 @@ export default function App() {
 
 function isPrimarySportMode(mode: KioskMode): mode is 'basketball' | 'wrestling' | 'volleyball' {
   return mode === 'basketball' || mode === 'wrestling' || mode === 'volleyball';
+}
+
+function isSportPanelLayout(type: unknown): type is 'two-panel' | 'three-panel' {
+  return type === 'two-panel' || type === 'three-panel';
 }

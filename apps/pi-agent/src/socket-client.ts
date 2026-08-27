@@ -11,11 +11,8 @@ import type {
   DeviceCommandAck,
   PresentationOverlay,
 } from '@shotclock/shared/types';
-import {
-  THREE_PANEL_AD_BEHAVIORS_CAPABILITY,
-  THREE_PANEL_SPORTS_ADS_CAPABILITY,
-} from '@shotclock/shared/types';
 import { rebaseTimerStateToLocalClock } from '@shotclock/shared/timer';
+import { ADVERTISED_DEVICE_CAPABILITIES } from './capabilities.js';
 import { loadIdentity, markAsPaired, isPaired } from './identity.js';
 import { loadState, saveState, setConfigPreview } from './state-store.js';
 import { saveConfig } from './config-store.js';
@@ -252,19 +249,7 @@ function sendHello(identity: DeviceIdentity): void {
     deviceName: currentIdentity.deviceName,
     firmwareVersion: currentIdentity.firmwareVersion,
     controllerType: currentIdentity.controllerType,
-    capabilities: [
-      'basketball',
-      'wrestling',
-      'volleyball',
-      'pitchkount',
-      'shot-clock',
-      'scoreboard',
-      'timer',
-      'media',
-      'presentation',
-      THREE_PANEL_SPORTS_ADS_CAPABILITY,
-      THREE_PANEL_AD_BEHAVIORS_CAPABILITY,
-    ],
+    capabilities: [...ADVERTISED_DEVICE_CAPABILITIES],
     displayProfile: state.displayProfile,
     pairingCode: pairingCode?.code,
     pairingCodeExpiresAt: pairingCode?.expiresAt,

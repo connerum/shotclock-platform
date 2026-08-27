@@ -6,7 +6,6 @@ import { prisma } from '@/lib/prisma';
 import { getServerIO } from '@/lib/socket';
 import {
   THREE_PANEL_AD_BEHAVIORS_CAPABILITY,
-  THREE_PANEL_SPORTS_ADS_CAPABILITY,
   type DeviceCommandAck,
   type DeviceMode,
   type TimerState,
@@ -15,6 +14,7 @@ import { canAccessDevice, requireApiUser } from '@/lib/auth';
 import {
   emitDeviceCommand,
   deviceSupportsCapability,
+  deviceSupportsSportDisplayLayout,
   getConnectedDeviceSocketCount,
   getDeviceRoom,
   markDeviceOffline,
@@ -122,12 +122,9 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         }
         if (
           mode.sportDisplayLayout &&
-          !deviceSupportsCapability(device.capabilities, THREE_PANEL_SPORTS_ADS_CAPABILITY)
+          !deviceSupportsSportDisplayLayout(device.capabilities, mode.sportDisplayLayout)
         ) {
-          return NextResponse.json(
-            { error: 'Display software update required for 3-section layouts' },
-            { status: 409 }
-          );
+          return unsupportedSportDisplayLayoutResponse(mode.sportDisplayLayout.type);
         }
         if (
           sportDisplayLayoutUsesAdvancedBehavior(mode.sportDisplayLayout) &&
@@ -178,12 +175,9 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
           }
           if (
             displayMode.sportDisplayLayout &&
-            !deviceSupportsCapability(device.capabilities, THREE_PANEL_SPORTS_ADS_CAPABILITY)
+            !deviceSupportsSportDisplayLayout(device.capabilities, displayMode.sportDisplayLayout)
           ) {
-            return NextResponse.json(
-              { error: 'Display software update required for 3-section layouts' },
-              { status: 409 }
-            );
+            return unsupportedSportDisplayLayoutResponse(displayMode.sportDisplayLayout.type);
           }
           if (
             sportDisplayLayoutUsesAdvancedBehavior(displayMode.sportDisplayLayout) &&
@@ -350,5 +344,13 @@ function commandAckError(ack: DeviceCommandAck) {
   return NextResponse.json(
     { success: false, error: ack.error || 'Device did not acknowledge command' },
     { status: 504 }
+  );
+}
+
+function unsupportedSportDisplayLayoutResponse(type: 'two-panel' | 'three-panel') {
+  const sectionCount = type === 'two-panel' ? 2 : 3;
+  return NextResponse.json(
+    { error: `Display software update required for ${sectionCount}-section layouts` },
+    { status: 409 }
   );
 }

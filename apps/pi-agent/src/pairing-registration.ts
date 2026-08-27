@@ -2,6 +2,7 @@ import type { DeviceIdentity } from './identity.js';
 import type { AgentConfig } from './config-store.js';
 import { getPairingCode } from './pairing-code.js';
 import { loadState } from './state-store.js';
+import { ADVERTISED_DEVICE_CAPABILITIES } from './capabilities.js';
 
 export async function registerPairingCodeWithServer(
   identity: DeviceIdentity,
@@ -27,7 +28,7 @@ export async function registerPairingCodeWithServer(
         deviceName: identity.deviceName,
         firmwareVersion: identity.firmwareVersion,
         controllerType: identity.controllerType,
-        capabilities: ['shot-clock', 'scoreboard', 'timer', 'media', 'pitchkount'],
+        capabilities: [...ADVERTISED_DEVICE_CAPABILITIES],
         displayProfile: state.displayProfile,
         pairingCode: pairingCode.code,
         pairingCodeExpiresAt: pairingCode.expiresAt,

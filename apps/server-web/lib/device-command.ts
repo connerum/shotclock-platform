@@ -7,10 +7,16 @@ import type {
   PresentationOverlayType,
   PrimaryClockResetAction,
   SportDisplayAdMode,
+  SportDisplayAdPosition,
   SportDisplayLayout,
   TimerState,
 } from '@shotclock/shared/types';
-import { normalizePitchKountState } from '@shotclock/shared/types';
+import {
+  DEFAULT_SPORT_DISPLAY_AD_POSITION,
+  normalizePitchKountState,
+  THREE_PANEL_SPORTS_ADS_CAPABILITY,
+  TWO_PANEL_SPORTS_AD_CAPABILITY,
+} from '@shotclock/shared/types';
 
 export const COMMAND_ACK_TIMEOUT_MS = 2500;
 
@@ -22,6 +28,7 @@ const SPORT_DISPLAY_AD_MODES = new Set<SportDisplayAdMode>([
   'mirrored-timed',
   'offset-on-timer-reset',
 ]);
+const SPORT_DISPLAY_AD_POSITIONS = new Set<SportDisplayAdPosition>(['start', 'end']);
 
 export type GameCommandType = 'set_mode' | 'set_timer' | 'presentation';
 
@@ -73,7 +80,7 @@ export function normalizeSportDisplayLayout(value: unknown): SportDisplayLayout 
   if (!value || typeof value !== 'object') return null;
 
   const layout = value as Partial<SportDisplayLayout>;
-  if (layout.type !== 'three-panel') return null;
+  if (layout.type !== 'two-panel' && layout.type !== 'three-panel') return null;
 
   const adPlaylist = Array.isArray(layout.adPlaylist)
     ? layout.adPlaylist
@@ -93,20 +100,30 @@ export function normalizeSportDisplayLayout(value: unknown): SportDisplayLayout 
   const rotationIntervalMs = typeof layout.rotationIntervalMs === 'number'
     ? Math.max(1000, Math.min(60000, Math.round(layout.rotationIntervalMs)))
     : undefined;
-  const adMode = layout.adMode && SPORT_DISPLAY_AD_MODES.has(layout.adMode)
+  const adMode = layout.type === 'three-panel' && layout.adMode && SPORT_DISPLAY_AD_MODES.has(layout.adMode)
     ? layout.adMode
+    : undefined;
+  const adPosition = layout.type === 'two-panel'
+    ? layout.adPosition && SPORT_DISPLAY_AD_POSITIONS.has(layout.adPosition)
+      ? layout.adPosition
+      : DEFAULT_SPORT_DISPLAY_AD_POSITION
     : undefined;
 
   return {
-    type: 'three-panel',
+    type: layout.type,
     adPlaylist,
     ...(rotationIntervalMs ? { rotationIntervalMs } : {}),
     ...(adMode ? { adMode } : {}),
+    ...(adPosition ? { adPosition } : {}),
   };
 }
 
 export function sportDisplayLayoutUsesAdvancedBehavior(layout: SportDisplayLayout | undefined): boolean {
-  return Boolean(layout?.adMode && layout.adMode !== 'offset-timed');
+  return Boolean(
+    layout?.type === 'three-panel' &&
+    layout.adMode &&
+    layout.adMode !== 'offset-timed'
+  );
 }
 
 function isPrimarySportMode(mode: DeviceMode['type']): mode is 'basketball' | 'wrestling' | 'volleyball' {
@@ -130,6 +147,17 @@ export function deviceSupportsCapability(value: unknown, capability: string): bo
   } catch {
     return false;
   }
+}
+
+export function deviceSupportsSportDisplayLayout(
+  capabilities: unknown,
+  layout: SportDisplayLayout | undefined
+): boolean {
+  if (!layout) return true;
+  const requiredCapability = layout.type === 'two-panel'
+    ? TWO_PANEL_SPORTS_AD_CAPABILITY
+    : THREE_PANEL_SPORTS_ADS_CAPABILITY;
+  return deviceSupportsCapability(capabilities, requiredCapability);
 }
 
 export function getConnectedDeviceSocketCount(deviceNamespace: any, deviceId: string): number {

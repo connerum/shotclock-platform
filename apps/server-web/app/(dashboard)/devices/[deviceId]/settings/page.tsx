@@ -7,8 +7,10 @@ import { useParams, useRouter } from 'next/navigation';
 import { DeviceMode, DisplayProfile, CalibrationData } from '@shotclock/shared/types';
 import {
   buildThreePanelSportLayout,
+  buildTwoPanelSportLayout,
   getActiveSportAdPlaylist,
   getSportDisplayAdMode,
+  getSportDisplayAdPosition,
 } from '../SportDisplayLayoutControls';
 
 interface Device {
@@ -55,7 +57,7 @@ const MEDIA_SLOT_CONFIG: Array<{
   {
     slot: 'ads',
     title: 'Ads',
-    description: 'Images or videos shown by Run Ads and the outer sections of 3-section sport layouts.',
+    description: 'Images or videos shown by Run Ads and the ad panels in split sport layouts.',
     accept: 'image/*,video/*',
     allowMultipleActive: true,
   },
@@ -611,7 +613,7 @@ export default function DeviceDetailPage() {
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data?.error || `Upload failed with HTTP ${res.status}`);
       const nextMediaAssets = await fetchMediaAssets();
-      if (slot === 'ads' && nextMediaAssets) await reconcileActiveThreePanelAds(nextMediaAssets);
+      if (slot === 'ads' && nextMediaAssets) await reconcileActiveSportLayoutAds(nextMediaAssets);
     } catch (err) {
       setMediaError(err instanceof Error ? err.message : 'Upload failed');
     } finally {
@@ -630,7 +632,7 @@ export default function DeviceDetailPage() {
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data?.error || `Update failed with HTTP ${res.status}`);
       const nextMediaAssets = await fetchMediaAssets();
-      if (asset.slot === 'ads' && nextMediaAssets) await reconcileActiveThreePanelAds(nextMediaAssets);
+      if (asset.slot === 'ads' && nextMediaAssets) await reconcileActiveSportLayoutAds(nextMediaAssets);
     } catch (err) {
       setMediaError(err instanceof Error ? err.message : 'Update failed');
     }
@@ -648,29 +650,28 @@ export default function DeviceDetailPage() {
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data?.error || `Delete failed with HTTP ${res.status}`);
       const nextMediaAssets = await fetchMediaAssets();
-      if (asset.slot === 'ads' && nextMediaAssets) await reconcileActiveThreePanelAds(nextMediaAssets);
+      if (asset.slot === 'ads' && nextMediaAssets) await reconcileActiveSportLayoutAds(nextMediaAssets);
     } catch (err) {
       setMediaError(err instanceof Error ? err.message : 'Delete failed');
     }
   };
 
-  const reconcileActiveThreePanelAds = async (nextMediaAssets: DeviceMediaAsset[]) => {
+  const reconcileActiveSportLayoutAds = async (nextMediaAssets: DeviceMediaAsset[]) => {
     const currentMode = device?.displayState?.deviceMode;
     const savedLayout = currentMode?.sportDisplayLayout
       || device?.displayState?.sportDisplayLayoutPreference;
-    if (savedLayout?.type !== 'three-panel') {
+    if (!savedLayout) {
       return;
     }
 
-    const nextLayout = buildThreePanelSportLayout(
-      nextMediaAssets,
-      getSportDisplayAdMode(savedLayout)
-    );
+    const nextLayout = savedLayout.type === 'two-panel'
+      ? buildTwoPanelSportLayout(nextMediaAssets, getSportDisplayAdPosition(savedLayout))
+      : buildThreePanelSportLayout(nextMediaAssets, getSportDisplayAdMode(savedLayout));
     const nextSavedLayout = getActiveSportAdPlaylist(nextMediaAssets).length > 0
       ? nextLayout
       : null;
     let nextMode: DeviceMode | null = null;
-    if (currentMode && isPrimarySportMode(currentMode.type) && currentMode.sportDisplayLayout?.type === 'three-panel') {
+    if (currentMode && isPrimarySportMode(currentMode.type) && currentMode.sportDisplayLayout) {
       const { sportDisplayLayout: _previousLayout, ...modeWithoutLayout } = currentMode;
       nextMode = {
         ...modeWithoutLayout,

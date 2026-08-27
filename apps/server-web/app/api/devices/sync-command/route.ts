@@ -7,13 +7,13 @@ import { getServerIO } from '@/lib/socket';
 import { canAccessDevice, requireApiUser } from '@/lib/auth';
 import {
   THREE_PANEL_AD_BEHAVIORS_CAPABILITY,
-  THREE_PANEL_SPORTS_ADS_CAPABILITY,
   type DeviceMode,
   type TimerState,
 } from '@shotclock/shared/types';
 import type { DeviceCommandResult, GameCommandType } from '@/lib/device-command';
 import {
   deviceSupportsCapability,
+  deviceSupportsSportDisplayLayout,
   emitDeviceCommandToDevice,
   getConnectedDeviceSocketCount,
   markDeviceOffline,
@@ -138,9 +138,12 @@ export async function POST(request: NextRequest) {
             { status: 400 }
           );
         }
-        const unsupportedDeviceIds = getUnsupportedThreePanelDeviceIds(devices, mode);
+        const unsupportedDeviceIds = getUnsupportedSportDisplayLayoutDeviceIds(devices, mode);
         if (unsupportedDeviceIds.length > 0) {
-          return unsupportedThreePanelResponse(unsupportedDeviceIds);
+          return unsupportedSportDisplayLayoutResponse(
+            unsupportedDeviceIds,
+            mode.sportDisplayLayout!.type
+          );
         }
         const unsupportedBehaviorDeviceIds = getUnsupportedAdBehaviorDeviceIds(devices, mode);
         if (unsupportedBehaviorDeviceIds.length > 0) {
@@ -174,9 +177,12 @@ export async function POST(request: NextRequest) {
               { status: 400 }
             );
           }
-          const unsupportedDeviceIds = getUnsupportedThreePanelDeviceIds(devices, displayMode);
+          const unsupportedDeviceIds = getUnsupportedSportDisplayLayoutDeviceIds(devices, displayMode);
           if (unsupportedDeviceIds.length > 0) {
-            return unsupportedThreePanelResponse(unsupportedDeviceIds);
+            return unsupportedSportDisplayLayoutResponse(
+              unsupportedDeviceIds,
+              displayMode.sportDisplayLayout!.type
+            );
           }
           const unsupportedBehaviorDeviceIds = getUnsupportedAdBehaviorDeviceIds(devices, displayMode);
           if (unsupportedBehaviorDeviceIds.length > 0) {
@@ -304,10 +310,10 @@ function getSyncDeviceMode(value: unknown): DeviceMode | null {
   return mode;
 }
 
-function getUnsupportedThreePanelDeviceIds(devices: SyncDevice[], mode: DeviceMode): string[] {
+function getUnsupportedSportDisplayLayoutDeviceIds(devices: SyncDevice[], mode: DeviceMode): string[] {
   if (!mode.sportDisplayLayout) return [];
   return devices
-    .filter((device) => !deviceSupportsCapability(device.capabilities, THREE_PANEL_SPORTS_ADS_CAPABILITY))
+    .filter((device) => !deviceSupportsSportDisplayLayout(device.capabilities, mode.sportDisplayLayout))
     .map((device) => device.deviceId);
 }
 
@@ -318,11 +324,15 @@ function getUnsupportedAdBehaviorDeviceIds(devices: SyncDevice[], mode: DeviceMo
     .map((device) => device.deviceId);
 }
 
-function unsupportedThreePanelResponse(unsupportedDeviceIds: string[]) {
+function unsupportedSportDisplayLayoutResponse(
+  unsupportedDeviceIds: string[],
+  type: 'two-panel' | 'three-panel'
+) {
+  const sectionCount = type === 'two-panel' ? 2 : 3;
   return NextResponse.json(
     {
       success: false,
-      error: 'One or more displays require a software update for 3-section layouts',
+      error: `One or more displays require a software update for ${sectionCount}-section layouts`,
       unsupportedDeviceIds,
     },
     { status: 409 }

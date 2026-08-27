@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import {
   THREE_PANEL_AD_BEHAVIORS_CAPABILITY,
-  THREE_PANEL_SPORTS_ADS_CAPABILITY,
   type SportDisplayLayout,
 } from '@shotclock/shared/types';
 import { prisma } from '@/lib/prisma';
@@ -9,6 +8,7 @@ import { canAccessDevice, requireApiUser } from '@/lib/auth';
 import { getRequestIp, writeAuditLog } from '@/lib/audit';
 import {
   deviceSupportsCapability,
+  deviceSupportsSportDisplayLayout,
   normalizeSportDisplayLayout,
   persistSportDisplayLayoutPreference,
   sportDisplayLayoutUsesAdvancedBehavior,
@@ -49,9 +49,10 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
       if (!sportDisplayLayout) {
         return NextResponse.json({ error: 'Invalid sport display layout' }, { status: 400 });
       }
-      if (!deviceSupportsCapability(device.capabilities, THREE_PANEL_SPORTS_ADS_CAPABILITY)) {
+      if (!deviceSupportsSportDisplayLayout(device.capabilities, sportDisplayLayout)) {
+        const sectionCount = sportDisplayLayout.type === 'two-panel' ? 2 : 3;
         return NextResponse.json(
-          { error: 'Display software update required for 3-section layouts' },
+          { error: `Display software update required for ${sectionCount}-section layouts` },
           { status: 409 }
         );
       }

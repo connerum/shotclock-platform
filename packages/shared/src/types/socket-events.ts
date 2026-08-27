@@ -9,6 +9,7 @@ export type SportType = 'basketball' | 'wrestling' | 'volleyball';
 
 export const THREE_PANEL_SPORTS_ADS_CAPABILITY = 'three-panel-sports-ads';
 export const THREE_PANEL_AD_BEHAVIORS_CAPABILITY = 'three-panel-ad-behaviors';
+export const TWO_PANEL_SPORTS_AD_CAPABILITY = 'two-panel-sports-ad';
 
 export type PracticeBoardUnit = 'offense' | 'defense';
 
@@ -320,11 +321,16 @@ export interface SportDisplayMedia {
 }
 
 export interface SportDisplayLayout {
-  type: 'three-panel';
+  type: 'two-panel' | 'three-panel';
   adPlaylist: SportDisplayMedia[];
   rotationIntervalMs?: number;
   adMode?: SportDisplayAdMode;
+  adPosition?: SportDisplayAdPosition;
 }
+
+export type SportDisplayAdPosition = 'start' | 'end';
+
+export const DEFAULT_SPORT_DISPLAY_AD_POSITION: SportDisplayAdPosition = 'end';
 
 export type SportDisplayAdMode =
   | 'offset-timed'

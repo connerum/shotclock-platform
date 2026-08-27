@@ -9,6 +9,7 @@ import {
   type PrimaryClockResetAction,
   ScoreboardBranding,
   type SportDisplayAdMode,
+  type SportDisplayAdPosition,
   SportDisplayLayout,
   TimerState,
 } from '@shotclock/shared/types';
@@ -24,10 +25,13 @@ import {
 import GamePresentationControls from '../GamePresentationControls';
 import SportDisplayLayoutControls, {
   buildThreePanelSportLayout,
+  buildTwoPanelSportLayout,
   createPrimaryClockResetAction,
   DEFAULT_SPORT_DISPLAY_AD_MODE,
+  DEFAULT_SPORT_DISPLAY_AD_POSITION,
   getActiveSportAdPlaylist,
   getSportDisplayAdMode,
+  getSportDisplayAdPosition,
 } from '../SportDisplayLayoutControls';
 import { SyncTargetBanner, useDeviceCommandDispatcher } from '../../../SelectedDevicesProvider';
 
@@ -94,8 +98,9 @@ export default function BasketballPage() {
   const [mediaAssets, setMediaAssets] = useState<DeviceMediaAsset[]>([]);
   const [mediaLoading, setMediaLoading] = useState(true);
   const [mediaError, setMediaError] = useState<string | null>(null);
-  const [threePanelEnabled, setThreePanelEnabled] = useState(false);
+  const [sportDisplayLayoutType, setSportDisplayLayoutType] = useState<SportDisplayLayout['type'] | undefined>();
   const [sportDisplayAdMode, setSportDisplayAdMode] = useState<SportDisplayAdMode>(DEFAULT_SPORT_DISPLAY_AD_MODE);
+  const [sportDisplayAdPosition, setSportDisplayAdPosition] = useState<SportDisplayAdPosition>(DEFAULT_SPORT_DISPLAY_AD_POSITION);
   const [hydratedSportDisplayLayout, setHydratedSportDisplayLayout] = useState<SportDisplayLayout | undefined>();
   const [layoutSaving, setLayoutSaving] = useState(false);
   const modeUpdateTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -107,8 +112,9 @@ export default function BasketballPage() {
     setError(null);
     setCommandError(null);
     setDevice(null);
-    setThreePanelEnabled(false);
+    setSportDisplayLayoutType(undefined);
     setSportDisplayAdMode(DEFAULT_SPORT_DISPLAY_AD_MODE);
+    setSportDisplayAdPosition(DEFAULT_SPORT_DISPLAY_AD_POSITION);
     setHydratedSportDisplayLayout(undefined);
     setMediaAssets([]);
     setMediaLoading(true);
@@ -129,7 +135,7 @@ export default function BasketballPage() {
     if (
       device?.deviceId !== deviceId ||
       mediaLoading ||
-      (threePanelEnabled && mediaError && !hydratedSportDisplayLayout)
+      (sportDisplayLayoutType && mediaError && !hydratedSportDisplayLayout)
     ) return;
     if (modeUpdateTimeoutRef.current) clearTimeout(modeUpdateTimeoutRef.current);
     const timeout = setTimeout(() => {
@@ -184,14 +190,15 @@ export default function BasketballPage() {
       setHomeColor(isHexColor(loadedBranding?.homeColor) ? loadedBranding.homeColor : DEFAULT_HOME_COLOR);
       setAwayColor(isHexColor(loadedBranding?.awayColor) ? loadedBranding.awayColor : DEFAULT_AWAY_COLOR);
       const savedLayoutPreference = data.device.displayState?.sportDisplayLayoutPreference as SportDisplayLayout | undefined;
-      const loadedSportDisplayLayout = loadedMode?.sportDisplayLayout?.type === 'three-panel'
+      const loadedSportDisplayLayout = loadedMode?.sportDisplayLayout
         ? loadedMode.sportDisplayLayout
-        : savedLayoutPreference?.type === 'three-panel'
+        : savedLayoutPreference
           ? savedLayoutPreference
           : undefined;
       setHydratedSportDisplayLayout(loadedSportDisplayLayout);
-      setThreePanelEnabled(Boolean(loadedSportDisplayLayout));
+      setSportDisplayLayoutType(loadedSportDisplayLayout?.type);
       setSportDisplayAdMode(getSportDisplayAdMode(loadedSportDisplayLayout));
+      setSportDisplayAdPosition(getSportDisplayAdPosition(loadedSportDisplayLayout));
       setTimerRunning(loadedTimerState.isRunning);
       setTimerLastUpdated(loadedTimerState.lastUpdated);
       setTimerNow(Date.now());
@@ -416,25 +423,35 @@ export default function BasketballPage() {
   });
 
   const resolveSportDisplayLayout = (
-    enabled = threePanelEnabled,
-    adMode = sportDisplayAdMode
+    layoutType = sportDisplayLayoutType,
+    adMode = sportDisplayAdMode,
+    adPosition = sportDisplayAdPosition
   ): SportDisplayLayout | undefined => {
-    if (!enabled) return undefined;
-    const localLayout = buildThreePanelSportLayout(mediaAssets, adMode);
+    if (!layoutType) return undefined;
+    const localLayout = layoutType === 'two-panel'
+      ? buildTwoPanelSportLayout(mediaAssets, adPosition)
+      : buildThreePanelSportLayout(mediaAssets, adMode);
     const sourceLayout = mediaLoading || mediaError
       ? hydratedSportDisplayLayout
       : localLayout.adPlaylist.length === 0 && hydratedSportDisplayLayout?.adPlaylist.length
         ? hydratedSportDisplayLayout
         : localLayout;
-    return sourceLayout ? { ...sourceLayout, adMode } : undefined;
+    if (!sourceLayout) return undefined;
+    if (layoutType === 'two-panel') {
+      const { adMode: _adMode, ...twoPanelLayout } = sourceLayout;
+      return { ...twoPanelLayout, type: 'two-panel', adPosition };
+    }
+    const { adPosition: _adPosition, ...threePanelLayout } = sourceLayout;
+    return { ...threePanelLayout, type: 'three-panel', adMode };
   };
 
   const buildBasketballMode = (
     mode: BasketballPreviewMode = previewMode,
-    layoutEnabled = threePanelEnabled,
-    adMode = sportDisplayAdMode
+    layoutType = sportDisplayLayoutType,
+    adMode = sportDisplayAdMode,
+    adPosition = sportDisplayAdPosition
   ): DeviceMode => {
-    const sportDisplayLayout = resolveSportDisplayLayout(layoutEnabled, adMode);
+    const sportDisplayLayout = resolveSportDisplayLayout(layoutType, adMode, adPosition);
     return {
       type: 'basketball',
       subMode: mode === 'regular' ? 'shot-clock-only' : mode,
@@ -443,20 +460,20 @@ export default function BasketballPage() {
     };
   };
 
-  const changeThreePanelLayout = async (enabled: boolean) => {
-    if (enabled === threePanelEnabled || layoutSaving) return;
+  const changeSportDisplayLayoutType = async (layoutType: SportDisplayLayout['type'] | undefined) => {
+    if (layoutType === sportDisplayLayoutType || layoutSaving) return;
 
-    const previousValue = threePanelEnabled;
+    const previousValue = sportDisplayLayoutType;
     if (modeUpdateTimeoutRef.current) {
       clearTimeout(modeUpdateTimeoutRef.current);
       modeUpdateTimeoutRef.current = null;
     }
-    setThreePanelEnabled(enabled);
+    setSportDisplayLayoutType(layoutType);
     setLayoutSaving(true);
-    const mode = buildBasketballMode(previewMode, enabled);
+    const mode = buildBasketballMode(previewMode, layoutType);
     const success = await sendCommand('set_mode', { mode });
     if (!success) {
-      setThreePanelEnabled(previousValue);
+      setSportDisplayLayoutType(previousValue);
     } else {
       setHydratedSportDisplayLayout(mode.sportDisplayLayout);
     }
@@ -473,10 +490,30 @@ export default function BasketballPage() {
     }
     setSportDisplayAdMode(adMode);
     setLayoutSaving(true);
-    const mode = buildBasketballMode(previewMode, true, adMode);
+    const mode = buildBasketballMode(previewMode, 'three-panel', adMode);
     const success = await sendCommand('set_mode', { mode });
     if (!success) {
       setSportDisplayAdMode(previousMode);
+    } else {
+      setHydratedSportDisplayLayout(mode.sportDisplayLayout);
+    }
+    setLayoutSaving(false);
+  };
+
+  const changeSportDisplayAdPosition = async (adPosition: SportDisplayAdPosition) => {
+    if (adPosition === sportDisplayAdPosition || layoutSaving) return;
+
+    const previousPosition = sportDisplayAdPosition;
+    if (modeUpdateTimeoutRef.current) {
+      clearTimeout(modeUpdateTimeoutRef.current);
+      modeUpdateTimeoutRef.current = null;
+    }
+    setSportDisplayAdPosition(adPosition);
+    setLayoutSaving(true);
+    const mode = buildBasketballMode(previewMode, 'two-panel', sportDisplayAdMode, adPosition);
+    const success = await sendCommand('set_mode', { mode });
+    if (!success) {
+      setSportDisplayAdPosition(previousPosition);
     } else {
       setHydratedSportDisplayLayout(mode.sportDisplayLayout);
     }
@@ -571,9 +608,10 @@ export default function BasketballPage() {
 
       <SportDisplayLayoutControls
         deviceId={deviceId}
-        enabled={threePanelEnabled}
+        layoutType={sportDisplayLayoutType}
         adMode={sportDisplayAdMode}
-        activeAdCount={threePanelEnabled
+        adPosition={sportDisplayAdPosition}
+        activeAdCount={sportDisplayLayoutType
           ? resolveSportDisplayLayout()?.adPlaylist.length ?? 0
           : getActiveSportAdPlaylist(mediaAssets).length}
         mediaLoading={mediaLoading}
@@ -581,8 +619,9 @@ export default function BasketballPage() {
         capabilities={device.capabilities}
         isSyncActive={isSyncActive}
         layoutSaving={layoutSaving}
-        onEnabledChange={changeThreePanelLayout}
+        onLayoutTypeChange={changeSportDisplayLayoutType}
         onAdModeChange={changeSportDisplayAdMode}
+        onAdPositionChange={changeSportDisplayAdPosition}
       />
 
       <section className="cc-card mb-4 p-4 md:p-5">

@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
   deviceSupportsCapability,
+  deviceSupportsSportDisplayLayout,
   normalizeDeviceMode,
   normalizeSportDisplayLayout,
   reconcileSportDisplayLayoutPreference,
@@ -13,6 +14,10 @@ import {
   stripPrimaryResetMetadata,
 } from '../apps/server-web/lib/device-command';
 import { createDefaultTimerState, normalizeTimerState } from '../packages/shared/src/timer/index';
+import {
+  THREE_PANEL_SPORTS_ADS_CAPABILITY,
+  TWO_PANEL_SPORTS_AD_CAPABILITY,
+} from '../packages/shared/src/types/index';
 import { getThreePanelAdIndices } from '../apps/pi-kiosk/src/components/three-panel-ad-behavior';
 
 test('three-panel sport layouts retain visual ads and clamp rotation timing', () => {
@@ -82,6 +87,31 @@ test('three-panel sport layout playlists are capped and invalid timing is omitte
   assert.equal(layout?.rotationIntervalMs, undefined);
 });
 
+test('two-panel sport layouts preserve ad position and omit three-panel behavior', () => {
+  assert.deepEqual(normalizeSportDisplayLayout({
+    type: 'two-panel',
+    adPosition: 'end',
+    adMode: 'mirrored-timed',
+    rotationIntervalMs: 8_000,
+    adPlaylist: [
+      { mediaUrl: 'https://cdn.example.test/ad.png', mediaMimeType: 'image/png' },
+    ],
+  }), {
+    type: 'two-panel',
+    adPosition: 'end',
+    rotationIntervalMs: 8_000,
+    adPlaylist: [
+      { mediaUrl: 'https://cdn.example.test/ad.png', mediaMimeType: 'image/png' },
+    ],
+  });
+
+  assert.equal(normalizeSportDisplayLayout({
+    type: 'two-panel',
+    adPosition: 'middle',
+    adPlaylist: [],
+  })?.adPosition, 'end');
+});
+
 test('layout is accepted only for basketball, wrestling, and volleyball', () => {
   const sportDisplayLayout = {
     type: 'three-panel',
@@ -109,6 +139,18 @@ test('display capabilities are parsed defensively for rollout gating', () => {
   assert.equal(deviceSupportsCapability('["timer","three-panel-sports-ads"]', 'three-panel-sports-ads'), true);
   assert.equal(deviceSupportsCapability(['timer'], 'three-panel-sports-ads'), false);
   assert.equal(deviceSupportsCapability('{bad json', 'three-panel-sports-ads'), false);
+  assert.equal(deviceSupportsSportDisplayLayout(
+    [TWO_PANEL_SPORTS_AD_CAPABILITY],
+    { type: 'two-panel', adPlaylist: [] }
+  ), true);
+  assert.equal(deviceSupportsSportDisplayLayout(
+    [THREE_PANEL_SPORTS_ADS_CAPABILITY],
+    { type: 'two-panel', adPlaylist: [] }
+  ), false);
+  assert.equal(deviceSupportsSportDisplayLayout(
+    [THREE_PANEL_SPORTS_ADS_CAPABILITY],
+    { type: 'three-panel', adPlaylist: [] }
+  ), true);
 });
 
 test('display-state persistence is serialized per device', async () => {
@@ -214,6 +256,32 @@ test('saved ad reconciliation also updates an enabled active sport mode', () => 
   const cleared = reconcileSportDisplayLayoutPreference(reconciled, null);
   assert.deepEqual(cleared.deviceMode, { type: 'basketball', subMode: 'scoreboard' });
   assert.equal(cleared.sportDisplayLayoutPreference, null);
+});
+
+test('saved ad reconciliation preserves a two-panel ad position', () => {
+  const nextLayout = {
+    type: 'two-panel' as const,
+    adPosition: 'start' as const,
+    rotationIntervalMs: 8_000,
+    adPlaylist: [{ mediaUrl: 'https://cdn.example.test/current.png', mediaMimeType: 'image/png' }],
+  };
+  const reconciled = reconcileSportDisplayLayoutPreference({
+    mode: 'volleyball',
+    deviceMode: {
+      type: 'volleyball',
+      sportDisplayLayout: {
+        type: 'two-panel',
+        adPosition: 'end',
+        adPlaylist: [{ mediaUrl: 'https://cdn.example.test/old.png', mediaMimeType: 'image/png' }],
+      },
+    },
+  }, nextLayout);
+
+  assert.deepEqual(reconciled.deviceMode, {
+    type: 'volleyball',
+    sportDisplayLayout: nextLayout,
+  });
+  assert.deepEqual(reconciled.sportDisplayLayoutPreference, nextLayout);
 });
 
 test('three-panel ad behaviors are normalized and advanced modes are capability-gated', () => {

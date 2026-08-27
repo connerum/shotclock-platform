@@ -1,6 +1,7 @@
 import {
   THREE_PANEL_AD_BEHAVIORS_CAPABILITY,
   THREE_PANEL_SPORTS_ADS_CAPABILITY,
+  TWO_PANEL_SPORTS_AD_CAPABILITY,
   type DeviceMode,
 } from '@shotclock/shared/types';
 
@@ -24,12 +25,20 @@ export function resolveReconnectDeviceMode(
       : []
   );
 
-  if (!advertisedCapabilities.has(THREE_PANEL_SPORTS_ADS_CAPABILITY)) {
+  const supportsLayout = layout.type === 'two-panel'
+    ? advertisedCapabilities.has(TWO_PANEL_SPORTS_AD_CAPABILITY)
+    : advertisedCapabilities.has(THREE_PANEL_SPORTS_ADS_CAPABILITY);
+
+  if (!supportsLayout) {
     const { sportDisplayLayout: _unsupportedLayout, ...modeWithoutLayout } = storedMode;
     return modeWithoutLayout as DeviceMode;
   }
 
-  if (!advertisedCapabilities.has(THREE_PANEL_AD_BEHAVIORS_CAPABILITY) && layout.adMode) {
+  if (
+    layout.type === 'three-panel' &&
+    !advertisedCapabilities.has(THREE_PANEL_AD_BEHAVIORS_CAPABILITY) &&
+    layout.adMode
+  ) {
     const { adMode: _unsupportedAdMode, ...legacyLayout } = layout;
     return {
       ...storedMode,

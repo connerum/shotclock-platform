@@ -7,6 +7,7 @@ import type {
   PrimaryClockResetAction,
   ScoreboardBranding,
   SportDisplayAdMode,
+  SportDisplayAdPosition,
   SportDisplayLayout,
   SportType,
   TimerState,
@@ -21,10 +22,13 @@ import {
 import GamePresentationControls from './GamePresentationControls';
 import SportDisplayLayoutControls, {
   buildThreePanelSportLayout,
+  buildTwoPanelSportLayout,
   createPrimaryClockResetAction,
   DEFAULT_SPORT_DISPLAY_AD_MODE,
+  DEFAULT_SPORT_DISPLAY_AD_POSITION,
   getActiveSportAdPlaylist,
   getSportDisplayAdMode,
+  getSportDisplayAdPosition,
 } from './SportDisplayLayoutControls';
 import { SyncTargetBanner, useDeviceCommandDispatcher } from '../../SelectedDevicesProvider';
 
@@ -84,8 +88,9 @@ export default function SportControlPage({ deviceId, config }: { deviceId: strin
   const [mediaAssets, setMediaAssets] = useState<DeviceMediaAsset[]>([]);
   const [mediaLoading, setMediaLoading] = useState(true);
   const [mediaError, setMediaError] = useState<string | null>(null);
-  const [threePanelEnabled, setThreePanelEnabled] = useState(false);
+  const [sportDisplayLayoutType, setSportDisplayLayoutType] = useState<SportDisplayLayout['type'] | undefined>();
   const [sportDisplayAdMode, setSportDisplayAdMode] = useState<SportDisplayAdMode>(DEFAULT_SPORT_DISPLAY_AD_MODE);
+  const [sportDisplayAdPosition, setSportDisplayAdPosition] = useState<SportDisplayAdPosition>(DEFAULT_SPORT_DISPLAY_AD_POSITION);
   const [hydratedSportDisplayLayout, setHydratedSportDisplayLayout] = useState<SportDisplayLayout | undefined>();
   const [layoutSaving, setLayoutSaving] = useState(false);
   const modeUpdateTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -97,8 +102,9 @@ export default function SportControlPage({ deviceId, config }: { deviceId: strin
     setCommandError(null);
     setDevice(null);
     setLoadedSport(null);
-    setThreePanelEnabled(false);
+    setSportDisplayLayoutType(undefined);
     setSportDisplayAdMode(DEFAULT_SPORT_DISPLAY_AD_MODE);
+    setSportDisplayAdPosition(DEFAULT_SPORT_DISPLAY_AD_POSITION);
     setHydratedSportDisplayLayout(undefined);
 
     const fetchDevice = async () => {
@@ -128,14 +134,15 @@ export default function SportControlPage({ deviceId, config }: { deviceId: strin
             : 'empty');
         }
         const savedLayoutPreference = data.device.displayState?.sportDisplayLayoutPreference as SportDisplayLayout | undefined;
-        const loadedSportDisplayLayout = loadedMode?.sportDisplayLayout?.type === 'three-panel'
+        const loadedSportDisplayLayout = loadedMode?.sportDisplayLayout
           ? loadedMode.sportDisplayLayout
-          : savedLayoutPreference?.type === 'three-panel'
+          : savedLayoutPreference
             ? savedLayoutPreference
             : undefined;
         setHydratedSportDisplayLayout(loadedSportDisplayLayout);
-        setThreePanelEnabled(Boolean(loadedSportDisplayLayout));
+        setSportDisplayLayoutType(loadedSportDisplayLayout?.type);
         setSportDisplayAdMode(getSportDisplayAdMode(loadedSportDisplayLayout));
+        setSportDisplayAdPosition(getSportDisplayAdPosition(loadedSportDisplayLayout));
         setDevice(data.device);
         setLoadedSport(config.sport);
       } catch (error) {
@@ -181,7 +188,7 @@ export default function SportControlPage({ deviceId, config }: { deviceId: strin
       device?.deviceId !== deviceId ||
       loadedSport !== config.sport ||
       mediaLoading ||
-      (threePanelEnabled && mediaError && !hydratedSportDisplayLayout)
+      (sportDisplayLayoutType && mediaError && !hydratedSportDisplayLayout)
     ) return;
 
     if (modeUpdateTimeoutRef.current) clearTimeout(modeUpdateTimeoutRef.current);
@@ -215,24 +222,34 @@ export default function SportControlPage({ deviceId, config }: { deviceId: strin
   });
 
   const resolveSportDisplayLayout = (
-    enabled = threePanelEnabled,
-    adMode = sportDisplayAdMode
+    layoutType = sportDisplayLayoutType,
+    adMode = sportDisplayAdMode,
+    adPosition = sportDisplayAdPosition
   ): SportDisplayLayout | undefined => {
-    if (!enabled) return undefined;
-    const localLayout = buildThreePanelSportLayout(mediaAssets, adMode);
+    if (!layoutType) return undefined;
+    const localLayout = layoutType === 'two-panel'
+      ? buildTwoPanelSportLayout(mediaAssets, adPosition)
+      : buildThreePanelSportLayout(mediaAssets, adMode);
     const sourceLayout = mediaLoading || mediaError
       ? hydratedSportDisplayLayout
       : localLayout.adPlaylist.length === 0 && hydratedSportDisplayLayout?.adPlaylist.length
         ? hydratedSportDisplayLayout
         : localLayout;
-    return sourceLayout ? { ...sourceLayout, adMode } : undefined;
+    if (!sourceLayout) return undefined;
+    if (layoutType === 'two-panel') {
+      const { adMode: _adMode, ...twoPanelLayout } = sourceLayout;
+      return { ...twoPanelLayout, type: 'two-panel', adPosition };
+    }
+    const { adPosition: _adPosition, ...threePanelLayout } = sourceLayout;
+    return { ...threePanelLayout, type: 'three-panel', adMode };
   };
 
   const buildSportMode = (
-    layoutEnabled = threePanelEnabled,
-    adMode = sportDisplayAdMode
+    layoutType = sportDisplayLayoutType,
+    adMode = sportDisplayAdMode,
+    adPosition = sportDisplayAdPosition
   ): DeviceMode => {
-    const sportDisplayLayout = resolveSportDisplayLayout(layoutEnabled, adMode);
+    const sportDisplayLayout = resolveSportDisplayLayout(layoutType, adMode, adPosition);
     return {
       type: config.sport,
       ...(supportsTeamBranding(config.sport) ? { scoreboardBranding: buildTeamBranding() } : {}),
@@ -264,20 +281,20 @@ export default function SportControlPage({ deviceId, config }: { deviceId: strin
     return (await sendCommandWithResult(type, payload)).success;
   };
 
-  const changeThreePanelLayout = async (enabled: boolean) => {
-    if (enabled === threePanelEnabled || layoutSaving) return;
+  const changeSportDisplayLayoutType = async (layoutType: SportDisplayLayout['type'] | undefined) => {
+    if (layoutType === sportDisplayLayoutType || layoutSaving) return;
 
-    const previousValue = threePanelEnabled;
+    const previousValue = sportDisplayLayoutType;
     if (modeUpdateTimeoutRef.current) {
       clearTimeout(modeUpdateTimeoutRef.current);
       modeUpdateTimeoutRef.current = null;
     }
-    setThreePanelEnabled(enabled);
+    setSportDisplayLayoutType(layoutType);
     setLayoutSaving(true);
-    const mode = buildSportMode(enabled);
+    const mode = buildSportMode(layoutType);
     const success = await sendCommand('set_mode', { mode });
     if (!success) {
-      setThreePanelEnabled(previousValue);
+      setSportDisplayLayoutType(previousValue);
     } else {
       setHydratedSportDisplayLayout(mode.sportDisplayLayout);
     }
@@ -294,10 +311,30 @@ export default function SportControlPage({ deviceId, config }: { deviceId: strin
     }
     setSportDisplayAdMode(adMode);
     setLayoutSaving(true);
-    const mode = buildSportMode(true, adMode);
+    const mode = buildSportMode('three-panel', adMode);
     const success = await sendCommand('set_mode', { mode });
     if (!success) {
       setSportDisplayAdMode(previousMode);
+    } else {
+      setHydratedSportDisplayLayout(mode.sportDisplayLayout);
+    }
+    setLayoutSaving(false);
+  };
+
+  const changeSportDisplayAdPosition = async (adPosition: SportDisplayAdPosition) => {
+    if (adPosition === sportDisplayAdPosition || layoutSaving) return;
+
+    const previousPosition = sportDisplayAdPosition;
+    if (modeUpdateTimeoutRef.current) {
+      clearTimeout(modeUpdateTimeoutRef.current);
+      modeUpdateTimeoutRef.current = null;
+    }
+    setSportDisplayAdPosition(adPosition);
+    setLayoutSaving(true);
+    const mode = buildSportMode('two-panel', sportDisplayAdMode, adPosition);
+    const success = await sendCommand('set_mode', { mode });
+    if (!success) {
+      setSportDisplayAdPosition(previousPosition);
     } else {
       setHydratedSportDisplayLayout(mode.sportDisplayLayout);
     }
@@ -391,9 +428,10 @@ export default function SportControlPage({ deviceId, config }: { deviceId: strin
 
       <SportDisplayLayoutControls
         deviceId={deviceId}
-        enabled={threePanelEnabled}
+        layoutType={sportDisplayLayoutType}
         adMode={sportDisplayAdMode}
-        activeAdCount={threePanelEnabled
+        adPosition={sportDisplayAdPosition}
+        activeAdCount={sportDisplayLayoutType
           ? resolveSportDisplayLayout()?.adPlaylist.length ?? 0
           : getActiveSportAdPlaylist(mediaAssets).length}
         mediaLoading={mediaLoading}
@@ -401,8 +439,9 @@ export default function SportControlPage({ deviceId, config }: { deviceId: strin
         capabilities={device?.capabilities}
         isSyncActive={isSyncActive}
         layoutSaving={layoutSaving}
-        onEnabledChange={changeThreePanelLayout}
+        onLayoutTypeChange={changeSportDisplayLayoutType}
         onAdModeChange={changeSportDisplayAdMode}
+        onAdPositionChange={changeSportDisplayAdPosition}
       />
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">

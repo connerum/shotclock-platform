@@ -3,6 +3,7 @@ import test from 'node:test';
 import {
   THREE_PANEL_AD_BEHAVIORS_CAPABILITY,
   THREE_PANEL_SPORTS_ADS_CAPABILITY,
+  TWO_PANEL_SPORTS_AD_CAPABILITY,
   type DeviceMode,
 } from '../packages/shared/src/types/index';
 import { resolveReconnectDeviceMode } from '../apps/server-web/socket/reconnect-device-mode';
@@ -18,6 +19,18 @@ const ADVANCED_MODE: DeviceMode = {
     adPlaylist: [
       { mediaUrl: 'https://cdn.example.test/ad-one.png', mediaMimeType: 'image/png' },
       { mediaUrl: 'https://cdn.example.test/ad-two.png', mediaMimeType: 'image/png' },
+    ],
+  },
+};
+
+const TWO_PANEL_MODE: DeviceMode = {
+  type: 'volleyball',
+  sportDisplayLayout: {
+    type: 'two-panel',
+    adPosition: 'end',
+    rotationIntervalMs: 8_000,
+    adPlaylist: [
+      { mediaUrl: 'https://cdn.example.test/ad-one.png', mediaMimeType: 'image/png' },
     ],
   },
 };
@@ -68,4 +81,19 @@ test('reconnect leaves modes without a three-panel layout unchanged', () => {
 
   assert.equal(resolveReconnectDeviceMode(fullBoardMode, undefined), fullBoardMode);
   assert.equal(resolveReconnectDeviceMode(null, [THREE_PANEL_SPORTS_ADS_CAPABILITY]), null);
+});
+
+test('reconnect preserves two-panel position when the display supports that layout', () => {
+  assert.equal(resolveReconnectDeviceMode(TWO_PANEL_MODE, [
+    TWO_PANEL_SPORTS_AD_CAPABILITY,
+  ]), TWO_PANEL_MODE);
+});
+
+test('reconnect drops a two-panel layout when its capability is missing', () => {
+  assert.deepEqual(resolveReconnectDeviceMode(TWO_PANEL_MODE, [
+    THREE_PANEL_SPORTS_ADS_CAPABILITY,
+    THREE_PANEL_AD_BEHAVIORS_CAPABILITY,
+  ]), {
+    type: 'volleyball',
+  });
 });
