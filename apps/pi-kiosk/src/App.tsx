@@ -1,5 +1,9 @@
 import { useState, useEffect } from 'react';
-import type { DeviceMode, PresentationOverlay as PresentationOverlayState } from '@shotclock/shared/types';
+import type {
+  DeviceConnectivityState,
+  DeviceMode,
+  PresentationOverlay as PresentationOverlayState,
+} from '@shotclock/shared/types';
 import { useLocalApi } from './hooks/useLocalApi';
 import { useDisplayProfile } from './hooks/useDisplayProfile';
 import SetupMode from './modes/SetupMode';
@@ -15,6 +19,7 @@ import PracticeBoardMode from './modes/PracticeBoardMode';
 import PitchKountMode from './modes/PitchKountMode';
 import ViewportCanvas from './components/ViewportCanvas';
 import PresentationOverlay from './components/PresentationOverlay';
+import ConnectivityBanner from './components/ConnectivityBanner';
 import SportDisplayLayout from './components/SportDisplayLayout';
 
 type KioskMode = 'setup' | 'pairing' | 'offline' | 'basketball' | 'wrestling' | 'volleyball' | 'practice-board' | 'pitchkount' | 'shot-clock' | 'media' | 'calibration' | 'blank';
@@ -37,6 +42,7 @@ interface ShotClockState {
     primaryResetSequence?: number;
   };
   presentationOverlay?: PresentationOverlayState;
+  connectivity?: DeviceConnectivityState;
 }
 
 export default function App() {
@@ -110,6 +116,11 @@ export default function App() {
       <div className="relative h-full w-full overflow-hidden">
         {activeDisplay}
         <PresentationOverlay overlay={state?.presentationOverlay} />
+        <ConnectivityBanner
+          connectivity={resolveConnectivity(state?.connectivity, currentMode)}
+          setupAp={config?.setupAp}
+          hidden={isEmergencyOverlay(state?.presentationOverlay)}
+        />
       </div>
     </ViewportCanvas>
   );
@@ -121,4 +132,25 @@ function isPrimarySportMode(mode: KioskMode): mode is 'basketball' | 'wrestling'
 
 function isSportPanelLayout(type: unknown): type is 'two-panel' | 'three-panel' {
   return type === 'two-panel' || type === 'three-panel';
+}
+
+function isEmergencyOverlay(overlay?: PresentationOverlayState): boolean {
+  return Boolean(
+    overlay?.active
+    && (overlay.type === 'emergency-weather' || overlay.type === 'emergency-medical')
+  );
+}
+
+function resolveConnectivity(
+  connectivity: DeviceConnectivityState | undefined,
+  currentMode: KioskMode
+): DeviceConnectivityState | undefined {
+  if (connectivity) return connectivity;
+  if (currentMode === 'offline') {
+    return { status: 'offline', since: 0 };
+  }
+  if (currentMode === 'setup') {
+    return { status: 'setup', since: 0 };
+  }
+  return undefined;
 }

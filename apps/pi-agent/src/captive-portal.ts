@@ -5,9 +5,10 @@ import { setupAP } from './setup-ap.js';
 import { wifiManager } from './wifi-manager.js';
 import { loadConfig, saveConfig } from './config-store.js';
 import { isPaired, loadIdentity, markAsPaired } from './identity.js';
-import { saveState } from './state-store.js';
+import { loadState, saveState } from './state-store.js';
 import { registerPairingCodeWithServer } from './pairing-registration.js';
 import { reconnectSocketClient } from './socket-client.js';
+import { stopMaintenanceWifiRecovery } from './network-recovery.js';
 
 interface SetupState {
   step: 'initial' | 'ap_created' | 'network_selected' | 'network_connected' | 'complete';
@@ -557,7 +558,15 @@ async function connectToWifiFromPortal(ssid: string, password?: string): Promise
     };
     const paired = isPaired();
     saveConfig({ mode: paired ? 'online' : 'pairing' });
-    saveState({ mode: { type: paired ? 'shot-clock' : 'pairing' } });
+    const currentState = loadState();
+    const preservedMode = paired && !['setup', 'pairing', 'offline'].includes(currentState.mode.type)
+      ? currentState.mode
+      : { type: paired ? 'shot-clock' as const : 'pairing' as const };
+    saveState({
+      mode: preservedMode,
+      connectivity: { status: 'online', since: Date.now() },
+    });
+    stopMaintenanceWifiRecovery();
     const identity = loadIdentity();
     if (identity && !paired) {
       void registerPairingCodeWithServer(identity, loadConfig());

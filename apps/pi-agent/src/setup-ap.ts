@@ -117,6 +117,18 @@ export class SetupAP {
   }
 
   /**
+   * Avoid interrupting a technician who is actively using the maintenance AP.
+   */
+  async hasConnectedClients(): Promise<boolean> {
+    try {
+      const { stdout } = await execFileAsync('iw', ['dev', this.config.apInterface, 'station', 'dump']);
+      return /^Station\s+/m.test(stdout);
+    } catch {
+      return false;
+    }
+  }
+
+  /**
    * Get AP configuration
    */
   getConfig(): CaptivePortalConfig {

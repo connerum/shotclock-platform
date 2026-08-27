@@ -156,6 +156,54 @@ export class WiFiManager {
     }
   }
 
+  /**
+   * Return NetworkManager WiFi connection profiles without exposing secrets.
+   */
+  async getSavedWifiProfiles(): Promise<string[]> {
+    try {
+      const { stdout } = await execFileAsync('nmcli', ['-t', '-f', 'NAME,TYPE', 'connection', 'show']);
+      return stdout
+        .split('\n')
+        .filter(Boolean)
+        .map((line) => {
+          const separatorIndex = line.lastIndexOf(':');
+          return separatorIndex === -1
+            ? { name: '', type: '' }
+            : { name: line.slice(0, separatorIndex), type: line.slice(separatorIndex + 1) };
+        })
+        .filter((profile) => profile.name && profile.type === '802-11-wireless')
+        .map((profile) => profile.name);
+    } catch (error) {
+      console.error('Get saved WiFi profiles error:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Let NetworkManager select and activate the best available saved profile.
+   * This never creates, deletes, or changes a saved connection.
+   */
+  async reconnectSavedWifi(): Promise<boolean> {
+    try {
+      const savedProfiles = await this.getSavedWifiProfiles();
+      if (savedProfiles.length === 0) {
+        console.warn('No saved WiFi profiles are available for automatic recovery');
+        return false;
+      }
+
+      console.log(`Trying ${savedProfiles.length} saved WiFi profile(s)`);
+      await this.prepareClientMode();
+      await execFileAsync('nmcli', ['device', 'connect', this.iface], { timeout: 30000 }).catch((error) => {
+        console.warn('NetworkManager automatic reconnect did not complete:', this.formatCommandError(error));
+      });
+
+      return this.waitForAnyConnection(15000);
+    } catch (error) {
+      console.error('Saved WiFi recovery failed:', this.formatCommandError(error));
+      return false;
+    }
+  }
+
   async forgetSavedWifiNetworks(): Promise<void> {
     try {
       const { stdout } = await execFileAsync('nmcli', ['-t', '-f', 'NAME,TYPE', 'connection', 'show']);
@@ -342,6 +390,20 @@ export class WiFiManager {
     while (Date.now() < deadline) {
       const status = await this.getStatus();
       if (status.connected && status.ssid === ssid && status.ip) {
+        return true;
+      }
+      await this.sleep(1000);
+    }
+
+    return false;
+  }
+
+  private async waitForAnyConnection(timeoutMs: number): Promise<boolean> {
+    const deadline = Date.now() + timeoutMs;
+
+    while (Date.now() < deadline) {
+      const status = await this.getStatus();
+      if (status.connected && status.ip) {
         return true;
       }
       await this.sleep(1000);

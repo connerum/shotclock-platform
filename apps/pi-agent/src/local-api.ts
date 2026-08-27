@@ -16,6 +16,7 @@ import { wifiManager } from './wifi-manager.js';
 import type { DeviceMode, TimerState } from '@shotclock/shared/types';
 import { rebaseTimerStateToLocalClock } from '@shotclock/shared/timer';
 import { getSetupApConfig } from './setup-mode.js';
+import { stopMaintenanceWifiRecovery } from './network-recovery.js';
 
 interface SetupState {
   step: 'initial' | 'ap_created' | 'network_selected' | 'network_connected' | 'complete';
@@ -197,6 +198,8 @@ export function startLocalApi(
   app.post('/api/setup/complete', async (_req: Request, res: Response) => {
     try {
       saveAgentConfig({ mode: 'online' });
+      saveState({ connectivity: { status: 'online', since: Date.now() } });
+      stopMaintenanceWifiRecovery();
       await setupAP.stop();
       res.json({ success: true });
     } catch (error) {

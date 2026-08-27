@@ -23,11 +23,29 @@ export function getSetupApConfig(identity: DeviceIdentity, config: AgentConfig) 
 export async function enterWifiSetupMode(
   identity: DeviceIdentity,
   config: AgentConfig,
-  reason: string
+  reason: string,
+  options: { preserveDisplay?: boolean } = {}
 ): Promise<void> {
   console.log(`Entering WiFi setup mode: ${reason}`);
   saveConfig({ mode: 'setup' });
-  saveState({ mode: { type: 'setup' } });
+  if (options.preserveDisplay) {
+    saveState({
+      connectivity: {
+        status: 'setup',
+        since: Date.now(),
+        reason,
+      },
+    });
+  } else {
+    saveState({
+      mode: { type: 'setup' },
+      connectivity: {
+        status: 'setup',
+        since: Date.now(),
+        reason,
+      },
+    });
+  }
 
   const setupApConfig = getSetupApConfig(identity, config);
   setupAP.updateConfig(setupApConfig);

@@ -14,6 +14,7 @@ import { saveState } from './state-store.js';
 import { getPairingCode, regeneratePairingCode } from './pairing-code.js';
 import { wifiManager } from './wifi-manager.js';
 import { enterWifiSetupMode } from './setup-mode.js';
+import { startMaintenanceWifiRecovery, stopMaintenanceWifiRecovery } from './network-recovery.js';
 
 const AGENT_VERSION = RUNTIME_VERSION;
 
@@ -59,7 +60,7 @@ async function main() {
     if (paired && networkStatus?.connected && networkStatus.ip) {
       console.log('Device is paired and WiFi is connected; restoring online mode');
       saveConfig({ mode: 'online' });
-      saveState({ mode: { type: 'shot-clock' } });
+      saveState({ connectivity: { status: 'online', since: Date.now() } });
     } else {
       console.log(paired
         ? 'Device is paired but WiFi setup is required - entering setup mode'
@@ -69,7 +70,8 @@ async function main() {
         const pairingCode = regeneratePairingCode();
         console.log(`Pairing code: ${pairingCode.code} (expires in 24 hours)`);
       }
-      await enterWifiSetupMode(identity, config, 'configured setup mode');
+      await enterWifiSetupMode(identity, config, 'configured setup mode', { preserveDisplay: paired });
+      if (paired) startMaintenanceWifiRecovery();
     }
   } else if (!paired) {
     console.log('Device has WiFi configured but is not paired - entering pairing mode');
@@ -82,14 +84,15 @@ async function main() {
     const networkStatus = await wifiManager.getStatus();
     if (!networkStatus.connected || !networkStatus.ip) {
       console.log('Device is paired but WiFi is not connected - entering setup mode');
-      await enterWifiSetupMode(identity, config, 'paired device has no WiFi connection');
+      await enterWifiSetupMode(identity, config, 'paired device has no WiFi connection', { preserveDisplay: true });
+      startMaintenanceWifiRecovery();
     } else {
       // Device is paired - connect to server
       console.log('Device is paired - connecting to server...');
 
       // Update mode to online
       saveConfig({ mode: 'online' });
-      saveState({ mode: { type: 'shot-clock' } });
+      saveState({ connectivity: { status: 'online', since: Date.now() } });
     }
   }
 
@@ -113,6 +116,7 @@ async function main() {
     console.log('\nShutting down agent...');
     heartbeatStop();
     stopPairingReconciliation();
+    stopMaintenanceWifiRecovery();
     socketClient.disconnect();
     await setupAP.stop();
     stopCaptivePortal();

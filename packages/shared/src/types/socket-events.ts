@@ -395,6 +395,14 @@ export interface NetworkStatus {
   isConnected: boolean;
 }
 
+export type DeviceConnectivityStatus = 'online' | 'offline' | 'setup' | 'reconnecting';
+
+export interface DeviceConnectivityState {
+  status: DeviceConnectivityStatus;
+  since: number;
+  reason?: string;
+}
+
 export interface DisplayStatePayload {
   mode: DeviceMode;
   timerState?: TimerState;

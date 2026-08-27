@@ -9,6 +9,7 @@ import type {
   DisplayProfile,
   CalibrationData,
   PresentationOverlay,
+  DeviceConnectivityState,
 } from '@shotclock/shared/types';
 
 export interface DeviceState {
@@ -17,6 +18,7 @@ export interface DeviceState {
   displayProfile: DisplayProfile;
   calibrationData?: CalibrationData;
   presentationOverlay?: PresentationOverlay;
+  connectivity?: DeviceConnectivityState;
   lastUpdated: number;
 }
 

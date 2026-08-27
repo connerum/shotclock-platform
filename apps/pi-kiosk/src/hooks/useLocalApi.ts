@@ -7,12 +7,14 @@ import type {
   DisplayProfile,
   CalibrationData,
   PresentationOverlay,
+  DeviceConnectivityState,
 } from '@shotclock/shared/types';
 
 interface LocalApiState {
   mode?: DeviceMode;
   timerState?: TimerState;
   presentationOverlay?: PresentationOverlay;
+  connectivity?: DeviceConnectivityState;
 }
 
 interface LocalApiConfig {
