@@ -41,6 +41,8 @@ test('Pi management does not use shell interpolation and stays loopback-only', a
   assert.doesNotMatch(wifi, /\bexec\s*\(/);
   assert.match(localApi, /localApiHost: process\.env\.AGENT_LOCAL_API_HOST \|\| '127\.0\.0\.1'/);
   assert.doesNotMatch(kiosk, /--no-sandbox/);
+  assert.match(kiosk, /until runuser[^]*xset q/);
+  assert.match(kiosk, /unclutter -idle 0\.1 -root/);
 });
 
 test('the local update API reports updater failures', async () => {

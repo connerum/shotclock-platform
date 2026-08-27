@@ -83,14 +83,41 @@ if command -v xset >/dev/null 2>&1; then
   runuser -u "$KIOSK_RUN_USER" -- env DISPLAY="$DISPLAY" XAUTHORITY="$XAUTHORITY" xset s off -dpms s noblank >/dev/null 2>&1 || true
 fi
 
-if cursor_hidden_enabled; then
-  if command -v unclutter >/dev/null 2>&1; then
-    pkill -u "$KIOSK_RUN_USER" -x unclutter >/dev/null 2>&1 || true
-    runuser -u "$KIOSK_RUN_USER" -- env DISPLAY="$DISPLAY" XAUTHORITY="$XAUTHORITY" \
-      unclutter -idle 0.1 -root >/dev/null 2>&1 &
-  else
+start_cursor_hider() {
+  pkill -u "$KIOSK_RUN_USER" -x unclutter >/dev/null 2>&1 || true
+
+  if ! command -v unclutter >/dev/null 2>&1; then
     echo "Warning: KIOSK_HIDE_CURSOR=true, but unclutter is not installed"
+    return
   fi
+
+  if ! command -v xset >/dev/null 2>&1; then
+    echo "Warning: KIOSK_HIDE_CURSOR=true, but xset is not installed"
+    return
+  fi
+
+  # On Raspberry Pi OS with labwc, Xwayland is created lazily when Chromium
+  # starts. Launching unclutter before that point makes it exit immediately
+  # because DISPLAY=:0 does not exist yet. Keep a small supervisor in this
+  # service's cgroup: it waits for Xwayland, starts unclutter, and starts it
+  # again if the graphical session is recreated.
+  (
+    while true; do
+      until runuser -u "$KIOSK_RUN_USER" -- env DISPLAY="$DISPLAY" XAUTHORITY="$XAUTHORITY" \
+        xset q >/dev/null 2>&1; do
+        sleep 0.5
+      done
+
+      echo "Graphical display is ready; starting kiosk cursor hider"
+      runuser -u "$KIOSK_RUN_USER" -- env DISPLAY="$DISPLAY" XAUTHORITY="$XAUTHORITY" \
+        unclutter -idle 0.1 -root >/dev/null 2>&1 || true
+      sleep 1
+    done
+  ) &
+}
+
+if cursor_hidden_enabled; then
+  start_cursor_hider
 else
   pkill -u "$KIOSK_RUN_USER" -x unclutter >/dev/null 2>&1 || true
   KIOSK_URL="$(append_query_param "$KIOSK_URL" "showCursor=1")"
