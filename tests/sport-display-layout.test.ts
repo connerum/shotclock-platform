@@ -5,8 +5,15 @@ import {
   normalizeDeviceMode,
   normalizeSportDisplayLayout,
   reconcileSportDisplayLayoutPreference,
+  resolvePrimaryResetMetadata,
+  runSerializedDeviceCommand,
+  runSerializedDeviceCommands,
   runSerializedDevicePersistence,
+  sportDisplayLayoutUsesAdvancedBehavior,
+  stripPrimaryResetMetadata,
 } from '../apps/server-web/lib/device-command';
+import { createDefaultTimerState, normalizeTimerState } from '../packages/shared/src/timer/index';
+import { getThreePanelAdIndices } from '../apps/pi-kiosk/src/components/three-panel-ad-behavior';
 
 test('three-panel sport layouts retain visual ads and clamp rotation timing', () => {
   const mode = normalizeDeviceMode({
@@ -129,6 +136,51 @@ test('display-state persistence is serialized per device', async () => {
   assert.deepEqual(order, ['first:start', 'first:end', 'second:start', 'second:end']);
 });
 
+test('overlapping synchronized command groups serialize every target device', async () => {
+  let releaseFirst: (() => void) | undefined;
+  let markFirstStarted: (() => void) | undefined;
+  const firstCanFinish = new Promise<void>((resolve) => {
+    releaseFirst = resolve;
+  });
+  const firstStarted = new Promise<void>((resolve) => {
+    markFirstStarted = resolve;
+  });
+  const order: string[] = [];
+
+  const firstGroup = runSerializedDeviceCommands(['board-b', 'board-a'], async () => {
+    order.push('first:start');
+    markFirstStarted?.();
+    await firstCanFinish;
+    order.push('first:end');
+  });
+  await firstStarted;
+
+  const overlappingGroup = runSerializedDeviceCommands(['board-c', 'board-b'], async () => {
+    order.push('overlap:start');
+    order.push('overlap:end');
+  });
+  const directCommand = runSerializedDeviceCommand('board-c', async () => {
+    order.push('direct:c');
+  });
+  const unrelatedCommand = runSerializedDeviceCommand('board-d', async () => {
+    order.push('unrelated:d');
+  });
+
+  await new Promise<void>((resolve) => setImmediate(resolve));
+  assert.deepEqual(order, ['first:start', 'unrelated:d']);
+
+  releaseFirst?.();
+  await Promise.all([firstGroup, overlappingGroup, directCommand, unrelatedCommand]);
+  assert.deepEqual(order, [
+    'first:start',
+    'unrelated:d',
+    'first:end',
+    'overlap:start',
+    'overlap:end',
+    'direct:c',
+  ]);
+});
+
 test('saved ad reconciliation also updates an enabled active sport mode', () => {
   const previousLayout = {
     type: 'three-panel' as const,
@@ -162,4 +214,154 @@ test('saved ad reconciliation also updates an enabled active sport mode', () => 
   const cleared = reconcileSportDisplayLayoutPreference(reconciled, null);
   assert.deepEqual(cleared.deviceMode, { type: 'basketball', subMode: 'scoreboard' });
   assert.equal(cleared.sportDisplayLayoutPreference, null);
+});
+
+test('three-panel ad behaviors are normalized and advanced modes are capability-gated', () => {
+  const mirrored = normalizeSportDisplayLayout({
+    type: 'three-panel',
+    adMode: 'mirrored-timed',
+    adPlaylist: [],
+  });
+  const resetDriven = normalizeSportDisplayLayout({
+    type: 'three-panel',
+    adMode: 'offset-on-timer-reset',
+    adPlaylist: [],
+  });
+  const invalid = normalizeSportDisplayLayout({
+    type: 'three-panel',
+    adMode: 'unknown-mode',
+    adPlaylist: [],
+  });
+
+  assert.equal(mirrored?.adMode, 'mirrored-timed');
+  assert.equal(resetDriven?.adMode, 'offset-on-timer-reset');
+  assert.equal(invalid?.adMode, undefined);
+  assert.equal(sportDisplayLayoutUsesAdvancedBehavior(mirrored ?? undefined), true);
+  assert.equal(sportDisplayLayoutUsesAdvancedBehavior(resetDriven ?? undefined), true);
+  assert.equal(sportDisplayLayoutUsesAdvancedBehavior(invalid ?? undefined), false);
+});
+
+test('three-panel indices support offset, mirrored, and reset-driven behavior', () => {
+  assert.deepEqual(getThreePanelAdIndices({
+    adMode: 'offset-timed',
+    playlistLength: 4,
+    timedCursor: 1,
+  }), { firstIndex: 1, secondIndex: 2 });
+  assert.deepEqual(getThreePanelAdIndices({
+    adMode: 'mirrored-timed',
+    playlistLength: 4,
+    timedCursor: 1,
+  }), { firstIndex: 1, secondIndex: 1 });
+  assert.deepEqual(getThreePanelAdIndices({
+    adMode: 'offset-on-timer-reset',
+    playlistLength: 2,
+    timedCursor: 99,
+    primaryResetSequence: 0,
+  }), { firstIndex: 0, secondIndex: 1 });
+  assert.deepEqual(getThreePanelAdIndices({
+    adMode: 'offset-on-timer-reset',
+    playlistLength: 2,
+    timedCursor: 99,
+    primaryResetSequence: 1,
+  }), { firstIndex: 1, secondIndex: 0 });
+  assert.deepEqual(getThreePanelAdIndices({
+    adMode: 'offset-on-timer-reset',
+    playlistLength: 3,
+    timedCursor: 0,
+    primaryResetSequence: 4,
+  }), { firstIndex: 1, secondIndex: 2 });
+  assert.deepEqual(getThreePanelAdIndices({
+    adMode: 'mirrored-timed',
+    playlistLength: 1,
+    timedCursor: 20,
+  }), { firstIndex: 0, secondIndex: 0 });
+});
+
+test('primary reset events advance once and duplicate event IDs are idempotent', () => {
+  const cachedState = { primaryResetSequence: 4, primaryResetEventId: 'reset-a' };
+  const relationState = { primaryResetSequence: 3, primaryResetEventId: 'reset-before-a' };
+
+  assert.deepEqual(resolvePrimaryResetMetadata(
+    { primaryResetSequence: 2 },
+    cachedState,
+    relationState,
+    { kind: 'primary-clock-reset', eventId: 'reset-b' }
+  ), {
+    primaryResetSequence: 5,
+    primaryResetEventId: 'reset-b',
+  });
+  assert.deepEqual(resolvePrimaryResetMetadata(
+    { primaryResetSequence: 2 },
+    cachedState,
+    relationState,
+    { kind: 'primary-clock-reset', eventId: 'reset-a' }
+  ), {
+    primaryResetSequence: 4,
+    primaryResetEventId: 'reset-a',
+  });
+  assert.deepEqual(resolvePrimaryResetMetadata(
+    { primaryResetSequence: 2 },
+    cachedState,
+    relationState
+  ), {
+    primaryResetSequence: 4,
+    primaryResetEventId: 'reset-a',
+  });
+});
+
+test('synchronized resets advance from each target persisted sequence', () => {
+  const incomingState = stripPrimaryResetMetadata({
+    ...createDefaultTimerState(123),
+    primaryResetSequence: 50,
+    primaryResetEventId: 'primary-previous-reset',
+  });
+  const resetAction = { kind: 'primary-clock-reset' as const, eventId: 'shared-sync-reset' };
+
+  assert.equal(incomingState.primaryResetSequence, undefined);
+  assert.equal(incomingState.primaryResetEventId, undefined);
+  assert.deepEqual(resolvePrimaryResetMetadata(
+    incomingState,
+    { primaryResetSequence: 2, primaryResetEventId: 'board-a-previous-reset' },
+    null,
+    resetAction
+  ), {
+    primaryResetSequence: 3,
+    primaryResetEventId: 'shared-sync-reset',
+  });
+  assert.deepEqual(resolvePrimaryResetMetadata(
+    incomingState,
+    { primaryResetSequence: 10, primaryResetEventId: 'board-b-previous-reset' },
+    null,
+    resetAction
+  ), {
+    primaryResetSequence: 11,
+    primaryResetEventId: 'shared-sync-reset',
+  });
+  assert.deepEqual(resolvePrimaryResetMetadata(
+    incomingState,
+    { primaryResetSequence: 11, primaryResetEventId: 'shared-sync-reset' },
+    null,
+    resetAction
+  ), {
+    primaryResetSequence: 11,
+    primaryResetEventId: 'shared-sync-reset',
+  });
+});
+
+test('timer normalization preserves bounded reset metadata', () => {
+  const normalized = normalizeTimerState({
+    mode: 'pause',
+    homeScore: 0,
+    awayScore: 0,
+    shotClock: 35,
+    gameClock: 720,
+    isRunning: false,
+    isPaused: true,
+    lastUpdated: 123,
+    primaryResetSequence: 7.9,
+    primaryResetEventId: ' reset-event ',
+  });
+
+  assert.equal(normalized.primaryResetSequence, 7);
+  assert.equal(normalized.primaryResetEventId, 'reset-event');
 });

@@ -8,6 +8,7 @@ import { DeviceMode, DisplayProfile, CalibrationData } from '@shotclock/shared/t
 import {
   buildThreePanelSportLayout,
   getActiveSportAdPlaylist,
+  getSportDisplayAdMode,
 } from '../SportDisplayLayoutControls';
 
 interface Device {
@@ -661,7 +662,10 @@ export default function DeviceDetailPage() {
       return;
     }
 
-    const nextLayout = buildThreePanelSportLayout(nextMediaAssets);
+    const nextLayout = buildThreePanelSportLayout(
+      nextMediaAssets,
+      getSportDisplayAdMode(savedLayout)
+    );
     const nextSavedLayout = getActiveSportAdPlaylist(nextMediaAssets).length > 0
       ? nextLayout
       : null;

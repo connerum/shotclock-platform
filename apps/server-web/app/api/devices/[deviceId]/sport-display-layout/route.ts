@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import {
+  THREE_PANEL_AD_BEHAVIORS_CAPABILITY,
   THREE_PANEL_SPORTS_ADS_CAPABILITY,
   type SportDisplayLayout,
 } from '@shotclock/shared/types';
@@ -10,6 +11,7 @@ import {
   deviceSupportsCapability,
   normalizeSportDisplayLayout,
   persistSportDisplayLayoutPreference,
+  sportDisplayLayoutUsesAdvancedBehavior,
 } from '@/lib/device-command';
 import { enforceRateLimit, requireJson } from '@/lib/request-security';
 
@@ -50,6 +52,15 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
       if (!deviceSupportsCapability(device.capabilities, THREE_PANEL_SPORTS_ADS_CAPABILITY)) {
         return NextResponse.json(
           { error: 'Display software update required for 3-section layouts' },
+          { status: 409 }
+        );
+      }
+      if (
+        sportDisplayLayoutUsesAdvancedBehavior(sportDisplayLayout) &&
+        !deviceSupportsCapability(device.capabilities, THREE_PANEL_AD_BEHAVIORS_CAPABILITY)
+      ) {
+        return NextResponse.json(
+          { error: 'Display software update required for synchronized and timer-reset ad behaviors' },
           { status: 409 }
         );
       }

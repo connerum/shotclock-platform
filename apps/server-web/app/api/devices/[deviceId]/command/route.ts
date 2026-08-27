@@ -5,6 +5,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getServerIO } from '@/lib/socket';
 import {
+  THREE_PANEL_AD_BEHAVIORS_CAPABILITY,
   THREE_PANEL_SPORTS_ADS_CAPABILITY,
   type DeviceCommandAck,
   type DeviceMode,
@@ -23,8 +24,10 @@ import {
   persistPresentationOverlay,
   persistTimerCommand,
   resetDeviceRecordAfterFactoryReset,
+  runSerializedDeviceCommand,
   resolveTimerCommandMode,
   resolveTimerCommandState,
+  sportDisplayLayoutUsesAdvancedBehavior,
 } from '@/lib/device-command';
 import { getRequestIp, writeAuditLog } from '@/lib/audit';
 import { enforceRateLimit, requireJson } from '@/lib/request-security';
@@ -126,6 +129,15 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
             { status: 409 }
           );
         }
+        if (
+          sportDisplayLayoutUsesAdvancedBehavior(mode.sportDisplayLayout) &&
+          !deviceSupportsCapability(device.capabilities, THREE_PANEL_AD_BEHAVIORS_CAPABILITY)
+        ) {
+          return NextResponse.json(
+            { error: 'Display software update required for synchronized and timer-reset ad behaviors' },
+            { status: 409 }
+          );
+        }
         const ack = await emitDeviceCommand(deviceNamespace, room, 'mode:set', mode);
         if (!ack.success) {
           return commandAckError(ack);
@@ -148,55 +160,74 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       }
 
       case 'set_timer': {
-        const rawTimerState: TimerState = payload?.timerState;
-        if (!rawTimerState) {
-          return NextResponse.json(
-            { error: 'Missing timerState for set_timer command' },
-            { status: 400 }
+        return runSerializedDeviceCommand(deviceId, async () => {
+          const rawTimerState: TimerState = payload?.timerState;
+          if (!rawTimerState) {
+            return NextResponse.json(
+              { error: 'Missing timerState for set_timer command' },
+              { status: 400 }
+            );
+          }
+
+          const displayMode: DeviceMode | null = await resolveTimerCommandMode(deviceId, payload?.mode);
+          if (!displayMode) {
+            return NextResponse.json(
+              { error: 'Invalid display mode for set_timer command' },
+              { status: 400 }
+            );
+          }
+          if (
+            displayMode.sportDisplayLayout &&
+            !deviceSupportsCapability(device.capabilities, THREE_PANEL_SPORTS_ADS_CAPABILITY)
+          ) {
+            return NextResponse.json(
+              { error: 'Display software update required for 3-section layouts' },
+              { status: 409 }
+            );
+          }
+          if (
+            sportDisplayLayoutUsesAdvancedBehavior(displayMode.sportDisplayLayout) &&
+            !deviceSupportsCapability(device.capabilities, THREE_PANEL_AD_BEHAVIORS_CAPABILITY)
+          ) {
+            return NextResponse.json(
+              { error: 'Display software update required for synchronized and timer-reset ad behaviors' },
+              { status: 409 }
+            );
+          }
+          const timerState = await resolveTimerCommandState(
+            deviceId,
+            rawTimerState,
+            displayMode.sportDisplayLayout?.adMode === 'offset-on-timer-reset'
+              ? payload?.timerAction
+              : undefined
           );
-        }
+          const modeAck = await emitDeviceCommand(deviceNamespace, room, 'mode:set', displayMode);
+          if (!modeAck.success) {
+            return commandAckError(modeAck);
+          }
 
-        const displayMode: DeviceMode | null = await resolveTimerCommandMode(deviceId, payload?.mode);
-        if (!displayMode) {
-          return NextResponse.json(
-            { error: 'Invalid display mode for set_timer command' },
-            { status: 400 }
-          );
-        }
-        if (
-          displayMode.sportDisplayLayout &&
-          !deviceSupportsCapability(device.capabilities, THREE_PANEL_SPORTS_ADS_CAPABILITY)
-        ) {
-          return NextResponse.json(
-            { error: 'Display software update required for 3-section layouts' },
-            { status: 409 }
-          );
-        }
-        const timerState = await resolveTimerCommandState(deviceId, rawTimerState);
-        const modeAck = await emitDeviceCommand(deviceNamespace, room, 'mode:set', displayMode);
-        if (!modeAck.success) {
-          return commandAckError(modeAck);
-        }
+          const ack = await emitDeviceCommand(deviceNamespace, room, 'state:update', timerState);
+          if (!ack.success) {
+            return commandAckError(ack);
+          }
 
-        const ack = await emitDeviceCommand(deviceNamespace, room, 'state:update', timerState);
-        if (!ack.success) {
-          return commandAckError(ack);
-        }
+          const displayState = {
+            mode: displayMode.type,
+            deviceMode: displayMode,
+            timerState,
+            mediaAssetId: null,
+          };
 
-        const displayState = {
-          mode: displayMode.type,
-          deviceMode: displayMode,
-          timerState,
-          mediaAssetId: null,
-        };
+          await persistTimerCommand(deviceId, displayState);
 
-        await persistTimerCommand(deviceId, displayState);
-
-        return NextResponse.json({
-          success: true,
-          command: type,
-          acknowledged: true,
-          dispatchedAt: new Date().toISOString(),
+          return NextResponse.json({
+            success: true,
+            command: type,
+            acknowledged: true,
+            mode: displayMode,
+            timerState,
+            dispatchedAt: new Date().toISOString(),
+          });
         });
       }
 

@@ -5,6 +5,7 @@ import type { DeviceMode, HelloPayload, HeartbeatPayload, UpdateStatusPayload } 
 import { PrismaClient } from '@prisma/client';
 import { resolveAuthoritativeDeviceLabel } from '../../lib/device-label.js';
 import { normalizeDeviceMode } from '../../lib/device-command.js';
+import { resolveReconnectDeviceMode } from '../reconnect-device-mode.js';
 
 const prisma = new PrismaClient();
 
@@ -30,6 +31,7 @@ export function setupDeviceHandlers(socket: TypedSocket, io: TypedServer): void 
       const storedCalibrationData = parseJsonField(existingDevice?.calibrationData);
       const storedDisplayState = parseJsonField(existingDevice?.displayState);
       const storedDeviceMode = getStoredDeviceMode(storedDisplayState);
+      const reconnectDeviceMode = resolveReconnectDeviceMode(storedDeviceMode, data.capabilities);
       const displayProfile = withDefaultColorCorrection(storedDisplayProfile || data.displayProfile);
       const pairingCodeExp = data.pairingCodeExpiresAt
         ? new Date(data.pairingCodeExpiresAt)
@@ -100,7 +102,7 @@ export function setupDeviceHandlers(socket: TypedSocket, io: TypedServer): void 
           serverUrl,
         };
         (socket as any).emit('pairing:complete', payload);
-        (socket as any).emit('mode:set', storedDeviceMode || { type: 'shot-clock' });
+        (socket as any).emit('mode:set', reconnectDeviceMode || { type: 'shot-clock' });
       }
     } catch (error) {
       console.error('Error handling device hello:', error);

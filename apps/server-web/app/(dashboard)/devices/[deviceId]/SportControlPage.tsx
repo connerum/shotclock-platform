@@ -2,7 +2,15 @@
 
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import type { DeviceMode, ScoreboardBranding, SportDisplayLayout, SportType, TimerState } from '@shotclock/shared/types';
+import type {
+  DeviceMode,
+  PrimaryClockResetAction,
+  ScoreboardBranding,
+  SportDisplayAdMode,
+  SportDisplayLayout,
+  SportType,
+  TimerState,
+} from '@shotclock/shared/types';
 import {
   createDefaultTimerState,
   pauseTimerState,
@@ -13,7 +21,10 @@ import {
 import GamePresentationControls from './GamePresentationControls';
 import SportDisplayLayoutControls, {
   buildThreePanelSportLayout,
+  createPrimaryClockResetAction,
+  DEFAULT_SPORT_DISPLAY_AD_MODE,
   getActiveSportAdPlaylist,
+  getSportDisplayAdMode,
 } from './SportDisplayLayoutControls';
 import { SyncTargetBanner, useDeviceCommandDispatcher } from '../../SelectedDevicesProvider';
 
@@ -74,6 +85,7 @@ export default function SportControlPage({ deviceId, config }: { deviceId: strin
   const [mediaLoading, setMediaLoading] = useState(true);
   const [mediaError, setMediaError] = useState<string | null>(null);
   const [threePanelEnabled, setThreePanelEnabled] = useState(false);
+  const [sportDisplayAdMode, setSportDisplayAdMode] = useState<SportDisplayAdMode>(DEFAULT_SPORT_DISPLAY_AD_MODE);
   const [hydratedSportDisplayLayout, setHydratedSportDisplayLayout] = useState<SportDisplayLayout | undefined>();
   const [layoutSaving, setLayoutSaving] = useState(false);
   const modeUpdateTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -86,6 +98,7 @@ export default function SportControlPage({ deviceId, config }: { deviceId: strin
     setDevice(null);
     setLoadedSport(null);
     setThreePanelEnabled(false);
+    setSportDisplayAdMode(DEFAULT_SPORT_DISPLAY_AD_MODE);
     setHydratedSportDisplayLayout(undefined);
 
     const fetchDevice = async () => {
@@ -122,6 +135,7 @@ export default function SportControlPage({ deviceId, config }: { deviceId: strin
             : undefined;
         setHydratedSportDisplayLayout(loadedSportDisplayLayout);
         setThreePanelEnabled(Boolean(loadedSportDisplayLayout));
+        setSportDisplayAdMode(getSportDisplayAdMode(loadedSportDisplayLayout));
         setDevice(data.device);
         setLoadedSport(config.sport);
       } catch (error) {
@@ -200,17 +214,25 @@ export default function SportControlPage({ deviceId, config }: { deviceId: strin
     ...(config.sport === 'volleyball' ? buildVolleyballTopMediaPayload(volleyballTopDisplay, mediaAssets) : {}),
   });
 
-  const resolveSportDisplayLayout = (enabled = threePanelEnabled): SportDisplayLayout | undefined => {
+  const resolveSportDisplayLayout = (
+    enabled = threePanelEnabled,
+    adMode = sportDisplayAdMode
+  ): SportDisplayLayout | undefined => {
     if (!enabled) return undefined;
-    if (mediaLoading || mediaError) return hydratedSportDisplayLayout;
-    const localLayout = buildThreePanelSportLayout(mediaAssets);
-    return localLayout.adPlaylist.length === 0 && hydratedSportDisplayLayout?.adPlaylist.length
+    const localLayout = buildThreePanelSportLayout(mediaAssets, adMode);
+    const sourceLayout = mediaLoading || mediaError
       ? hydratedSportDisplayLayout
-      : localLayout;
+      : localLayout.adPlaylist.length === 0 && hydratedSportDisplayLayout?.adPlaylist.length
+        ? hydratedSportDisplayLayout
+        : localLayout;
+    return sourceLayout ? { ...sourceLayout, adMode } : undefined;
   };
 
-  const buildSportMode = (layoutEnabled = threePanelEnabled): DeviceMode => {
-    const sportDisplayLayout = resolveSportDisplayLayout(layoutEnabled);
+  const buildSportMode = (
+    layoutEnabled = threePanelEnabled,
+    adMode = sportDisplayAdMode
+  ): DeviceMode => {
+    const sportDisplayLayout = resolveSportDisplayLayout(layoutEnabled, adMode);
     return {
       type: config.sport,
       ...(supportsTeamBranding(config.sport) ? { scoreboardBranding: buildTeamBranding() } : {}),
@@ -223,19 +245,23 @@ export default function SportControlPage({ deviceId, config }: { deviceId: strin
     await sendCommand('set_mode', { mode });
   };
 
-  const sendCommand = async (type: string, payload?: unknown) => {
+  const sendCommandWithResult = async (type: string, payload?: unknown) => {
     setCommandError(null);
     try {
       const { response, data } = await dispatchCommand(type, payload);
       if (!response.ok) {
         setCommandError(data?.error || `Command failed with HTTP ${response.status}`);
-        return false;
+        return { success: false, data };
       }
-      return true;
+      return { success: true, data };
     } catch (error) {
       setCommandError(error instanceof Error ? error.message : 'Command failed');
-      return false;
+      return { success: false, data: null };
     }
+  };
+
+  const sendCommand = async (type: string, payload?: unknown) => {
+    return (await sendCommandWithResult(type, payload)).success;
   };
 
   const changeThreePanelLayout = async (enabled: boolean) => {
@@ -248,17 +274,46 @@ export default function SportControlPage({ deviceId, config }: { deviceId: strin
     }
     setThreePanelEnabled(enabled);
     setLayoutSaving(true);
-    const success = await sendCommand('set_mode', { mode: buildSportMode(enabled) });
-    if (!success) setThreePanelEnabled(previousValue);
+    const mode = buildSportMode(enabled);
+    const success = await sendCommand('set_mode', { mode });
+    if (!success) {
+      setThreePanelEnabled(previousValue);
+    } else {
+      setHydratedSportDisplayLayout(mode.sportDisplayLayout);
+    }
     setLayoutSaving(false);
   };
 
-  const sendTimerState = async (nextState: TimerState) => {
+  const changeSportDisplayAdMode = async (adMode: SportDisplayAdMode) => {
+    if (adMode === sportDisplayAdMode || layoutSaving) return;
+
+    const previousMode = sportDisplayAdMode;
+    if (modeUpdateTimeoutRef.current) {
+      clearTimeout(modeUpdateTimeoutRef.current);
+      modeUpdateTimeoutRef.current = null;
+    }
+    setSportDisplayAdMode(adMode);
+    setLayoutSaving(true);
+    const mode = buildSportMode(true, adMode);
+    const success = await sendCommand('set_mode', { mode });
+    if (!success) {
+      setSportDisplayAdMode(previousMode);
+    } else {
+      setHydratedSportDisplayLayout(mode.sportDisplayLayout);
+    }
+    setLayoutSaving(false);
+  };
+
+  const sendTimerState = async (
+    nextState: TimerState,
+    timerAction?: PrimaryClockResetAction
+  ) => {
     const mode = buildSportMode();
-    const success = await sendCommand('set_timer', { timerState: nextState, mode });
-    if (success) {
-      setTimerState(nextState);
-      setNow(nextState.lastUpdated);
+    const result = await sendCommandWithResult('set_timer', { timerState: nextState, mode, timerAction });
+    if (result.success) {
+      const appliedState = hydrateTimerState(result.data?.timerState || nextState);
+      setTimerState(appliedState);
+      setNow(appliedState.lastUpdated);
     }
   };
 
@@ -294,7 +349,7 @@ export default function SportControlPage({ deviceId, config }: { deviceId: strin
       homeTimeouts: 0,
       awayTimeouts: 0,
       period: 1,
-    }));
+    }), createPrimaryClockResetAction());
   };
 
   const formatClock = (seconds: number) => {
@@ -337,6 +392,7 @@ export default function SportControlPage({ deviceId, config }: { deviceId: strin
       <SportDisplayLayoutControls
         deviceId={deviceId}
         enabled={threePanelEnabled}
+        adMode={sportDisplayAdMode}
         activeAdCount={threePanelEnabled
           ? resolveSportDisplayLayout()?.adPlaylist.length ?? 0
           : getActiveSportAdPlaylist(mediaAssets).length}
@@ -346,6 +402,7 @@ export default function SportControlPage({ deviceId, config }: { deviceId: strin
         isSyncActive={isSyncActive}
         layoutSaving={layoutSaving}
         onEnabledChange={changeThreePanelLayout}
+        onAdModeChange={changeSportDisplayAdMode}
       />
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">

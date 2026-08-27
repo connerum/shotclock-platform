@@ -34,6 +34,7 @@ interface ShotClockState {
     isRunning: boolean;
     isPaused?: boolean;
     lastUpdated?: number;
+    primaryResetSequence?: number;
   };
   presentationOverlay?: PresentationOverlayState;
 }
@@ -94,7 +95,14 @@ export default function App() {
   const modeDisplay = renderMode();
   const sportDisplayLayout = state?.mode?.sportDisplayLayout;
   const activeDisplay = isPrimarySportMode(currentMode) && sportDisplayLayout?.type === 'three-panel'
-    ? <ThreePanelSportLayout layout={sportDisplayLayout}>{modeDisplay}</ThreePanelSportLayout>
+    ? (
+        <ThreePanelSportLayout
+          layout={sportDisplayLayout}
+          primaryResetSequence={state?.timerState?.primaryResetSequence}
+        >
+          {modeDisplay}
+        </ThreePanelSportLayout>
+      )
     : modeDisplay;
 
   return (

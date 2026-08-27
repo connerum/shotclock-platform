@@ -4,7 +4,14 @@ import { useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { DeviceMode, ScoreboardBranding, SportDisplayLayout, TimerState } from '@shotclock/shared/types';
+import {
+  DeviceMode,
+  type PrimaryClockResetAction,
+  ScoreboardBranding,
+  type SportDisplayAdMode,
+  SportDisplayLayout,
+  TimerState,
+} from '@shotclock/shared/types';
 import {
   clampSeconds,
   createDefaultTimerState,
@@ -17,7 +24,10 @@ import {
 import GamePresentationControls from '../GamePresentationControls';
 import SportDisplayLayoutControls, {
   buildThreePanelSportLayout,
+  createPrimaryClockResetAction,
+  DEFAULT_SPORT_DISPLAY_AD_MODE,
   getActiveSportAdPlaylist,
+  getSportDisplayAdMode,
 } from '../SportDisplayLayoutControls';
 import { SyncTargetBanner, useDeviceCommandDispatcher } from '../../../SelectedDevicesProvider';
 
@@ -70,6 +80,7 @@ export default function BasketballPage() {
   const [timerRunning, setTimerRunning] = useState(false);
   const [timerLastUpdated, setTimerLastUpdated] = useState(Date.now());
   const [timerNow, setTimerNow] = useState(Date.now());
+  const [primaryResetSequence, setPrimaryResetSequence] = useState(0);
   const [previewMode, setPreviewMode] = useState<BasketballPreviewMode>('regular');
   const [scoreboardBrandingEnabled, setScoreboardBrandingEnabled] = useState(false);
   const [scoreboardTimeoutsVisible, setScoreboardTimeoutsVisible] = useState(true);
@@ -84,6 +95,7 @@ export default function BasketballPage() {
   const [mediaLoading, setMediaLoading] = useState(true);
   const [mediaError, setMediaError] = useState<string | null>(null);
   const [threePanelEnabled, setThreePanelEnabled] = useState(false);
+  const [sportDisplayAdMode, setSportDisplayAdMode] = useState<SportDisplayAdMode>(DEFAULT_SPORT_DISPLAY_AD_MODE);
   const [hydratedSportDisplayLayout, setHydratedSportDisplayLayout] = useState<SportDisplayLayout | undefined>();
   const [layoutSaving, setLayoutSaving] = useState(false);
   const modeUpdateTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -96,10 +108,12 @@ export default function BasketballPage() {
     setCommandError(null);
     setDevice(null);
     setThreePanelEnabled(false);
+    setSportDisplayAdMode(DEFAULT_SPORT_DISPLAY_AD_MODE);
     setHydratedSportDisplayLayout(undefined);
     setMediaAssets([]);
     setMediaLoading(true);
     setMediaError(null);
+    setPrimaryResetSequence(0);
     void fetchDevice(controller.signal);
     void fetchMediaAssets(controller.signal);
     return () => controller.abort();
@@ -177,9 +191,11 @@ export default function BasketballPage() {
           : undefined;
       setHydratedSportDisplayLayout(loadedSportDisplayLayout);
       setThreePanelEnabled(Boolean(loadedSportDisplayLayout));
+      setSportDisplayAdMode(getSportDisplayAdMode(loadedSportDisplayLayout));
       setTimerRunning(loadedTimerState.isRunning);
       setTimerLastUpdated(loadedTimerState.lastUpdated);
       setTimerNow(Date.now());
+      setPrimaryResetSequence(loadedTimerState.primaryResetSequence ?? 0);
       setDevice(data.device);
     } catch (err) {
       if (!signal?.aborted) {
@@ -206,21 +222,25 @@ export default function BasketballPage() {
     }
   };
 
-  const sendCommand = async (type: string, payload?: unknown) => {
+  const sendCommandWithResult = async (type: string, payload?: unknown) => {
     setCommandError(null);
     try {
       const { response, data } = await dispatchCommand(type, payload);
       if (!response.ok) {
         const message = data?.error || `Command failed with HTTP ${response.status}`;
         setCommandError(message);
-        return false;
+        return { success: false, data };
       }
-      return true;
+      return { success: true, data };
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Command failed';
       setCommandError(message);
-      return false;
+      return { success: false, data: null };
     }
+  };
+
+  const sendCommand = async (type: string, payload?: unknown) => {
+    return (await sendCommandWithResult(type, payload)).success;
   };
 
   const buildCurrentTimerState = (): TimerState => ({
@@ -235,6 +255,7 @@ export default function BasketballPage() {
     isRunning: timerRunning,
     isPaused: !timerRunning,
     lastUpdated: timerLastUpdated,
+    primaryResetSequence,
   });
 
   const projectedTimerState = projectPreciseTimerState(buildCurrentTimerState(), timerNow);
@@ -248,7 +269,25 @@ export default function BasketballPage() {
       ? 'text-orange-300 drop-shadow-[0_0_32px_rgba(249,115,22,0.35)]'
       : 'text-white drop-shadow-[0_0_32px_rgba(255,255,255,0.12)]';
 
-  const commitTimerUpdates = (updates: Partial<TimerState>) => {
+  const sendTimerCommand = async (
+    timerState: TimerState,
+    timerAction?: PrimaryClockResetAction
+  ) => {
+    const result = await sendCommandWithResult('set_timer', {
+      timerState,
+      mode: buildBasketballMode(),
+      timerAction,
+    });
+    return {
+      success: result.success,
+      timerState: hydrateTimerState(result.data?.timerState || timerState),
+    };
+  };
+
+  const commitTimerUpdates = (
+    updates: Partial<TimerState>,
+    timerAction?: PrimaryClockResetAction
+  ) => {
     const now = Date.now();
     const currentState = projectPreciseTimerState(buildCurrentTimerState(), now);
     const timerState: TimerState = {
@@ -262,11 +301,20 @@ export default function BasketballPage() {
     };
 
     applyTimerState(timerState);
-    void sendCommand('set_timer', { timerState, mode: buildBasketballMode() });
+    void sendTimerCommand(timerState, timerAction).then((result) => {
+      if (result.success) applyTimerState(result.timerState);
+    });
   };
 
   const updateShotClock = (value: number) => {
     commitTimerUpdates({ shotClock: clampSeconds(value, 0, 99) });
+  };
+
+  const resetShotClock = (value: number) => {
+    commitTimerUpdates(
+      { shotClock: clampSeconds(value, 0, 99) },
+      createPrimaryClockResetAction()
+    );
   };
 
   const updateGameClock = (value: number) => {
@@ -295,9 +343,9 @@ export default function BasketballPage() {
 
   const startTimer = async () => {
     const timerState = startTimerState(buildCurrentTimerState());
-    const success = await sendCommand('set_timer', { timerState, mode: buildBasketballMode() });
-    if (success) {
-      applyTimerState(timerState);
+    const result = await sendTimerCommand(timerState);
+    if (result.success) {
+      applyTimerState(result.timerState);
       setTimerRunning(true);
     }
   };
@@ -314,9 +362,9 @@ export default function BasketballPage() {
       isPaused: true,
       lastUpdated: now,
     };
-    const success = await sendCommand('set_timer', { timerState, mode: buildBasketballMode() });
-    if (success) {
-      applyTimerState(timerState);
+    const result = await sendTimerCommand(timerState);
+    if (result.success) {
+      applyTimerState(result.timerState);
       setTimerRunning(false);
     }
   };
@@ -330,14 +378,14 @@ export default function BasketballPage() {
       awayTimeouts: 0,
       period: 1,
     });
-    const success = await sendCommand('set_timer', { timerState, mode: buildBasketballMode() });
-    if (success) {
-      applyTimerState(timerState);
-      setPeriod(timerState.period ?? 1);
-      setHomeScore(timerState.homeScore);
-      setAwayScore(timerState.awayScore);
-      setHomeTimeouts(timerState.homeTimeouts ?? 0);
-      setAwayTimeouts(timerState.awayTimeouts ?? 0);
+    const result = await sendTimerCommand(timerState, createPrimaryClockResetAction());
+    if (result.success) {
+      applyTimerState(result.timerState);
+      setPeriod(result.timerState.period ?? 1);
+      setHomeScore(result.timerState.homeScore);
+      setAwayScore(result.timerState.awayScore);
+      setHomeTimeouts(result.timerState.homeTimeouts ?? 0);
+      setAwayTimeouts(result.timerState.awayTimeouts ?? 0);
       setTimerRunning(false);
     }
   };
@@ -353,6 +401,7 @@ export default function BasketballPage() {
     setTimerRunning(timerState.isRunning);
     setTimerLastUpdated(timerState.lastUpdated);
     setTimerNow(timerState.lastUpdated);
+    setPrimaryResetSequence(timerState.primaryResetSequence ?? 0);
   };
 
   const buildScoreboardBranding = (): ScoreboardBranding => ({
@@ -366,20 +415,26 @@ export default function BasketballPage() {
     ...(awayLogoUrl ? { awayLogoUrl } : {}),
   });
 
-  const resolveSportDisplayLayout = (enabled = threePanelEnabled): SportDisplayLayout | undefined => {
+  const resolveSportDisplayLayout = (
+    enabled = threePanelEnabled,
+    adMode = sportDisplayAdMode
+  ): SportDisplayLayout | undefined => {
     if (!enabled) return undefined;
-    if (mediaLoading || mediaError) return hydratedSportDisplayLayout;
-    const localLayout = buildThreePanelSportLayout(mediaAssets);
-    return localLayout.adPlaylist.length === 0 && hydratedSportDisplayLayout?.adPlaylist.length
+    const localLayout = buildThreePanelSportLayout(mediaAssets, adMode);
+    const sourceLayout = mediaLoading || mediaError
       ? hydratedSportDisplayLayout
-      : localLayout;
+      : localLayout.adPlaylist.length === 0 && hydratedSportDisplayLayout?.adPlaylist.length
+        ? hydratedSportDisplayLayout
+        : localLayout;
+    return sourceLayout ? { ...sourceLayout, adMode } : undefined;
   };
 
   const buildBasketballMode = (
     mode: BasketballPreviewMode = previewMode,
-    layoutEnabled = threePanelEnabled
+    layoutEnabled = threePanelEnabled,
+    adMode = sportDisplayAdMode
   ): DeviceMode => {
-    const sportDisplayLayout = resolveSportDisplayLayout(layoutEnabled);
+    const sportDisplayLayout = resolveSportDisplayLayout(layoutEnabled, adMode);
     return {
       type: 'basketball',
       subMode: mode === 'regular' ? 'shot-clock-only' : mode,
@@ -398,8 +453,33 @@ export default function BasketballPage() {
     }
     setThreePanelEnabled(enabled);
     setLayoutSaving(true);
-    const success = await sendCommand('set_mode', { mode: buildBasketballMode(previewMode, enabled) });
-    if (!success) setThreePanelEnabled(previousValue);
+    const mode = buildBasketballMode(previewMode, enabled);
+    const success = await sendCommand('set_mode', { mode });
+    if (!success) {
+      setThreePanelEnabled(previousValue);
+    } else {
+      setHydratedSportDisplayLayout(mode.sportDisplayLayout);
+    }
+    setLayoutSaving(false);
+  };
+
+  const changeSportDisplayAdMode = async (adMode: SportDisplayAdMode) => {
+    if (adMode === sportDisplayAdMode || layoutSaving) return;
+
+    const previousMode = sportDisplayAdMode;
+    if (modeUpdateTimeoutRef.current) {
+      clearTimeout(modeUpdateTimeoutRef.current);
+      modeUpdateTimeoutRef.current = null;
+    }
+    setSportDisplayAdMode(adMode);
+    setLayoutSaving(true);
+    const mode = buildBasketballMode(previewMode, true, adMode);
+    const success = await sendCommand('set_mode', { mode });
+    if (!success) {
+      setSportDisplayAdMode(previousMode);
+    } else {
+      setHydratedSportDisplayLayout(mode.sportDisplayLayout);
+    }
     setLayoutSaving(false);
   };
 
@@ -492,6 +572,7 @@ export default function BasketballPage() {
       <SportDisplayLayoutControls
         deviceId={deviceId}
         enabled={threePanelEnabled}
+        adMode={sportDisplayAdMode}
         activeAdCount={threePanelEnabled
           ? resolveSportDisplayLayout()?.adPlaylist.length ?? 0
           : getActiveSportAdPlaylist(mediaAssets).length}
@@ -501,6 +582,7 @@ export default function BasketballPage() {
         isSyncActive={isSyncActive}
         layoutSaving={layoutSaving}
         onEnabledChange={changeThreePanelLayout}
+        onAdModeChange={changeSportDisplayAdMode}
       />
 
       <section className="cc-card mb-4 p-4 md:p-5">
@@ -590,14 +672,14 @@ export default function BasketballPage() {
         <ControlCard title="Time Settings" icon="TIME" accentClass="bg-purple-500/15 text-purple-300">
           <div className="grid grid-cols-2 gap-3">
             <button
-              onClick={() => updateShotClock(35)}
+              onClick={() => resetShotClock(35)}
               disabled={timerRunning}
               className="cc-btn cc-btn-blue px-4 py-3 disabled:cursor-not-allowed disabled:opacity-50"
             >
               Reset 35
             </button>
             <button
-              onClick={() => updateShotClock(25)}
+              onClick={() => resetShotClock(25)}
               disabled={timerRunning}
               className="cc-btn cc-btn-blue px-4 py-3 disabled:cursor-not-allowed disabled:opacity-50"
             >

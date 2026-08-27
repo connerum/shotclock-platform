@@ -7,7 +7,12 @@ import { getServerIO } from '@/lib/socket';
 import { TimerState } from '@shotclock/shared/types';
 import { DEFAULT_GAME_CLOCK_SECONDS, DEFAULT_SHOT_CLOCK_SECONDS } from '@shotclock/shared/timer';
 import { canAccessDevice, requireApiUser } from '@/lib/auth';
-import { runSerializedDevicePersistence } from '@/lib/device-command';
+import {
+  normalizeDeviceMode,
+  resolvePrimaryResetMetadata,
+  runSerializedDeviceCommand,
+  runSerializedDevicePersistence,
+} from '@/lib/device-command';
 import { parsePitchKountDisplayState, serializePitchKountDisplayState } from '@/lib/pitchkount-players';
 
 interface RouteParams {
@@ -120,7 +125,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
     const { deviceId } = await params;
     const body = await request.json();
-    const { mode, timerState, mediaAssetId } = body;
+    const { mode, timerState, mediaAssetId, timerAction } = body;
     const timerStatePayload: TimerState | null = timerState
       ? rebaseTimerStateToLocalClock(timerState)
       : null;
@@ -134,49 +139,73 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       return NextResponse.json({ error: 'Device not found' }, { status: 404 });
     }
 
-    const state = await runSerializedDevicePersistence(deviceId, () => prisma.$transaction(async (transaction) => {
-      const deviceRecord = await transaction.device.findUnique({
-        where: { deviceId },
-        select: { displayState: true },
-      });
-      const existingDisplayState = parsePitchKountDisplayState(deviceRecord?.displayState);
-      const nextDisplayState = serializePitchKountDisplayState({
-        ...(existingDisplayState ?? {}),
-        mode,
-        timerState: timerStatePayload,
-        mediaAssetId: mediaAssetId || null,
-      });
-
-      const nextState = await transaction.displayState.upsert({
-        where: { deviceId },
-        update: {
+    const persisted = await runSerializedDeviceCommand(deviceId, () => (
+      runSerializedDevicePersistence(deviceId, () => prisma.$transaction(async (transaction) => {
+        const deviceRecord = await transaction.device.findUnique({
+          where: { deviceId },
+          select: {
+            displayState: true,
+            state: { select: { timerState: true } },
+          },
+        });
+        const existingDisplayState = parsePitchKountDisplayState(deviceRecord?.displayState);
+        const existingMode = normalizeDeviceMode(existingDisplayState?.deviceMode);
+        const cachedTimerState = asTimerStateSnapshot(existingDisplayState?.timerState);
+        const relationalTimerState = asTimerStateSnapshot(
+          parsePitchKountDisplayState(deviceRecord?.state?.timerState)
+        );
+        const appliedTimerState = timerStatePayload
+          ? {
+              ...timerStatePayload,
+              ...resolvePrimaryResetMetadata(
+                timerStatePayload,
+                cachedTimerState,
+                relationalTimerState,
+                existingMode?.sportDisplayLayout?.adMode === 'offset-on-timer-reset'
+                  ? timerAction
+                  : undefined
+              ),
+            }
+          : null;
+        const nextDisplayState = serializePitchKountDisplayState({
+          ...(existingDisplayState ?? {}),
           mode,
-          timerState: timerStatePayload ? JSON.stringify(timerStatePayload) : null,
+          timerState: appliedTimerState,
           mediaAssetId: mediaAssetId || null,
-        },
-        create: {
-          deviceId,
-          mode,
-          timerState: timerStatePayload ? JSON.stringify(timerStatePayload) : null,
-          mediaAssetId: mediaAssetId || null,
-        },
-      });
+        });
 
-      await transaction.device.update({
-        where: { deviceId },
-        data: {
-          displayState: nextDisplayState,
-          mode,
-        },
-      });
+        const nextState = await transaction.displayState.upsert({
+          where: { deviceId },
+          update: {
+            mode,
+            timerState: appliedTimerState ? JSON.stringify(appliedTimerState) : null,
+            mediaAssetId: mediaAssetId || null,
+          },
+          create: {
+            deviceId,
+            mode,
+            timerState: appliedTimerState ? JSON.stringify(appliedTimerState) : null,
+            mediaAssetId: mediaAssetId || null,
+          },
+        });
 
-      return nextState;
-    }));
+        await transaction.device.update({
+          where: { deviceId },
+          data: {
+            displayState: nextDisplayState,
+            mode,
+          },
+        });
+
+        return { state: nextState, timerState: appliedTimerState };
+      }))
+    ));
+    const { state, timerState: appliedTimerState } = persisted;
 
     // Emit state update to device via Socket.IO
     const io = getServerIO();
     if (io) {
-      io.of('/device').to(`device:${deviceId}`).emit('state:update', timerStatePayload || createDefaultTimerState());
+      io.of('/device').to(`device:${deviceId}`).emit('state:update', appliedTimerState || createDefaultTimerState());
     }
 
     return NextResponse.json({ 
@@ -190,4 +219,10 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     console.error('Error updating state:', error);
     return NextResponse.json({ error: 'Failed to update state' }, { status: 500 });
   }
+}
+
+function asTimerStateSnapshot(value: unknown): Partial<TimerState> | null {
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? value as Partial<TimerState>
+    : null;
 }

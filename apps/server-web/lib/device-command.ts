@@ -5,6 +5,8 @@ import type {
   PresentationOverlay,
   PresentationOverlayAccent,
   PresentationOverlayType,
+  PrimaryClockResetAction,
+  SportDisplayAdMode,
   SportDisplayLayout,
   TimerState,
 } from '@shotclock/shared/types';
@@ -13,6 +15,13 @@ import { normalizePitchKountState } from '@shotclock/shared/types';
 export const COMMAND_ACK_TIMEOUT_MS = 2500;
 
 const devicePersistenceQueues = new Map<string, Promise<void>>();
+const deviceCommandQueues = new Map<string, Promise<void>>();
+
+const SPORT_DISPLAY_AD_MODES = new Set<SportDisplayAdMode>([
+  'offset-timed',
+  'mirrored-timed',
+  'offset-on-timer-reset',
+]);
 
 export type GameCommandType = 'set_mode' | 'set_timer' | 'presentation';
 
@@ -84,12 +93,20 @@ export function normalizeSportDisplayLayout(value: unknown): SportDisplayLayout 
   const rotationIntervalMs = typeof layout.rotationIntervalMs === 'number'
     ? Math.max(1000, Math.min(60000, Math.round(layout.rotationIntervalMs)))
     : undefined;
+  const adMode = layout.adMode && SPORT_DISPLAY_AD_MODES.has(layout.adMode)
+    ? layout.adMode
+    : undefined;
 
   return {
     type: 'three-panel',
     adPlaylist,
     ...(rotationIntervalMs ? { rotationIntervalMs } : {}),
+    ...(adMode ? { adMode } : {}),
   };
+}
+
+export function sportDisplayLayoutUsesAdvancedBehavior(layout: SportDisplayLayout | undefined): boolean {
+  return Boolean(layout?.adMode && layout.adMode !== 'offset-timed');
 }
 
 function isPrimarySportMode(mode: DeviceMode['type']): mode is 'basketball' | 'wrestling' | 'volleyball' {
@@ -463,8 +480,110 @@ export async function runSerializedDevicePersistence<T>(
   }
 }
 
-export async function resolveTimerCommandState(_deviceId: string, incomingState: TimerState): Promise<TimerState> {
-  return rebaseTimerStateToLocalClock(incomingState);
+export async function runSerializedDeviceCommand<T>(
+  deviceId: string,
+  operation: () => Promise<T>
+): Promise<T> {
+  return runSerializedDeviceCommands([deviceId], operation);
+}
+
+export async function runSerializedDeviceCommands<T>(
+  deviceIds: string[],
+  operation: () => Promise<T>
+): Promise<T> {
+  const normalizedDeviceIds = Array.from(new Set(
+    deviceIds.map((deviceId) => deviceId.trim()).filter(Boolean)
+  )).sort();
+  if (normalizedDeviceIds.length === 0) return operation();
+
+  const previous = Promise.all(normalizedDeviceIds.map((deviceId) => (
+    deviceCommandQueues.get(deviceId) ?? Promise.resolve()
+  )));
+  const current = previous.then(operation, operation);
+  const settled = current.then(() => undefined, () => undefined);
+
+  normalizedDeviceIds.forEach((deviceId) => {
+    deviceCommandQueues.set(deviceId, settled);
+  });
+
+  try {
+    return await current;
+  } finally {
+    normalizedDeviceIds.forEach((deviceId) => {
+      if (deviceCommandQueues.get(deviceId) === settled) {
+        deviceCommandQueues.delete(deviceId);
+      }
+    });
+  }
+}
+
+export function stripPrimaryResetMetadata(timerState: TimerState): TimerState {
+  const {
+    primaryResetSequence: _primaryResetSequence,
+    primaryResetEventId: _primaryResetEventId,
+    ...timerStateWithoutResetMetadata
+  } = timerState;
+  return timerStateWithoutResetMetadata;
+}
+
+export async function resolveTimerCommandState(
+  deviceId: string,
+  incomingState: TimerState,
+  rawTimerAction?: unknown
+): Promise<TimerState> {
+  const device = await prisma.device.findUnique({
+    where: { deviceId },
+    select: {
+      displayState: true,
+      state: { select: { timerState: true } },
+    },
+  });
+  const displayState = parseDisplayState(device?.displayState);
+  const cachedTimerState = asTimerStateSnapshot(displayState.timerState);
+  const relationalTimerState = parseTimerStateSnapshot(device?.state?.timerState);
+  const resetMetadata = resolvePrimaryResetMetadata(
+    incomingState,
+    cachedTimerState,
+    relationalTimerState,
+    rawTimerAction
+  );
+
+  return rebaseTimerStateToLocalClock({
+    ...incomingState,
+    ...resetMetadata,
+  });
+}
+
+export function resolvePrimaryResetMetadata(
+  incomingState: Partial<TimerState>,
+  cachedTimerState: Partial<TimerState> | null,
+  relationalTimerState: Partial<TimerState> | null,
+  rawTimerAction?: unknown
+): Pick<TimerState, 'primaryResetSequence'> & { primaryResetEventId?: string } {
+  const incomingSequence = normalizePrimaryResetSequence(incomingState.primaryResetSequence);
+  const cachedSequence = normalizePrimaryResetSequence(cachedTimerState?.primaryResetSequence);
+  const relationalSequence = normalizePrimaryResetSequence(relationalTimerState?.primaryResetSequence);
+  const currentSequence = Math.max(incomingSequence, cachedSequence, relationalSequence);
+  const cachedEventId = normalizePrimaryResetEventId(cachedTimerState?.primaryResetEventId);
+  const relationalEventId = normalizePrimaryResetEventId(relationalTimerState?.primaryResetEventId);
+  const storedEventId = cachedSequence > relationalSequence
+    ? cachedEventId
+    : relationalSequence > cachedSequence
+      ? relationalEventId
+      : cachedEventId || relationalEventId;
+  const timerAction = normalizePrimaryClockResetAction(rawTimerAction);
+  const isDuplicateReset = Boolean(timerAction && timerAction.eventId === storedEventId);
+  const primaryResetSequence = timerAction && !isDuplicateReset
+    ? Math.min(Number.MAX_SAFE_INTEGER, currentSequence + 1)
+    : currentSequence;
+  const primaryResetEventId = timerAction?.eventId
+    || normalizePrimaryResetEventId(incomingState.primaryResetEventId)
+    || storedEventId;
+
+  return {
+    primaryResetSequence,
+    ...(primaryResetEventId ? { primaryResetEventId } : {}),
+  };
 }
 
 export async function resolveTimerCommandMode(deviceId: string, incomingMode: unknown): Promise<DeviceMode | null> {
@@ -509,4 +628,39 @@ function rebaseTimerStateToLocalClock(state: TimerState, now = Date.now()): Time
     ...state,
     lastUpdated: now,
   };
+}
+
+function normalizePrimaryClockResetAction(value: unknown): PrimaryClockResetAction | null {
+  if (!value || typeof value !== 'object') return null;
+  const action = value as Partial<PrimaryClockResetAction>;
+  const eventId = normalizePrimaryResetEventId(action.eventId);
+  return action.kind === 'primary-clock-reset' && eventId
+    ? { kind: 'primary-clock-reset', eventId }
+    : null;
+}
+
+function normalizePrimaryResetSequence(value: unknown): number {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return 0;
+  return Math.max(0, Math.min(Number.MAX_SAFE_INTEGER, Math.floor(value)));
+}
+
+function normalizePrimaryResetEventId(value: unknown): string | null {
+  if (typeof value !== 'string') return null;
+  const normalized = value.trim();
+  return normalized ? normalized.slice(0, 128) : null;
+}
+
+function asTimerStateSnapshot(value: unknown): Partial<TimerState> | null {
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? value as Partial<TimerState>
+    : null;
+}
+
+function parseTimerStateSnapshot(value: string | null | undefined): Partial<TimerState> | null {
+  if (!value) return null;
+  try {
+    return asTimerStateSnapshot(JSON.parse(value));
+  } catch {
+    return null;
+  }
 }

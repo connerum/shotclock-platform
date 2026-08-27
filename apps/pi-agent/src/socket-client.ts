@@ -11,7 +11,10 @@ import type {
   DeviceCommandAck,
   PresentationOverlay,
 } from '@shotclock/shared/types';
-import { THREE_PANEL_SPORTS_ADS_CAPABILITY } from '@shotclock/shared/types';
+import {
+  THREE_PANEL_AD_BEHAVIORS_CAPABILITY,
+  THREE_PANEL_SPORTS_ADS_CAPABILITY,
+} from '@shotclock/shared/types';
 import { rebaseTimerStateToLocalClock } from '@shotclock/shared/timer';
 import { loadIdentity, markAsPaired, isPaired } from './identity.js';
 import { loadState, saveState, setConfigPreview } from './state-store.js';
@@ -260,6 +263,7 @@ function sendHello(identity: DeviceIdentity): void {
       'media',
       'presentation',
       THREE_PANEL_SPORTS_ADS_CAPABILITY,
+      THREE_PANEL_AD_BEHAVIORS_CAPABILITY,
     ],
     displayProfile: state.displayProfile,
     pairingCode: pairingCode?.code,

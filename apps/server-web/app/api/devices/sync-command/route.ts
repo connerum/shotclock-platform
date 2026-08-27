@@ -6,6 +6,7 @@ import { prisma } from '@/lib/prisma';
 import { getServerIO } from '@/lib/socket';
 import { canAccessDevice, requireApiUser } from '@/lib/auth';
 import {
+  THREE_PANEL_AD_BEHAVIORS_CAPABILITY,
   THREE_PANEL_SPORTS_ADS_CAPABILITY,
   type DeviceMode,
   type TimerState,
@@ -21,8 +22,11 @@ import {
   persistDisplayMode,
   persistPresentationOverlay,
   persistTimerCommand,
+  runSerializedDeviceCommands,
   resolveTimerCommandMode,
   resolveTimerCommandState,
+  sportDisplayLayoutUsesAdvancedBehavior,
+  stripPrimaryResetMetadata,
 } from '@/lib/device-command';
 
 const GAME_COMMAND_TYPES = new Set<GameCommandType>(['set_mode', 'set_timer', 'presentation']);
@@ -138,6 +142,10 @@ export async function POST(request: NextRequest) {
         if (unsupportedDeviceIds.length > 0) {
           return unsupportedThreePanelResponse(unsupportedDeviceIds);
         }
+        const unsupportedBehaviorDeviceIds = getUnsupportedAdBehaviorDeviceIds(devices, mode);
+        if (unsupportedBehaviorDeviceIds.length > 0) {
+          return unsupportedAdBehaviorResponse(unsupportedBehaviorDeviceIds);
+        }
 
         const results = await emitToTargets(deviceNamespace, targetDeviceIds, 'mode:set', mode);
         await persistDisplayModesForSuccessfulResults(results, mode);
@@ -150,60 +158,89 @@ export async function POST(request: NextRequest) {
       }
 
       case 'set_timer': {
-        const rawTimerState = (payload as any)?.timerState as TimerState | undefined;
-        if (!rawTimerState) {
-          return NextResponse.json(
-            { success: false, error: 'Missing timerState for synchronized set_timer command' },
-            { status: 400 }
-          );
-        }
+        return runSerializedDeviceCommands(targetDeviceIds, async () => {
+          const rawTimerState = (payload as any)?.timerState as TimerState | undefined;
+          if (!rawTimerState) {
+            return NextResponse.json(
+              { success: false, error: 'Missing timerState for synchronized set_timer command' },
+              { status: 400 }
+            );
+          }
 
-        const displayMode = await resolveTimerCommandMode(primaryDeviceId, (payload as any)?.mode);
-        if (!displayMode || !SYNC_MODE_TYPES.has(displayMode.type)) {
-          return NextResponse.json(
-            { success: false, error: 'Invalid game mode for synchronized set_timer command' },
-            { status: 400 }
-          );
-        }
-        const unsupportedDeviceIds = getUnsupportedThreePanelDeviceIds(devices, displayMode);
-        if (unsupportedDeviceIds.length > 0) {
-          return unsupportedThreePanelResponse(unsupportedDeviceIds);
-        }
-        const timerState = await resolveTimerCommandState(primaryDeviceId, rawTimerState);
-        const modeResults = await emitToTargets(deviceNamespace, targetDeviceIds, 'mode:set', displayMode);
-        await persistDisplayModesForSuccessfulResults(modeResults, displayMode);
+          const displayMode = await resolveTimerCommandMode(primaryDeviceId, (payload as any)?.mode);
+          if (!displayMode || !SYNC_MODE_TYPES.has(displayMode.type)) {
+            return NextResponse.json(
+              { success: false, error: 'Invalid game mode for synchronized set_timer command' },
+              { status: 400 }
+            );
+          }
+          const unsupportedDeviceIds = getUnsupportedThreePanelDeviceIds(devices, displayMode);
+          if (unsupportedDeviceIds.length > 0) {
+            return unsupportedThreePanelResponse(unsupportedDeviceIds);
+          }
+          const unsupportedBehaviorDeviceIds = getUnsupportedAdBehaviorDeviceIds(devices, displayMode);
+          if (unsupportedBehaviorDeviceIds.length > 0) {
+            return unsupportedAdBehaviorResponse(unsupportedBehaviorDeviceIds);
+          }
+          const timerAction = displayMode.sportDisplayLayout?.adMode === 'offset-on-timer-reset'
+            ? (payload as any)?.timerAction
+            : undefined;
+          const timerStateWithoutResetMetadata = stripPrimaryResetMetadata(rawTimerState);
+          const resolvedTargetTimerStates = await Promise.all(targetDeviceIds.map(async (deviceId) => (
+            [
+              deviceId,
+              await resolveTimerCommandState(deviceId, timerStateWithoutResetMetadata, timerAction),
+            ] as const
+          )));
+          const synchronizedAt = Date.now();
+          const targetTimerStates = new Map(resolvedTargetTimerStates.map(([deviceId, timerState]) => (
+            [deviceId, { ...timerState, lastUpdated: synchronizedAt }] as const
+          )));
+          const primaryTimerState = targetTimerStates.get(primaryDeviceId)!;
+          const modeResults = await emitToTargets(deviceNamespace, targetDeviceIds, 'mode:set', displayMode);
+          await persistDisplayModesForSuccessfulResults(modeResults, displayMode);
 
-        if (hasFailedResult(modeResults)) {
-          return commandResultsError(
-            type,
-            primaryDeviceId,
-            targetDeviceIds,
-            modeResults.map((result) => result.success
-              ? {
-                  deviceId: result.deviceId,
-                  success: false,
-                  error: 'Timer state was not dispatched because another selected device did not acknowledge mode:set',
-                }
-              : result)
-          );
-        }
+          if (hasFailedResult(modeResults)) {
+            return commandResultsError(
+              type,
+              primaryDeviceId,
+              targetDeviceIds,
+              modeResults.map((result) => result.success
+                ? {
+                    deviceId: result.deviceId,
+                    success: false,
+                    error: 'Timer state was not dispatched because another selected device did not acknowledge mode:set',
+                  }
+                : result)
+            );
+          }
 
-        const stateResults = await emitToTargets(deviceNamespace, targetDeviceIds, 'state:update', timerState);
-        const displayState = {
-          mode: displayMode.type,
-          deviceMode: displayMode,
-          timerState,
-          mediaAssetId: null,
-        };
-        await Promise.all(stateResults
-          .filter((result) => result.success)
-          .map((result) => persistTimerCommand(result.deviceId, displayState)));
+          const stateResults = await Promise.all(targetDeviceIds.map((deviceId) => (
+            emitDeviceCommandToDevice(
+              deviceNamespace,
+              deviceId,
+              'state:update',
+              targetTimerStates.get(deviceId)!
+            )
+          )));
+          await Promise.all(stateResults
+            .filter((result) => result.success)
+            .map((result) => persistTimerCommand(result.deviceId, {
+              mode: displayMode.type,
+              deviceMode: displayMode,
+              timerState: targetTimerStates.get(result.deviceId)!,
+              mediaAssetId: null,
+            })));
 
-        if (hasFailedResult(stateResults)) {
-          return commandResultsError(type, primaryDeviceId, targetDeviceIds, stateResults);
-        }
+          if (hasFailedResult(stateResults)) {
+            return commandResultsError(type, primaryDeviceId, targetDeviceIds, stateResults);
+          }
 
-        return commandResultsSuccess(type, primaryDeviceId, targetDeviceIds, stateResults);
+          return commandResultsSuccess(type, primaryDeviceId, targetDeviceIds, stateResults, {
+            mode: displayMode,
+            timerState: primaryTimerState,
+          });
+        });
       }
 
       case 'presentation': {
@@ -274,11 +311,29 @@ function getUnsupportedThreePanelDeviceIds(devices: SyncDevice[], mode: DeviceMo
     .map((device) => device.deviceId);
 }
 
+function getUnsupportedAdBehaviorDeviceIds(devices: SyncDevice[], mode: DeviceMode): string[] {
+  if (!sportDisplayLayoutUsesAdvancedBehavior(mode.sportDisplayLayout)) return [];
+  return devices
+    .filter((device) => !deviceSupportsCapability(device.capabilities, THREE_PANEL_AD_BEHAVIORS_CAPABILITY))
+    .map((device) => device.deviceId);
+}
+
 function unsupportedThreePanelResponse(unsupportedDeviceIds: string[]) {
   return NextResponse.json(
     {
       success: false,
       error: 'One or more displays require a software update for 3-section layouts',
+      unsupportedDeviceIds,
+    },
+    { status: 409 }
+  );
+}
+
+function unsupportedAdBehaviorResponse(unsupportedDeviceIds: string[]) {
+  return NextResponse.json(
+    {
+      success: false,
+      error: 'One or more displays require a software update for synchronized and timer-reset ad behaviors',
       unsupportedDeviceIds,
     },
     { status: 409 }
@@ -313,7 +368,8 @@ function commandResultsSuccess(
   command: GameCommandType,
   primaryDeviceId: string,
   targetDeviceIds: string[],
-  results: DeviceCommandResult[]
+  results: DeviceCommandResult[],
+  details: Record<string, unknown> = {}
 ) {
   return NextResponse.json({
     success: true,
@@ -321,6 +377,7 @@ function commandResultsSuccess(
     primaryDeviceId,
     targetDeviceIds,
     results,
+    ...details,
     dispatchedAt: new Date().toISOString(),
   });
 }

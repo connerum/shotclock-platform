@@ -28,6 +28,7 @@ export function createDefaultTimerState(now = Date.now()): TimerState {
     isRunning: false,
     isPaused: false,
     lastUpdated: now,
+    primaryResetSequence: 0,
   };
 }
 
@@ -50,6 +51,10 @@ export function normalizeTimerState(state: Partial<TimerState> | null | undefine
     lastUpdated: typeof state?.lastUpdated === 'number' && Number.isFinite(state.lastUpdated)
       ? state.lastUpdated
       : now,
+    primaryResetSequence: normalizeSequence(state?.primaryResetSequence),
+    ...(normalizeResetEventId(state?.primaryResetEventId)
+      ? { primaryResetEventId: normalizeResetEventId(state?.primaryResetEventId)! }
+      : {}),
   };
 }
 
@@ -147,4 +152,15 @@ export function rebaseTimerStateToLocalClock(state: TimerState, now = Date.now()
 
 function roundTimerDisplay(value: number): number {
   return Math.round(value * 100) / 100;
+}
+
+function normalizeSequence(value: number | undefined): number {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return 0;
+  return Math.max(0, Math.min(Number.MAX_SAFE_INTEGER, Math.floor(value)));
+}
+
+function normalizeResetEventId(value: string | undefined): string | null {
+  if (typeof value !== 'string') return null;
+  const normalized = value.trim();
+  return normalized ? normalized.slice(0, 128) : null;
 }

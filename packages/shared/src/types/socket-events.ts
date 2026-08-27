@@ -8,6 +8,7 @@ export type TimerMode = 'stop' | 'run' | 'pause';
 export type SportType = 'basketball' | 'wrestling' | 'volleyball';
 
 export const THREE_PANEL_SPORTS_ADS_CAPABILITY = 'three-panel-sports-ads';
+export const THREE_PANEL_AD_BEHAVIORS_CAPABILITY = 'three-panel-ad-behaviors';
 
 export type PracticeBoardUnit = 'offense' | 'defense';
 
@@ -212,6 +213,13 @@ export interface TimerState {
   isRunning: boolean;
   isPaused: boolean;
   lastUpdated: number;
+  primaryResetSequence?: number;
+  primaryResetEventId?: string;
+}
+
+export interface PrimaryClockResetAction {
+  kind: 'primary-clock-reset';
+  eventId: string;
 }
 
 // Display types
@@ -315,7 +323,13 @@ export interface SportDisplayLayout {
   type: 'three-panel';
   adPlaylist: SportDisplayMedia[];
   rotationIntervalMs?: number;
+  adMode?: SportDisplayAdMode;
 }
+
+export type SportDisplayAdMode =
+  | 'offset-timed'
+  | 'mirrored-timed'
+  | 'offset-on-timer-reset';
 
 export interface ScoreboardBranding {
   enabled: boolean;
