@@ -13,6 +13,8 @@ This document is the operational source of truth for the production server and e
 | Display 40092 support tunnel | server loopback `127.0.0.1:44092` | `shotclock-remote-support` |
 | Display 40100 | device `shotclock-95e17086` | `shotclock-agent`, `shotclock-kiosk` |
 | Display 40100 support tunnel | server loopback `127.0.0.1:44100` | `shotclock-remote-support` |
+| Legacy board (`dart@raspberrypi`) | device `shotclock-b4cd01b3`, serial `1639d968d7b496bb` | `shotclock-agent`, `shotclock-kiosk` |
+| Legacy board support tunnel | server loopback `127.0.0.1:44093` | `shotclock-remote-support` |
 
 ## Routine health checks
 
@@ -43,7 +45,7 @@ sudo journalctl -u shotclock-agent -u shotclock-kiosk --since today
 
 ## Recovery when normal WiFi is unavailable
 
-Each display preserves saved NetworkManager profiles. After one minute without a usable WiFi address it starts its maintenance network: `Shotclock-Setup-1e4b35` for 40091, `Shotclock-Setup-aa8f34` for 40092, or `Shotclock-Setup-95e170` for 40100. Each unique 12-character password is in the corresponding maintenance-AP password file in the handoff vault. A nearby operator can join that network without opening the LED panel, browse to `http://192.168.4.1:8080`, and select replacement WiFi. While connected to the maintenance AP, SSH is also available at `192.168.4.1` with the vaulted Pi key. SSH password login is disabled on all production machines; old bootstrap passwords are not remote access paths.
+Each display preserves saved NetworkManager profiles. After one minute without a usable WiFi address it starts its maintenance network: `Shotclock-Setup-1e4b35` for 40091, `Shotclock-Setup-aa8f34` for 40092, `Shotclock-Setup-95e170` for 40100, or `Shotclock-Setup-b4cd01` for the legacy board. Each unique 12-character password is in the corresponding maintenance-AP password file in the handoff vault. A nearby operator can join that network without opening the LED panel, browse to `http://192.168.4.1:8080`, and select replacement WiFi. While connected to the maintenance AP, SSH is also available at `192.168.4.1` with the vaulted Pi key. SSH password login is disabled on hardened production machines; the recovered legacy board retains password access temporarily until its local handoff is complete.
 
 While the maintenance AP is idle, firmware 1.2.19 and later briefly retries the saved WiFi profiles every two minutes. A successful retry restores CourtCast automatically; a failed retry restores the maintenance AP. The retry is deferred whenever a technician is connected to the AP so an active troubleshooting session is not interrupted. The display continues showing last-known content during an outage, with an `OFFLINE`, `NETWORK SETUP`, or `RECONNECTING` banner above non-emergency media.
 
