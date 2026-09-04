@@ -145,6 +145,9 @@ function resolveConnectivity(
   connectivity: DeviceConnectivityState | undefined,
   currentMode: KioskMode
 ): DeviceConnectivityState | undefined {
+  if (currentMode === 'setup' && connectivity?.status === 'online') {
+    return { status: 'setup', since: connectivity.since };
+  }
   if (connectivity) return connectivity;
   if (currentMode === 'offline') {
     return { status: 'offline', since: 0 };

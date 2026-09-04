@@ -21,6 +21,7 @@ test('emergency presentations remain higher priority than network status', async
   assert.match(app, /hidden=\{isEmergencyOverlay/);
   assert.match(app, /<PresentationOverlay[^]*<ConnectivityBanner/);
   assert.match(app, /currentMode === 'setup'[^]*status: 'setup'/);
+  assert.match(app, /currentMode === 'setup' && connectivity\?\.status === 'online'/);
 });
 
 test('maintenance AP periodically retries saved WiFi without interrupting an active technician', async () => {
@@ -44,4 +45,5 @@ test('automatic recovery preserves the last display mode and records connectivit
   assert.match(recovery, /preserveDisplay: true/);
   assert.match(recovery, /status: 'offline'/);
   assert.match(recovery, /status: 'setup'/);
+  assert.match(recovery, /config\.mode === 'setup'[^]*keeping WiFi setup status active/);
 });

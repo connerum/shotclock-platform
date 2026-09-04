@@ -38,8 +38,10 @@ export function clearNetworkRecovery(): void {
   }
   stopMaintenanceWifiRecovery();
   recoveryInProgress = false;
-  if (isPaired() && loadConfig().mode === 'setup') {
-    saveConfig({ mode: 'online' });
+  const config = loadConfig();
+  if (config.mode === 'setup') {
+    console.log('Server connection restored over a secondary interface; keeping WiFi setup status active');
+    return;
   }
   saveState({
     connectivity: {
